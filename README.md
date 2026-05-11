@@ -68,6 +68,17 @@ python tools\build_portable.py
 
 可攜版不需要安裝 Python、Git 或任何軟體。離線時仍可使用設備點位、聚合、搜尋與資訊窗；只有道路底圖需要網路才會顯示。
 
+### 離線道路底圖
+
+官方 OpenStreetMap 圖磚不允許大量預先下載作為離線包使用。若你有合法授權、允許離線/批次下載的圖磚來源，可以先下載到 `tiles\`，再重新產生可攜版：
+
+```powershell
+python tools\download_tiles.py --url-template "https://你的圖磚來源/{z}/{x}/{y}.png" --min-zoom 8 --max-zoom 15 --attribution "你的圖資來源" --yes-i-have-permission
+python tools\build_portable.py
+```
+
+產生後 `portable-map\tiles\` 會被一起放入 USB 版，離線時就會顯示本機道路底圖。
+
 ## 手動更新指令
 
 如果不使用腳本，也可以手動執行：

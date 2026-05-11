@@ -1,4 +1,5 @@
 const portableMode = Boolean(window.PORTABLE_MAP_POINTS && window.PORTABLE_MAP_META);
+const portableTiles = window.PORTABLE_TILE_MANIFEST || null;
 
 const map = L.map("map", {
   preferCanvas: true,
@@ -6,7 +7,15 @@ const map = L.map("map", {
   attributionControl: true,
 });
 
-if (portableMode) {
+if (portableMode && portableTiles) {
+  L.tileLayer("tiles/{z}/{x}/{y}.png", {
+    minZoom: portableTiles.minZoom,
+    maxZoom: portableTiles.maxZoom,
+    bounds: portableTiles.bounds,
+    noWrap: true,
+    attribution: portableTiles.attribution || "本機離線圖磚",
+  }).addTo(map);
+} else if (portableMode) {
   L.control
     .attribution({
       prefix: "Leaflet",

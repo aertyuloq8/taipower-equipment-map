@@ -38,7 +38,8 @@ def portable_html() -> str:
     html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
     html = html.replace("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", "assets/leaflet.css")
     html = html.replace('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>', '<script src="assets/leaflet.js"></script>')
-    html = html.replace('<script src="app.js"></script>', '<script src="portable/data.js"></script>\n    <script src="app.js"></script>')
+    manifest_script = '<script src="tiles/manifest.js"></script>\n    ' if (ROOT / "tiles" / "manifest.js").exists() else ""
+    html = html.replace('<script src="app.js"></script>', f'{manifest_script}<script src="portable/data.js"></script>\n    <script src="app.js"></script>')
     return html
 
 
@@ -93,6 +94,8 @@ def main() -> None:
     (DIST / "index.html").write_text(portable_html(), encoding="utf-8")
     shutil.copy2(ROOT / "web" / "app.js", DIST / "app.js")
     shutil.copy2(ROOT / "web" / "styles.css", DIST / "styles.css")
+    if (ROOT / "tiles").exists():
+        shutil.copytree(ROOT / "tiles", DIST / "tiles")
     write_portable_data()
     write_readme()
 
