@@ -11,12 +11,13 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const state = {
   meta: null,
+  points: null,
+  staticMode: new URLSearchParams(window.location.search).has("static") || !["localhost", "127.0.0.1"].includes(window.location.hostname),
   markers: L.layerGroup().addTo(map),
   labelLayer: L.layerGroup().addTo(map),
   selectedArea: "",
   searchText: "",
   requestId: 0,
-  activePoint: null,
 };
 
 const summary = document.querySelector("#summary");
@@ -26,8 +27,12 @@ const searchInput = document.querySelector("#searchInput");
 const fitButton = document.querySelector("#fitButton");
 const results = document.querySelector("#results");
 const resultTemplate = document.querySelector("#resultTemplate");
-
 const clusterIconCache = new Map();
+
+function assetPath(path) {
+  const prefix = window.location.pathname.includes("/web/") ? "../" : "";
+  return `${prefix}${path}`;
+}
 
 function formatNumber(value) {
   return new Intl.NumberFormat("zh-TW").format(value);
@@ -54,14 +59,24 @@ function debounce(fn, wait = 260) {
   };
 }
 
-function boundsParams() {
+function currentBounds() {
   const bounds = map.getBounds();
+  return {
+    south: bounds.getSouth(),
+    west: bounds.getWest(),
+    north: bounds.getNorth(),
+    east: bounds.getEast(),
+  };
+}
+
+function boundsParams() {
+  const bounds = currentBounds();
   const size = map.getSize();
   return new URLSearchParams({
-    south: bounds.getSouth().toFixed(7),
-    west: bounds.getWest().toFixed(7),
-    north: bounds.getNorth().toFixed(7),
-    east: bounds.getEast().toFixed(7),
+    south: bounds.south.toFixed(7),
+    west: bounds.west.toFixed(7),
+    north: bounds.north.toFixed(7),
+    east: bounds.east.toFixed(7),
     zoom: String(map.getZoom()),
     width: String(size.x),
     height: String(size.y),
@@ -71,12 +86,89 @@ function boundsParams() {
   });
 }
 
+function pointInBounds(point, bounds) {
+  return point.lat >= bounds.south && point.lat <= bounds.north && point.lng >= bounds.west && point.lng <= bounds.east;
+}
+
+function filteredStaticPoints(bounds = currentBounds()) {
+  const query = state.searchText.trim().toLowerCase();
+  return state.points.filter((point) => {
+    if (!pointInBounds(point, bounds)) return false;
+    if (state.selectedArea && point.area !== state.selectedArea) return false;
+    if (query && !point.name.toLowerCase().includes(query) && !point.code.toLowerCase().includes(query)) return false;
+    return true;
+  });
+}
+
+function clusterStaticPoints(points) {
+  const bounds = currentBounds();
+  const size = map.getSize();
+  const zoom = map.getZoom();
+  const cellPx = zoom <= 10 ? 72 : zoom <= 12 ? 60 : 48;
+  const latCell = Math.max((bounds.north - bounds.south) / Math.max(1, size.y / cellPx), 0.00008);
+  const lngCell = Math.max((bounds.east - bounds.west) / Math.max(1, size.x / cellPx), 0.00008);
+  const buckets = new Map();
+
+  for (const point of points) {
+    const key = `${Math.floor(point.lat / latCell)}:${Math.floor(point.lng / lngCell)}`;
+    const cluster = buckets.get(key);
+    if (cluster) {
+      cluster.count += 1;
+      cluster.latSum += point.lat;
+      cluster.lngSum += point.lng;
+      continue;
+    }
+    buckets.set(key, {
+      type: "cluster",
+      count: 1,
+      latSum: point.lat,
+      lngSum: point.lng,
+      sample: point.name,
+      area: point.area,
+    });
+  }
+
+  return [...buckets.values()].map((cluster) => ({
+    type: "cluster",
+    count: cluster.count,
+    lat: cluster.latSum / cluster.count,
+    lng: cluster.lngSum / cluster.count,
+    sample: cluster.sample,
+    area: cluster.area,
+  }));
+}
+
+function staticPointsPayload() {
+  const zoom = map.getZoom();
+  const limit = window.innerWidth < 760 ? 1000 : 2200;
+  const filtered = filteredStaticPoints();
+
+  if (zoom >= 15 || filtered.length <= limit) {
+    return {
+      mode: "points",
+      total: filtered.length,
+      returned: Math.min(filtered.length, limit),
+      items: filtered.slice(0, limit).map((point) => ({ ...point, type: "point" })),
+    };
+  }
+
+  let clusters = clusterStaticPoints(filtered);
+  if (clusters.length > limit) {
+    clusters = clusters.sort((a, b) => b.count - a.count).slice(0, limit);
+  }
+  return {
+    mode: "clusters",
+    total: filtered.length,
+    returned: clusters.length,
+    items: clusters,
+  };
+}
+
 function clusterIcon(count) {
   const bucket =
     count >= 10000 ? "10000" : count >= 5000 ? "5000" : count >= 1000 ? "1000" : count >= 500 ? "500" : count >= 100 ? "100" : count >= 20 ? "20" : "small";
-  if (clusterIconCache.has(bucket + count)) {
-    return clusterIconCache.get(bucket + count);
-  }
+  const cacheKey = `${bucket}:${count}`;
+  if (clusterIconCache.has(cacheKey)) return clusterIconCache.get(cacheKey);
 
   const size = Math.max(28, Math.min(62, 24 + Math.log10(count + 1) * 15));
   const color = count >= 1000 ? "#bf4e30" : count >= 100 ? "#d88922" : "#087f8c";
@@ -99,7 +191,7 @@ function clusterIcon(count) {
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
-  clusterIconCache.set(bucket + count, icon);
+  clusterIconCache.set(cacheKey, icon);
   return icon;
 }
 
@@ -176,9 +268,7 @@ function renderItems(payload) {
     marker.setLatLng([item.lat, item.lng]);
     marker.bindPopup(popupHtml(item));
     marker.addTo(state.markers);
-    if (showLabels) {
-      labelFor(item).addTo(state.labelLayer);
-    }
+    if (showLabels) labelFor(item).addTo(state.labelLayer);
   }
 
   const modeText = payload.mode === "clusters" ? "聚合顯示" : showLabels ? "顯示實際點與標籤" : "顯示實際點";
@@ -190,8 +280,15 @@ async function loadPoints() {
   if (!state.meta) return;
   const requestId = ++state.requestId;
   setStatus("讀取目前視窗資料...");
-  const response = await fetch(`/api/points?${boundsParams().toString()}`);
-  const payload = await response.json();
+
+  let payload;
+  if (state.staticMode) {
+    payload = staticPointsPayload();
+  } else {
+    const response = await fetch(`/api/points?${boundsParams().toString()}`);
+    payload = await response.json();
+  }
+
   if (requestId !== state.requestId) return;
   renderItems(payload);
 }
@@ -204,6 +301,7 @@ function fitAll() {
 }
 
 function fillAreas(areas) {
+  areaSelect.querySelectorAll("option:not(:first-child)").forEach((option) => option.remove());
   for (const area of areas || []) {
     const option = document.createElement("option");
     option.value = area.name;
@@ -226,13 +324,26 @@ function showResults(items) {
     fragment.querySelector("span").textContent = `${item.area || ""} / ${item.code || ""}`;
     button.addEventListener("click", () => {
       results.hidden = true;
-      state.activePoint = item;
       map.flyTo([item.lat, item.lng], 17, { duration: 0.45 });
       L.popup().setLatLng([item.lat, item.lng]).setContent(popupHtml({ ...item, type: "point" })).openOn(map);
     });
     results.append(fragment);
   }
   results.hidden = false;
+}
+
+function searchStaticItems(q) {
+  const query = q.trim().toLowerCase();
+  if (!query) return [];
+  const matches = [];
+  for (const point of state.points) {
+    if (state.selectedArea && point.area !== state.selectedArea) continue;
+    if (point.name.toLowerCase().includes(query) || point.code.toLowerCase().includes(query)) {
+      matches.push(point);
+      if (matches.length >= 20) break;
+    }
+  }
+  return matches;
 }
 
 async function searchNow() {
@@ -243,22 +354,35 @@ async function searchNow() {
     debouncedLoadPoints();
     return;
   }
-  const params = new URLSearchParams({
-    q,
-    area: state.selectedArea,
-    limit: "20",
-  });
-  const response = await fetch(`/api/search?${params.toString()}`);
-  const payload = await response.json();
-  showResults(payload.items);
+
+  if (state.staticMode) {
+    showResults(searchStaticItems(q));
+  } else {
+    const params = new URLSearchParams({ q, area: state.selectedArea, limit: "20" });
+    const response = await fetch(`/api/search?${params.toString()}`);
+    const payload = await response.json();
+    showResults(payload.items);
+  }
   debouncedLoadPoints();
 }
 
 const debouncedSearch = debounce(searchNow, 220);
 
+async function loadStaticData() {
+  setStatus("第一次載入 GitHub Pages 資料，請稍候...");
+  const [metaResponse, pointsResponse] = await Promise.all([fetch(assetPath("data/meta.json")), fetch(assetPath("data/points.json"))]);
+  state.meta = await metaResponse.json();
+  state.points = await pointsResponse.json();
+}
+
 async function init() {
-  const response = await fetch("/api/meta");
-  state.meta = await response.json();
+  if (state.staticMode) {
+    await loadStaticData();
+  } else {
+    const response = await fetch("/api/meta");
+    state.meta = await response.json();
+  }
+
   fillAreas(state.meta.areas);
   summary.textContent = `${formatNumber(state.meta.converted || state.meta.loaded)} 筆可用點位`;
   map.setView([23.7, 120.95], 8);
@@ -277,5 +401,5 @@ fitButton.addEventListener("click", fitAll);
 
 init().catch((error) => {
   console.error(error);
-  setStatus("資料載入失敗，請確認已執行轉換程式並啟動 server.py");
+  setStatus("資料載入失敗，請確認 data/points.json 是否存在，或本機 server.py 是否正在執行。");
 });
