@@ -1,39 +1,69 @@
 # 土木設備分布地圖
 
-這個資料夾已建立一個免費底圖的本機網頁地圖，用 OpenStreetMap 作為底圖來源，並把 Excel 的「圖號座標」轉成 WGS84 經緯度。
+這個專案將 Excel 的 `土木設備 / 圖號座標 / 區域` 轉成 WGS84 經緯度，並用 OpenStreetMap 顯示設備分布。
 
-## 使用方式
+線上 GitHub Pages：
 
-1. 轉換 Excel：
+```text
+https://aertyuloq8.github.io/taipower-equipment-map/
+```
 
-   ```powershell
-   python tools\convert_excel.py
-   ```
+## 功能
 
-2. 啟動地圖服務：
+- 全圖使用聚合點顯示，避免一次繪製 238,104 筆點位。
+- 放大到高倍率後顯示實際點位與 `土木設備` 標籤。
+- 點擊點位或標籤會打開資訊窗，資訊窗內有 `Google 導航` 和 `OSM 查看`。
+- 可依 `區域` 篩選，也可搜尋 `土木設備` 或 `圖號座標`。
+- 有 `定位` 按鈕，可跳到目前手機或電腦的位置。
+- 手機版搜尋/篩選區預設收折，避免佔用太多畫面。
 
-   ```powershell
-   python server.py
-   ```
+## 本機使用
 
-3. 用瀏覽器開啟：
+```powershell
+python server.py
+```
+
+然後開啟：
+
+```text
+http://127.0.0.1:8765
+```
+
+## 更新 Excel 資料並同步線上網頁
+
+1. 把新的 Excel 放到專案資料夾。
+2. Excel 欄位需包含：
 
    ```text
-   http://127.0.0.1:8765
+   土木設備    圖號座標    區域
    ```
 
-## 檔案說明
+3. 執行：
 
-- `tools/convert_excel.py`：讀取資料夾內最新的 Excel 檔，將 `土木設備 / 圖號座標 / 區域` 轉成 `data/points.json` 和 `data/points.csv`。
-- `server.py`：本機 API 與靜態網頁伺服器。地圖移動或縮放時，只回傳目前視窗內需要的資料。
-- `web/index.html`：地圖頁面。
-- `web/app.js`：地圖互動、搜尋、區域篩選、聚合顯示、放大後標籤。
-- `web/styles.css`：頁面樣式。
-- `data/meta.json`：轉換摘要與地圖範圍。
+   ```powershell
+   .\update_data.ps1
+   ```
 
-## 大量點位處理方式
+這個腳本會：
 
-- 低倍率與中倍率：API 依目前地圖視窗做格網聚合，只顯示群集數量。
-- 高倍率：只在視窗內點位量合理時回傳實際設備點。
-- 標籤：放大到 16 級以上才顯示 `土木設備` 標籤，避免 238,104 筆標籤同時進入瀏覽器。
-- 搜尋：可用 `土木設備` 或 `圖號座標` 快速定位。
+- 重新執行 `tools\convert_excel.py`
+- 更新 `data\points.json`、`data\points.csv`、`data\meta.json`
+- 建立 Git commit
+- 推送到 GitHub
+
+推送完成後，GitHub Pages 通常會在 1 到 3 分鐘內自動更新。
+
+## 手動更新指令
+
+如果不使用腳本，也可以手動執行：
+
+```powershell
+python tools\convert_excel.py
+git add data\points.json data\points.csv data\meta.json
+git commit -m "Update map data"
+git push
+```
+
+## 注意
+
+GitHub Pages 是公開網站；若 repository 設為公開，`data/points.json` 裡的設備座標也會公開可下載。

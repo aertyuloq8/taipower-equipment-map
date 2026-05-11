@@ -14,7 +14,11 @@
           <strong>土木設備分布地圖</strong>
           <span id="summary">載入資料中...</span>
         </div>
-        <div class="controls">
+        <div class="toolbar-actions">
+          <button id="locateButton" class="secondary-button" type="button" title="定位目前位置">定位</button>
+          <button id="filterToggle" class="filter-toggle" type="button" aria-expanded="false" aria-controls="mapControls">搜尋/篩選</button>
+        </div>
+        <div id="mapControls" class="controls">
           <label>
             <span>區域</span>
             <select id="areaSelect">

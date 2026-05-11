@@ -77,6 +77,12 @@ label span {
   justify-content: flex-end;
 }
 
+.toolbar-actions {
+  align-items: end;
+  display: flex;
+  gap: 10px;
+}
+
 label {
   display: grid;
   gap: 4px;
@@ -113,6 +119,26 @@ button {
 
 button:hover {
   background: var(--accent-strong);
+}
+
+button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.secondary-button,
+.filter-toggle {
+  background: #ffffff;
+  color: var(--accent-strong);
+}
+
+.secondary-button:hover,
+.filter-toggle:hover {
+  background: #eef8f9;
+}
+
+.filter-toggle {
+  display: none;
 }
 
 .map-wrap {
@@ -198,10 +224,9 @@ button:hover {
   white-space: nowrap;
 }
 
-.point-label-link {
+.point-label-text {
   color: inherit;
   display: block;
-  text-decoration: none;
 }
 
 .leaflet-popup-content {
@@ -247,6 +272,7 @@ button:hover {
     align-items: stretch;
     display: grid;
     gap: 10px;
+    grid-template-columns: 1fr auto;
     min-height: 0;
     padding: 10px;
   }
@@ -259,10 +285,31 @@ button:hover {
     font-size: 16px;
   }
 
+  .toolbar-actions {
+    align-items: center;
+    justify-content: end;
+  }
+
   .controls {
-    display: grid;
+    display: none;
+    grid-column: 1 / -1;
     grid-template-columns: 1fr 1fr auto;
     width: 100%;
+  }
+
+  .controls.is-open {
+    display: grid;
+  }
+
+  .filter-toggle {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .secondary-button,
+  .filter-toggle {
+    min-height: 36px;
+    padding: 0 10px;
   }
 
   select,

@@ -25,9 +25,14 @@ const statusBox = document.querySelector("#status");
 const areaSelect = document.querySelector("#areaSelect");
 const searchInput = document.querySelector("#searchInput");
 const fitButton = document.querySelector("#fitButton");
+const locateButton = document.querySelector("#locateButton");
+const filterToggle = document.querySelector("#filterToggle");
+const mapControls = document.querySelector("#mapControls");
 const results = document.querySelector("#results");
 const resultTemplate = document.querySelector("#resultTemplate");
 const clusterIconCache = new Map();
+let locationMarker = null;
+let locationCircle = null;
 
 function assetPath(path) {
   const prefix = window.location.pathname.includes("/web/") ? "../" : "";
@@ -234,17 +239,20 @@ function popupHtml(item) {
 }
 
 function labelFor(item) {
-  return L.marker([item.lat, item.lng], {
+  const marker = L.marker([item.lat, item.lng], {
     interactive: true,
     keyboard: true,
-    title: `${item.name || "設備"} 導航`,
+    title: item.name || "設備",
     icon: L.divIcon({
       className: "point-label",
-      html: `<a class="point-label-link" href="${googleNavUrl(item)}" target="_blank" rel="noopener">${escapeHtml(item.name || "")}</a>`,
+      html: `<span class="point-label-text">${escapeHtml(item.name || "")}</span>`,
       iconSize: null,
       iconAnchor: [-8, 20],
     }),
   });
+  marker.bindPopup(popupHtml(item));
+  marker.on("click", () => marker.openPopup());
+  return marker;
 }
 
 function renderItems(payload) {
@@ -368,6 +376,65 @@ async function searchNow() {
 
 const debouncedSearch = debounce(searchNow, 220);
 
+function setControlsOpen(open) {
+  mapControls.classList.toggle("is-open", open);
+  filterToggle.setAttribute("aria-expanded", String(open));
+}
+
+function locateCurrentPosition() {
+  if (!navigator.geolocation) {
+    setStatus("此瀏覽器不支援目前位置定位。");
+    return;
+  }
+
+  locateButton.disabled = true;
+  setStatus("正在定位目前位置...");
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const latlng = [latitude, longitude];
+      if (!locationMarker) {
+        locationMarker = L.circleMarker(latlng, {
+          radius: 7,
+          color: "#ffffff",
+          weight: 2,
+          fillColor: "#2563eb",
+          fillOpacity: 0.95,
+        }).addTo(map);
+      } else {
+        locationMarker.setLatLng(latlng);
+      }
+
+      if (!locationCircle) {
+        locationCircle = L.circle(latlng, {
+          radius: accuracy || 30,
+          color: "#2563eb",
+          weight: 1,
+          fillColor: "#2563eb",
+          fillOpacity: 0.12,
+        }).addTo(map);
+      } else {
+        locationCircle.setLatLng(latlng);
+        locationCircle.setRadius(accuracy || 30);
+      }
+
+      locationMarker.bindPopup(`<div class="popup-title">目前位置</div><div class="popup-meta">精準度：約 ${Math.round(accuracy || 0)} 公尺</div>`).openPopup();
+      map.flyTo(latlng, Math.max(map.getZoom(), 16), { duration: 0.45 });
+      setStatus(`已定位目前位置，精準度約 ${Math.round(accuracy || 0)} 公尺。`);
+      locateButton.disabled = false;
+    },
+    () => {
+      setStatus("無法取得目前位置，請確認瀏覽器定位權限已允許。");
+      locateButton.disabled = false;
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 30000,
+    },
+  );
+}
+
 async function loadStaticData() {
   setStatus("第一次載入 GitHub Pages 資料，請稍候...");
   const [metaResponse, pointsResponse] = await Promise.all([fetch(assetPath("data/meta.json")), fetch(assetPath("data/points.json"))]);
@@ -398,6 +465,10 @@ areaSelect.addEventListener("change", () => {
 });
 searchInput.addEventListener("input", debouncedSearch);
 fitButton.addEventListener("click", fitAll);
+locateButton.addEventListener("click", locateCurrentPosition);
+filterToggle.addEventListener("click", () => {
+  setControlsOpen(!mapControls.classList.contains("is-open"));
+});
 
 init().catch((error) => {
   console.error(error);
