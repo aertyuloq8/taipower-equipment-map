@@ -53,6 +53,21 @@ http://127.0.0.1:8765
 
 推送完成後，GitHub Pages 通常會在 1 到 3 分鐘內自動更新。
 
+## 產生 USB 可攜版
+
+執行：
+
+```powershell
+python tools\build_portable.py
+```
+
+會產生：
+
+- `portable-map\`：整個資料夾可複製到 USB，直接雙擊 `index.html` 開啟。
+- `portable-map.zip`：同一份可攜版壓縮檔。
+
+可攜版不需要安裝 Python、Git 或任何軟體。離線時仍可使用設備點位、聚合、搜尋與資訊窗；只有道路底圖需要網路才會顯示。
+
 ## 手動更新指令
 
 如果不使用腳本，也可以手動執行：

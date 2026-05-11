@@ -1,18 +1,29 @@
+const portableMode = Boolean(window.PORTABLE_MAP_POINTS && window.PORTABLE_MAP_META);
+
 const map = L.map("map", {
   preferCanvas: true,
   zoomControl: true,
   attributionControl: true,
 });
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-}).addTo(map);
+if (portableMode) {
+  L.control
+    .attribution({
+      prefix: "Leaflet",
+    })
+    .addAttribution("離線可攜版：道路底圖需網路")
+    .addTo(map);
+} else {
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
+}
 
 const state = {
   meta: null,
   points: null,
-  staticMode: new URLSearchParams(window.location.search).has("static") || !["localhost", "127.0.0.1"].includes(window.location.hostname),
+  staticMode: portableMode || new URLSearchParams(window.location.search).has("static") || !["localhost", "127.0.0.1"].includes(window.location.hostname),
   markers: L.layerGroup().addTo(map),
   labelLayer: L.layerGroup().addTo(map),
   selectedArea: "",
@@ -436,6 +447,13 @@ function locateCurrentPosition() {
 }
 
 async function loadStaticData() {
+  if (portableMode) {
+    setStatus("載入 USB 可攜版資料...");
+    state.meta = window.PORTABLE_MAP_META;
+    state.points = window.PORTABLE_MAP_POINTS;
+    return;
+  }
+
   setStatus("第一次載入 GitHub Pages 資料，請稍候...");
   const [metaResponse, pointsResponse] = await Promise.all([fetch(assetPath("data/meta.json")), fetch(assetPath("data/points.json"))]);
   state.meta = await metaResponse.json();
