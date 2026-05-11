@@ -1,0 +1,296 @@
+:root {
+  --bg: #f5f7f9;
+  --panel: #ffffff;
+  --text: #17202a;
+  --muted: #647080;
+  --border: #d9e0e7;
+  --accent: #087f8c;
+  --accent-strong: #0b5f6a;
+  --danger: #bf4e30;
+  --shadow: 0 8px 22px rgba(21, 38, 54, 0.13);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+.app-shell {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "Microsoft JhengHei",
+    "Noto Sans TC",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.toolbar {
+  align-items: center;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 12px 16px;
+  position: relative;
+  z-index: 5;
+}
+
+.brand {
+  display: grid;
+  gap: 3px;
+  min-width: 210px;
+}
+
+.brand strong {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.brand span,
+label span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.controls {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+}
+
+select,
+input,
+button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  min-height: 38px;
+}
+
+select,
+input {
+  background: #fff;
+  color: var(--text);
+  min-width: 150px;
+  padding: 0 10px;
+}
+
+.search-box input {
+  min-width: 210px;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 14px;
+}
+
+button:hover {
+  background: var(--accent-strong);
+}
+
+.map-wrap {
+  min-height: 0;
+  position: relative;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+}
+
+.status {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  bottom: 18px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+  left: 50%;
+  max-width: min(90vw, 520px);
+  padding: 9px 12px;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 500;
+}
+
+.results {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: min(360px, calc(100vw - 32px));
+  z-index: 510;
+}
+
+.result-item {
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
+  display: grid;
+  font-weight: 400;
+  gap: 4px;
+  min-height: auto;
+  padding: 10px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.result-item:hover {
+  background: #eef8f9;
+  color: var(--text);
+}
+
+.result-item strong {
+  font-size: 14px;
+}
+
+.result-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.point-label {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(8, 127, 140, 0.35);
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(21, 38, 54, 0.18);
+  color: #12272b;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+  padding: 3px 5px;
+  white-space: nowrap;
+}
+
+.point-label-link {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+}
+
+.leaflet-popup-content {
+  line-height: 1.45;
+  margin: 12px 14px;
+}
+
+.popup-title {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.popup-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.popup-actions a {
+  background: var(--accent);
+  border-radius: 6px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 32px;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.popup-actions a:hover {
+  background: var(--accent-strong);
+}
+
+@media (max-width: 760px) {
+  .toolbar {
+    align-items: stretch;
+    display: grid;
+    gap: 10px;
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .brand strong {
+    font-size: 16px;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    width: 100%;
+  }
+
+  select,
+  input,
+  .search-box input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .status {
+    bottom: 12px;
+    font-size: 12px;
+  }
+
+  .results {
+    left: 10px;
+    right: 10px;
+    top: 10px;
+    width: auto;
+  }
+}
+
+@media (max-width: 460px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  #fitButton {
+    width: 100%;
+  }
+}

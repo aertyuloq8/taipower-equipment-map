@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>土木設備分布地圖</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/web/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="toolbar" aria-label="地圖工具">
+        <div class="brand">
+          <strong>土木設備分布地圖</strong>
+          <span id="summary">載入資料中...</span>
+        </div>
+        <div class="controls">
+          <label>
+            <span>區域</span>
+            <select id="areaSelect">
+              <option value="">全部</option>
+            </select>
+          </label>
+          <label class="search-box">
+            <span>搜尋</span>
+            <input id="searchInput" type="search" placeholder="設備或圖號" autocomplete="off" />
+          </label>
+          <button id="fitButton" type="button" title="回到所有資料範圍">全圖</button>
+        </div>
+      </section>
+      <section class="map-wrap">
+        <div id="map" aria-label="土木設備地圖"></div>
+        <div id="status" class="status">準備中...</div>
+        <div id="results" class="results" hidden></div>
+      </section>
+    </main>
+
+    <template id="resultTemplate">
+      <button type="button" class="result-item">
+        <strong></strong>
+        <span></span>
+      </button>
+    </template>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/web/app.js"></script>
+  </body>
+</html>
