@@ -67,7 +67,7 @@ def write_readme() -> None:
 - 離線時，道路底圖無法從 OpenStreetMap 下載，但設備點位、圖號前綴標籤、搜尋、標籤與資訊窗仍可使用。
 - 若已使用 `tools\\download_tiles.py` 下載合法授權的圖磚，USB 版會優先使用本機離線圖磚。
 - 若電腦有網路，請使用線上 GitHub Pages 版本，會有完整道路底圖。
-- 瀏覽器定位功能可能需要 HTTPS 或瀏覽器權限；離線 file 模式下部分瀏覽器可能不允許定位。
+- 地圖右上角的定位功能可能需要 HTTPS 或瀏覽器權限；離線 file 模式下部分瀏覽器可能不允許定位。
 """
     (DIST / "README.txt").write_text(text, encoding="utf-8")
 

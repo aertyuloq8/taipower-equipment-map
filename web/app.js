@@ -58,6 +58,9 @@ const panelToggle = document.querySelector("#panelToggle");
 let labelsLayer = L.layerGroup().addTo(map);
 let locationMarker = null;
 let locationCircle = null;
+let locationWatchId = null;
+let locationActive = false;
+let locationHasCentered = false;
 
 function formatNumber(value) {
   return new Intl.NumberFormat("zh-TW").format(value);
@@ -559,56 +562,98 @@ function findNearestPoint(event) {
   return best;
 }
 
-function locateCurrentPosition() {
+function setLocateButton(active, loading = false) {
+  locateButton.disabled = loading;
+  locateButton.classList.toggle("is-active", active);
+  locateButton.setAttribute("aria-pressed", String(active));
+  locateButton.textContent = loading ? "定位中" : active ? "關閉定位" : "定位";
+  locateButton.title = active ? "關閉目前位置顯示" : "定位目前位置";
+}
+
+function clearLocation() {
+  if (locationWatchId !== null) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+  }
+  if (locationMarker) {
+    map.removeLayer(locationMarker);
+    locationMarker = null;
+  }
+  if (locationCircle) {
+    map.removeLayer(locationCircle);
+    locationCircle = null;
+  }
+  locationActive = false;
+  locationHasCentered = false;
+  setLocateButton(false);
+  setStatus("已關閉目前位置顯示。");
+}
+
+function updateCurrentPosition(position) {
+  const { latitude, longitude, accuracy } = position.coords;
+  const latlng = [latitude, longitude];
+  if (!locationMarker) {
+    locationMarker = L.circleMarker(latlng, {
+      radius: 7,
+      color: "#fff",
+      weight: 2,
+      fillColor: "#2563eb",
+      fillOpacity: 0.95,
+    }).addTo(map);
+  } else {
+    locationMarker.setLatLng(latlng);
+  }
+  if (!locationCircle) {
+    locationCircle = L.circle(latlng, {
+      radius: accuracy || 30,
+      color: "#2563eb",
+      weight: 1,
+      fillColor: "#2563eb",
+      fillOpacity: 0.12,
+    }).addTo(map);
+  } else {
+    locationCircle.setLatLng(latlng);
+    locationCircle.setRadius(accuracy || 30);
+  }
+  locationActive = true;
+  setLocateButton(true);
+  if (!locationHasCentered) {
+    locationHasCentered = true;
+    map.flyTo(latlng, Math.max(map.getZoom(), 17), { duration: 0.45 });
+  }
+  setStatus(`定位已開啟，精準度約 ${Math.round(accuracy || 0)} 公尺；藍色圓圈為可能誤差範圍。`);
+}
+
+function toggleCurrentPosition() {
+  if (locationActive || locationWatchId !== null) {
+    clearLocation();
+    return;
+  }
   if (!navigator.geolocation) {
     setStatus("此瀏覽器不支援定位。");
     return;
   }
-  locateButton.disabled = true;
-  setStatus("正在定位目前位置...");
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const { latitude, longitude, accuracy } = position.coords;
-      const latlng = [latitude, longitude];
-      if (!locationMarker) {
-        locationMarker = L.circleMarker(latlng, {
-          radius: 7,
-          color: "#fff",
-          weight: 2,
-          fillColor: "#2563eb",
-          fillOpacity: 0.95,
-        }).addTo(map);
-      } else {
-        locationMarker.setLatLng(latlng);
-      }
-      if (!locationCircle) {
-        locationCircle = L.circle(latlng, {
-          radius: accuracy || 30,
-          color: "#2563eb",
-          weight: 1,
-          fillColor: "#2563eb",
-          fillOpacity: 0.12,
-        }).addTo(map);
-      } else {
-        locationCircle.setLatLng(latlng);
-        locationCircle.setRadius(accuracy || 30);
-      }
-      map.flyTo(latlng, Math.max(map.getZoom(), 16), { duration: 0.45 });
-      setStatus(`已定位目前位置，精準度約 ${Math.round(accuracy || 0)} 公尺。`);
-      locateButton.disabled = false;
-    },
+  locationHasCentered = false;
+  setLocateButton(false, true);
+  setStatus("正在啟動高精準度定位...");
+  locationWatchId = navigator.geolocation.watchPosition(
+    updateCurrentPosition,
     () => {
       setStatus("無法取得目前位置，請確認瀏覽器定位權限。");
-      locateButton.disabled = false;
+      if (locationWatchId !== null) {
+        navigator.geolocation.clearWatch(locationWatchId);
+        locationWatchId = null;
+      }
+      setLocateButton(false);
     },
-    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
   );
 }
 
 areaSelect.addEventListener("change", applyFilter);
 searchInput.addEventListener("input", debounce(applyFilter, 180));
 fitButton.addEventListener("click", fitAll);
-locateButton.addEventListener("click", locateCurrentPosition);
+locateButton.addEventListener("click", toggleCurrentPosition);
 function setPanelCollapsed(collapsed) {
   panel.classList.toggle("is-collapsed", collapsed);
   app.classList.toggle("is-panel-collapsed", collapsed);
