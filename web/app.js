@@ -1,28 +1,15 @@
-const portableMode = Boolean(window.PORTABLE_MAP_POINTS && window.PORTABLE_MAP_META);
-const portableTiles = window.PORTABLE_TILE_MANIFEST || null;
-
 const map = L.map("map", {
   preferCanvas: true,
-  zoomControl: true,
+  zoomControl: false,
   attributionControl: true,
 });
 
-if (portableMode && portableTiles) {
-  L.tileLayer("tiles/{z}/{x}/{y}.png", {
-    minZoom: portableTiles.minZoom,
-    maxZoom: portableTiles.maxZoom,
-    bounds: portableTiles.bounds,
-    noWrap: true,
-    attribution: portableTiles.attribution || "本機離線圖磚",
-  }).addTo(map);
-} else if (portableMode) {
-  L.control.attribution({ prefix: "Leaflet" }).addAttribution("離線可攜版：道路底圖需網路").addTo(map);
-} else {
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  }).addTo(map);
-}
+L.control.zoom({ position: "bottomright" }).addTo(map);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(map);
 
 const SHOW_POINTS_ZOOM = 15;
 const MAX_POINT_LABELS = 1200;
@@ -678,14 +665,9 @@ map.on("click", (event) => {
 
 async function init() {
   setStatus("載入 238,104 筆設備資料...");
-  if (portableMode) {
-    state.meta = window.PORTABLE_MAP_META;
-    state.points = window.PORTABLE_MAP_POINTS;
-  } else {
-    const [metaResponse, pointsResponse] = await Promise.all([fetch("../data/meta.json"), fetch("../data/points.json")]);
-    state.meta = await metaResponse.json();
-    state.points = await pointsResponse.json();
-  }
+  const [metaResponse, pointsResponse] = await Promise.all([fetch("../data/meta.json"), fetch("../data/points.json")]);
+  state.meta = await metaResponse.json();
+  state.points = await pointsResponse.json();
   state.prefixTotal = new Set(state.points.map((point) => codePrefix(point.code))).size;
   fillAreas();
   renderResults([]);
@@ -696,5 +678,5 @@ async function init() {
 
 init().catch((error) => {
   console.error(error);
-  setStatus("資料載入失敗，請確認是從 GitHub Pages、本機伺服器或 USB 可攜版開啟。");
+  setStatus("資料載入失敗，請確認是從 GitHub Pages 或本機伺服器開啟。");
 });

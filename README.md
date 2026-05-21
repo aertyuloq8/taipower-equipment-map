@@ -56,32 +56,6 @@ http://127.0.0.1:8765
 
 推送完成後，GitHub Pages 通常會在 1 到 3 分鐘內自動更新。網頁程式在 `web\`，Excel 更新時只要資料欄位不變，不需要另外修改網頁。
 
-## 產生 USB 可攜版
-
-執行：
-
-```powershell
-python tools\build_portable.py
-```
-
-會產生：
-
-- `portable-map\`：整個資料夾可複製到 USB，直接雙擊 `index.html` 開啟。
-- `portable-map.zip`：同一份可攜版壓縮檔。
-
-可攜版不需要安裝 Python、Git 或任何軟體。離線時仍可使用設備點位、圖號前綴標籤、搜尋、標籤與資訊窗；只有道路底圖需要網路或預先下載好的離線圖磚才會顯示。
-
-### 離線道路底圖
-
-官方 OpenStreetMap 圖磚不允許大量預先下載作為離線包使用。`tools\download_tiles.py` 預設使用內政部國土測繪中心圖磚；若你改用其他來源，請先確認該來源允許離線/批次下載。
-
-```powershell
-python tools\download_tiles.py --min-zoom 8 --max-zoom 15
-python tools\build_portable.py
-```
-
-若要改用其他合法授權圖磚，可自行帶入 `--url-template` 與 `--attribution`。產生後 `portable-map\tiles\` 會被一起放入 USB 版，離線時就會顯示本機道路底圖。
-
 ## 手動更新指令
 
 如果不使用腳本，也可以手動執行：

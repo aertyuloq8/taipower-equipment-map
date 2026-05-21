@@ -10,6 +10,7 @@
   --red: #bf4e30;
   --blue: #2563eb;
   --shadow: 0 12px 36px rgba(22, 36, 52, 0.16);
+  --control-z: 900;
 }
 
 * {
@@ -271,7 +272,7 @@ input {
   position: absolute;
   right: 14px;
   top: 14px;
-  z-index: 650;
+  z-index: var(--control-z);
 }
 
 .map-locate-button:hover {
@@ -377,7 +378,7 @@ input {
     transform: translateX(0);
     transition: transform 180ms ease;
     width: min(88vw, 380px);
-    z-index: 700;
+    z-index: calc(var(--control-z) + 10);
   }
 
   .panel.is-collapsed {
@@ -399,6 +400,10 @@ input {
   .panel.is-collapsed .panel-head {
     justify-content: flex-end;
     padding: 12px 10px;
+  }
+
+  .leaflet-bottom.leaflet-right {
+    bottom: 70px;
   }
 
   .color-guide {
