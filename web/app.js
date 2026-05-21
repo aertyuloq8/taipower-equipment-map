@@ -420,11 +420,6 @@ function updateStats() {
   totalCount.textContent = formatNumber(state.points.length);
   visibleCount.textContent = formatNumber(state.visiblePoints.length);
   drawCount.textContent = formatNumber(state.drawnItems.length);
-  if (state.displayMode === "point") {
-    setStatus(`點位標籤：視窗內 ${formatNumber(state.visiblePoints.length)} 筆，顯示 ${formatNumber(state.drawnItems.length)} 個點位；相近中文前綴會盡量避色，無中文前綴為灰色`);
-  } else {
-    setStatus(`圖號前綴：視窗內 ${formatNumber(state.visiblePoints.length)} 筆，顯示 ${formatNumber(state.drawnItems.length)} 個前綴標籤；顏色用來分辨前綴，筆數看標籤數字`);
-  }
 }
 
 function updateLabels() {
@@ -674,6 +669,7 @@ async function init() {
   map.setView([23.7, 120.95], 8);
   fitAll();
   renderer.redraw();
+  setStatus("");
 }
 
 init().catch((error) => {

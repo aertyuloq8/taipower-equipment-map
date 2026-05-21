@@ -45,7 +45,7 @@ body {
 }
 
 .app.is-panel-collapsed {
-  grid-template-columns: 58px 1fr;
+  grid-template-columns: 0 1fr;
 }
 
 .panel {
@@ -60,9 +60,22 @@ body {
   z-index: 600;
 }
 
+.panel.is-collapsed {
+  background: transparent;
+  border-right: 0;
+  box-shadow: none;
+  overflow: visible;
+  pointer-events: none;
+}
+
 .panel.is-collapsed .panel-head {
-  justify-content: center;
+  justify-content: flex-start;
   padding: 12px 9px;
+  width: 58px;
+}
+
+.panel.is-collapsed #panelToggle {
+  pointer-events: auto;
 }
 
 .panel.is-collapsed .panel-head > div,
@@ -309,6 +322,10 @@ input {
   z-index: 500;
 }
 
+.status:empty {
+  display: none;
+}
+
 .popup-title {
   font-weight: 900;
   margin-bottom: 4px;
@@ -382,8 +399,12 @@ input {
   }
 
   .panel.is-collapsed {
+    background: transparent;
+    border-right: 0;
+    box-shadow: none;
     max-height: none;
-    transform: translateX(calc(-100% + 58px));
+    transform: none;
+    width: 0;
   }
 
   .panel.is-collapsed .stats,
@@ -398,12 +419,22 @@ input {
   }
 
   .panel.is-collapsed .panel-head {
-    justify-content: flex-end;
-    padding: 12px 10px;
+    justify-content: flex-start;
+    padding: 12px 9px;
+    width: 58px;
   }
 
   .leaflet-bottom.leaflet-right {
-    bottom: 70px;
+    bottom: env(safe-area-inset-bottom, 0);
+    right: env(safe-area-inset-right, 0);
+  }
+
+  .leaflet-bottom .leaflet-control {
+    margin-bottom: 6px;
+  }
+
+  .leaflet-right .leaflet-control {
+    margin-right: 6px;
   }
 
   .color-guide {
