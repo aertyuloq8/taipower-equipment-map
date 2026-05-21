@@ -8,34 +8,73 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <section class="toolbar" aria-label="地圖工具">
-        <div class="brand">
-          <strong>土木設備分布地圖</strong>
-          <span id="summary">載入資料中...</span>
-        </div>
-        <div class="toolbar-actions">
-          <button id="locateButton" class="secondary-button" type="button" title="定位目前位置">定位</button>
-          <button id="filterToggle" class="filter-toggle" type="button" aria-expanded="false" aria-controls="mapControls">搜尋/篩選</button>
-        </div>
-        <div id="mapControls" class="controls">
+    <main class="app">
+      <aside id="panel" class="panel">
+        <header class="panel-head">
+          <div>
+            <p class="eyebrow">免費地圖</p>
+            <h1>土木設備分布地圖</h1>
+          </div>
+          <button id="panelToggle" class="icon-button" type="button" aria-expanded="true" title="收合面板">≡</button>
+        </header>
+
+        <section class="stats" aria-label="資料摘要">
+          <div>
+            <span>總點位</span>
+            <strong id="totalCount">--</strong>
+          </div>
+          <div>
+            <span>目前視窗</span>
+            <strong id="visibleCount">--</strong>
+          </div>
+          <div>
+            <span>顯示標籤</span>
+            <strong id="drawCount">--</strong>
+          </div>
+        </section>
+
+        <section class="tools" aria-label="地圖工具">
           <label>
             <span>區域</span>
             <select id="areaSelect">
-              <option value="">全部</option>
+              <option value="">全部區域</option>
             </select>
           </label>
-          <label class="search-box">
-            <span>搜尋</span>
-            <input id="searchInput" type="search" placeholder="設備或圖號" autocomplete="off" />
+
+          <label>
+            <span>搜尋設備或圖號</span>
+            <input id="searchInput" type="search" placeholder="例如 Q1295.Q1395.尖峰.觀音" autocomplete="off" />
           </label>
-          <button id="fitButton" type="button" title="回到所有資料範圍">全圖</button>
-        </div>
-      </section>
-      <section class="map-wrap">
-        <div id="map" aria-label="土木設備地圖"></div>
-        <div id="status" class="status">準備中...</div>
-        <div id="results" class="results" hidden></div>
+
+          <div class="button-row">
+            <button id="fitButton" type="button">全圖</button>
+            <button id="locateButton" type="button">定位</button>
+          </div>
+        </section>
+
+        <section class="color-guide" aria-label="標籤顏色說明">
+          <h2>標籤顏色</h2>
+          <p>縮小時顏色分辨圖號前綴；放大後會依畫面位置替設備中文前綴避色，無中文前綴統一灰色。</p>
+          <div class="swatches" aria-hidden="true">
+            <span style="--swatch: #0f766e"></span>
+            <span style="--swatch: #2563eb"></span>
+            <span style="--swatch: #7c3aed"></span>
+            <span style="--swatch: #be123c"></span>
+            <span style="--swatch: #c2410c"></span>
+            <span style="--swatch: #15803d"></span>
+            <span style="--swatch: #64748b"></span>
+          </div>
+        </section>
+
+        <section class="results-wrap">
+          <h2>搜尋結果</h2>
+          <div id="results" class="results"></div>
+        </section>
+      </aside>
+
+      <section class="map-shell">
+        <div id="map"></div>
+        <div id="status" class="status">載入資料中...</div>
       </section>
     </main>
 

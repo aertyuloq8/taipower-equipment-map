@@ -2,6 +2,8 @@ __pycache__/
 *.py[cod]
 portable-map/
 portable-map.zip
+tiles/
+v2/
 ~$*.xls*
 *.xls*
 .DS_Store

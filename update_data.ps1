@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+Set-Location -Path $PSScriptRoot
 
 Write-Host "1/4 Convert Excel to map data..."
 python tools\convert_excel.py
