@@ -80,7 +80,11 @@ body {
   align-items: start;
   display: flex;
   justify-content: space-between;
-  padding: 18px 18px 12px;
+  padding: 64px 18px 12px;
+}
+
+.panel-title {
+  min-width: 0;
 }
 
 .panel-toggle-button {
@@ -89,14 +93,6 @@ body {
   position: fixed;
   top: calc(12px + env(safe-area-inset-top, 0px));
   z-index: calc(var(--control-z) + 30);
-}
-
-.eyebrow {
-  color: var(--accent-dark);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-  margin: 0 0 4px;
 }
 
 h1,
@@ -413,7 +409,7 @@ input {
   }
 
   .panel-head {
-    padding: 12px 14px;
+    padding: 62px 14px 12px;
   }
 
   .leaflet-bottom.leaflet-right {
@@ -465,7 +461,7 @@ input {
   }
 
   .panel-head {
-    padding: 8px 12px;
+    padding: 58px 12px 10px;
   }
 
   .stats {
