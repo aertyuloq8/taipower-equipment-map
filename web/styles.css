@@ -64,18 +64,8 @@ body {
   background: transparent;
   border-right: 0;
   box-shadow: none;
-  overflow: visible;
+  overflow: hidden;
   pointer-events: none;
-}
-
-.panel.is-collapsed .panel-head {
-  justify-content: flex-start;
-  padding: 12px 9px;
-  width: 58px;
-}
-
-.panel.is-collapsed #panelToggle {
-  pointer-events: auto;
 }
 
 .panel.is-collapsed .panel-head > div,
@@ -91,6 +81,14 @@ body {
   display: flex;
   justify-content: space-between;
   padding: 18px 18px 12px;
+}
+
+.panel-toggle-button {
+  box-shadow: 0 8px 20px rgba(22, 36, 52, 0.18);
+  left: calc(10px + env(safe-area-inset-left, 0px));
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  z-index: calc(var(--control-z) + 30);
 }
 
 .eyebrow {
@@ -418,15 +416,14 @@ input {
     padding: 12px 14px;
   }
 
-  .panel.is-collapsed .panel-head {
-    justify-content: flex-start;
-    padding: 12px 9px;
-    width: 58px;
-  }
-
   .leaflet-bottom.leaflet-right {
     bottom: env(safe-area-inset-bottom, 0);
     right: env(safe-area-inset-right, 0);
+  }
+
+  .panel-toggle-button {
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    top: calc(12px + env(safe-area-inset-top, 0px));
   }
 
   .leaflet-bottom .leaflet-control {
