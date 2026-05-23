@@ -5,9 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>土木設備分布地圖</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div id="globalModal" class="custom-modal-overlay">
+      <div class="custom-modal-box">
+        <h3 id="gmTitle" style="margin-top:0; font-size:18px; font-weight:900; color:var(--text);"></h3>
+        <p id="gmContent" style="margin:10px 0 15px; font-size:14px; color:var(--muted); line-height:1.5;"></p>
+        <input type="text" id="gmInput" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; display:none;" />
+        <select id="gmSelect" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; display:none;"></select>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button id="gmCancelBtn" style="padding:8px 16px; background:#e2e8f0; color:#333; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">取消</button>
+          <button id="gmConfirmBtn" style="padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">確定</button>
+        </div>
+      </div>
+    </div>
+
+    <datalist id="defect-list">
+      <option value="架空地線綁紮"></option>
+      <option value="樹木修剪"></option>
+      <option value="椰樹修剪"></option>
+      <option value="藤蔓清除"></option>
+      <option value="竹枝清除"></option>
+    </datalist>
+
     <button id="panelToggle" class="icon-button panel-toggle-button" type="button" aria-expanded="true" title="收合面板">≡</button>
 
     <main class="app">
@@ -16,59 +38,73 @@
           <div class="panel-title">
             <h1>土木設備分布地圖</h1>
           </div>
+          <button id="toggleLabelsBtn" class="btn-global-toggle">隱藏所有主圖標籤</button>
         </header>
 
-        <section class="stats" aria-label="資料摘要">
-          <div>
-            <span>總點位</span>
-            <strong id="totalCount">--</strong>
-          </div>
-          <div>
-            <span>目前視窗</span>
-            <strong id="visibleCount">--</strong>
-          </div>
-          <div>
-            <span>顯示標籤</span>
-            <strong id="drawCount">--</strong>
-          </div>
-        </section>
+        <nav class="tab-nav">
+          <button id="tabSearchBtn" class="tab-btn is-active">🔍 搜尋設備</button>
+          <button id="tabRecordsBtn" class="tab-btn">📋 個人儲存</button>
+        </nav>
 
-        <section class="tools" aria-label="地圖工具">
-          <label>
-            <span>區域</span>
-            <select id="areaSelect">
-              <option value="">全部區域</option>
-            </select>
-          </label>
+        <div id="tabSearch" class="tab-content is-active">
+          <section class="stats" aria-label="資料摘要">
+            <div><span>總點位</span><strong id="totalCount">--</strong></div>
+            <div><span>目前視窗</span><strong id="visibleCount">--</strong></div>
+            <div><span>顯示標籤</span><strong id="drawCount">--</strong></div>
+          </section>
 
-          <label>
-            <span>搜尋設備或圖號</span>
-            <input id="searchInput" type="search" placeholder="例如 Q1295.Q1395.尖峰.觀音" autocomplete="off" />
-          </label>
+          <section class="tools" aria-label="地圖工具">
+            <label>
+              <span>區域</span>
+              <select id="areaSelect"><option value="">全部區域</option></select>
+            </label>
+            <label>
+              <span>搜尋設備或圖號</span>
+              <input id="searchInput" type="search" placeholder="例如 Q1295.Q1395.尖峰" autocomplete="off" />
+            </label>
+            <p style="font-size: 11px; color: var(--muted); margin: 4px 0 0 0;">💡 提示：在地圖上按<strong>右鍵 (或長按)</strong>，可反推圖號座標並手動新增設備。</p>
+          </section>
 
-          <div class="button-row">
-            <button id="fitButton" type="button">全圖</button>
-          </div>
-        </section>
+          <section class="results-wrap">
+            <h2>搜尋結果</h2>
+            <div id="results" class="results"></div>
+          </section>
+        </div>
 
-        <section class="color-guide" aria-label="標籤顏色說明">
-          <h2>標籤顏色</h2>
-          <p>縮小時顏色分辨圖號前綴；放大後會依畫面位置替設備中文前綴避色，無中文前綴統一灰色。</p>
-          <div class="swatches" aria-hidden="true">
-            <span style="--swatch: #0f766e"></span>
-            <span style="--swatch: #2563eb"></span>
-            <span style="--swatch: #7c3aed"></span>
-            <span style="--swatch: #be123c"></span>
-            <span style="--swatch: #c2410c"></span>
-            <span style="--swatch: #15803d"></span>
-            <span style="--swatch: #64748b"></span>
-          </div>
-        </section>
+        <div id="tabRecords" class="tab-content">
+          <section class="folders-section" aria-label="個人儲存">
+            <div class="folder-header">
+              <div style="display: flex; gap: 8px; width: 100%; justify-content: space-between;">
+                <span style="font-weight: bold; font-size: 14px;">地圖標記：</span>
+                <div>
+                  <button id="showAllStarsBtn" class="text-button" style="font-size:12px; margin-right: 8px;">全部顯示⭐</button>
+                  <button id="hideAllStarsBtn" class="text-button" style="font-size:12px;">全部隱藏🙈</button>
+                </div>
+              </div>
+            </div>
 
-        <section class="results-wrap">
-          <h2>搜尋結果</h2>
-          <div id="results" class="results"></div>
-        </section>
+            <div class="folder-btn-group">
+              <button id="addFolderBtn" class="btn-action btn-add-folder">+ 新增最上層資料夾</button>
+              <button id="importCsvBtn" class="btn-action btn-import-csv" title="支援 .xlsx, .xls, .csv">📥 匯入 Excel</button>
+              <input type="file" id="importFileInput" accept=".csv, .xlsx, .xls, .xlsm" style="display: none;" />
+            </div>
+            <div class="folder-btn-group">
+              <button id="exportSystemBtn" class="btn-action btn-export-json" title="將所有資料夾與紀錄打包下載">💾 系統備份</button>
+              <button id="importSystemBtn" class="btn-action btn-import-json" title="從備份檔還原所有資料">📂 系統還原</button>
+              <input type="file" id="importSystemInput" accept=".json" style="display: none;" />
+            </div>
+
+            <div id="batchActionBar" class="batch-action-bar">
+              <span style="color:#b91c1c; font-size:13px; font-weight:bold;">已選：<span id="selectedCount">0</span> 項</span>
+              <div style="display:flex; gap:6px;">
+                <button id="batchMoveBtn" style="background:#2563eb; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer;">移動 🚚</button>
+                <button id="batchDeleteBtn" style="background:#dc2626; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer;">刪除 🗑️</button>
+              </div>
+            </div>
+
+            <div id="folderList" class="folder-list"></div>
+          </section>
+        </div>
       </aside>
 
       <section class="map-shell">
@@ -80,8 +116,7 @@
 
     <template id="resultTemplate">
       <button type="button" class="result-item">
-        <strong></strong>
-        <span></span>
+        <strong></strong><span></span>
       </button>
     </template>
 
