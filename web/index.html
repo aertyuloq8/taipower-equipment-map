@@ -1149,7 +1149,7 @@
     <!-- Leaflet 地圖函式庫與本頁主要程式。 -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-// ==========================================
+      // ==========================================
       // 全局自訂彈出視窗 (Modal)
       // ==========================================
       // 共用 Modal 控制器：統一處理提示、確認、文字輸入與下拉選擇。
@@ -1228,7 +1228,53 @@
           });
         },
       };
+     // ==========================================
+      // [新增] 智慧檔案匯出處理器 (支援分享與本地下載)
+      // ==========================================
+      async function exportOrShareFile(fileData, fileName, mimeType) {
+        const file = new File([fileData], fileName, { type: mimeType });
+        const blob = new Blob([fileData], { type: mimeType });
 
+        // 傳統下載本地端的邏輯
+        const downloadLocally = () => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+
+        // 偵測是否支援手機原生分享功能
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          GlobalModal.select(
+            "📤 匯出選項",
+            "請選擇您要如何處理這份檔案：",
+            `<option value="share">☁️ 傳送至其他 App (雲端/LINE)</option>
+             <option value="local">💾 直接下載到本機裝置</option>`,
+            async (choice) => {
+              if (choice === "share") {
+                try {
+                  await navigator.share({
+                    title: fileName,
+                    files: [file]
+                  });
+                } catch (err) {
+                  // 使用者可能中途取消，不需特別報錯
+                  console.log("分享取消或失敗:", err);
+                }
+              } else {
+                downloadLocally();
+              }
+            }
+          );
+        } else {
+          // 如果是舊版瀏覽器或不支援分享的普通電腦，直接下載
+          downloadLocally();
+        }
+      }
       // ==========================================
       // [新增] 監聽日期選擇事件，自動帶入文字框
       // ==========================================
@@ -2034,14 +2080,20 @@
             GlobalModal.alert("勾選範圍內沒有紀錄可匯出。");
             return;
           }
-          const ws = XLSX.utils.json_to_sheet(exportData);
+        const ws = XLSX.utils.json_to_sheet(exportData);
           const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
-          XLSX.writeFile(
-            wb,
-            `批次匯出_${new Date().toISOString().slice(0, 10)}.xlsx`,
+          
+          // [修改] 將 Excel 轉為二進位陣列，傳給我們的智慧匯出函式
+          const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+          const fileName = `批次匯出_${new Date().toISOString().slice(0, 10)}.xlsx`;
+          exportOrShareFile(
+            excelBuffer, 
+            fileName, 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           );
         });
+
 
       document
         .getElementById("batchDeleteBtn")
@@ -2395,10 +2447,18 @@
               施工單號: "",
               施工日期: "",
             });
-          const ws = XLSX.utils.json_to_sheet(exportData);
+const ws = XLSX.utils.json_to_sheet(exportData);
           const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
-          XLSX.writeFile(wb, `巡視紀錄_${folder.name}.xlsx`);
+          
+          // [修改] 將單一資料夾 Excel 轉為二進位陣列，呼叫智慧匯出
+          const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+          const fileName = `巡視紀錄_${folder.name}.xlsx`;
+          exportOrShareFile(
+            excelBuffer, 
+            fileName, 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          );
         } else if (target.dataset.deleteFolder) {
           const fId = target.dataset.deleteFolder;
           const folder = state.folders.find((f) => f.id === fId);
@@ -2577,25 +2637,14 @@
           reader.readAsArrayBuffer(file);
         });
 
-      // 資料備份與還原
-      document
-        .getElementById("exportSystemBtn")
-        .addEventListener("click", () => {
-          const data = JSON.stringify(
-            { folders: state.folders, records: state.records },
-            null,
-            2,
-          );
-          const blob = new Blob([data], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `資料備份_${new Date().toISOString().slice(0, 10)}.json`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        });
+// 資料備份與還原
+      document.getElementById("exportSystemBtn").addEventListener("click", () => {
+        const data = JSON.stringify({ folders: state.folders, records: state.records }, null, 2);
+        const fileName = `資料備份_${new Date().toISOString().slice(0, 10)}.json`;
+        
+        // 呼叫智慧匯出函式
+        exportOrShareFile(data, fileName, "application/json");
+      });
       document
         .getElementById("importSystemBtn")
         .addEventListener("click", () =>
