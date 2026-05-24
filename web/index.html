@@ -1485,75 +1485,18 @@ function popupHtml(point) {
       function matchesFilters(point) { if (state.area && point.area !== state.area) return false; return matchesSearch(point, state.search); }
       function visibleFilteredPoints() { const bounds = map.getBounds(); const output = []; for (const point of state.points) { if (pointInBounds(point, bounds) && matchesFilters(point)) output.push(point); } return output; }
 
-// ==========================================
-      // 【全新高辨識度調色盤】移除相似色，確保每種顏色都清晰獨立
-      // ==========================================
-      const PREFIX_COLORS = [
-        "#0284c7", "#b91c1c", "#15803d", "#7e22ce", 
-        "#c2410c", "#0f766e", "#be185d", "#b45309", 
-        "#4338ca", "#4d7c0f", "#a21caf", "#047857", 
-        "#1d4ed8", "#9a3412", "#3f6212", "#0f172a"
-      ];
-      // ==========================================
-      // 【全新邏輯】黃金比例動態調色盤 (Golden Ratio Color Generator)
-      // 解決 16 色用完後的撞色問題。透過黃金比例分配色相，確保再多設備也不會重複。
-      // ==========================================
+      const PREFIX_COLORS = ["#0f766e", "#2563eb", "#7c3aed", "#be123c", "#c2410c", "#15803d", "#0369a1", "#a16207", "#6d28d9", "#0e7490", "#b45309", "#047857"];
       const UNKNOWN_EQUIPMENT_PREFIX = "未分類", UNKNOWN_EQUIPMENT_COLOR = "#64748b";
-
-      function equipmentNamePrefix(name) { 
-        const match = String(name || "").trim().match(/^[\u3400-\u9fff]+/); 
-        return match ? match[0].slice(0, 4) : UNKNOWN_EQUIPMENT_PREFIX; 
+      function hashText(value) { let hash = 0; for (const char of value) { hash = (hash * 31 + char.charCodeAt(0)) >>> 0; } return hash; }
+      // 圖號前綴用黃金角度 HSL，確保 Q0158、Q1166、Q1380... 每個都是明顯不同的顏色
+      function colorForPrefix(prefix) {
+        const h = hashText(prefix);
+        const hue = (h * 137.508) % 360;
+        const sat = 58 + (h % 22);   // 58~80%
+        const lit = 30 + (h % 16);   // 30~46%，夠深讓白字清晰
+        return `hsl(${hue.toFixed(0)}, ${sat}%, ${lit}%)`;
       }
-
-      // 網頁載入時，直接統計所有線路，並用黃金比例永久配發獨立 HSL 顏色
-      function buildGlobalColorMap() {
-        const groups = new Map();
-        for (const point of state.points) {
-          const prefix = equipmentNamePrefix(point.name);
-          if (prefix !== UNKNOWN_EQUIPMENT_PREFIX) {
-            groups.set(prefix, (groups.get(prefix) || 0) + 1);
-          }
-        }
-        
-        // 依出現次數由多到少排序
-        const sortedPrefixes = [...groups.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
-        
-        state.equipmentColorMap.clear();
-        
-        // 使用黃金比例演算法分配顏色
-        sortedPrefixes.forEach((prefix, index) => {
-          // 色相 (Hue): 乘以 137.508 度 (黃金角度)，確保顏色在色相環上均勻且不重複
-          const hue = (index * 137.508) % 360;
-          // 飽和度 (Saturation): 65% ~ 80% 之間微調，增加層次感，避免太單調
-          const saturation = 65 + (index % 4) * 5;
-          // 亮度 (Lightness): 35% ~ 45% 之間微調，確保背景夠暗，讓白色文字清晰好讀
-          const lightness = 35 + (index % 3) * 5;
-          
-          state.equipmentColorMap.set(prefix, `hsl(${hue}, ${saturation}%, ${lightness}%)`);
-        });
-      }
-
-      function colorForEquipmentName(name) { 
-          const prefix = equipmentNamePrefix(name);
-          if (prefix === UNKNOWN_EQUIPMENT_PREFIX) return UNKNOWN_EQUIPMENT_COLOR;
-          
-          // 若遇到資料庫沒有的全新前綴 (例如純手動新增)，用字串編碼即時運算產生專屬顏色
-          if (!state.equipmentColorMap.has(prefix)) {
-              let hash = 0; 
-              for (let i = 0; i < prefix.length; i++) hash = prefix.charCodeAt(i) + ((hash << 5) - hash);
-              const h = Math.abs(hash) % 360;
-              const s = 65 + (Math.abs(hash) % 15);
-              const l = 35 + (Math.abs(hash) % 10);
-              state.equipmentColorMap.set(prefix, `hsl(${h}, ${s}%, ${l}%)`);
-          }
-          return state.equipmentColorMap.get(prefix); 
-      }
-function colorForPrefix(prefix) {
-    let hash = 0;
-    for (const char of prefix) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-    const hue = (hash * 137.508) % 360;
-    return `hsl(${hue.toFixed(0)}, ${60 + hash % 20}%, ${32 + hash % 14}%)`;
-}
+      function equipmentNamePrefix(name) { const match = String(name || "").trim().match(/^[\u3400-\u9fff]+/); return match ? match[0].slice(0, 4) : UNKNOWN_EQUIPMENT_PREFIX; }
 
       // ==========================================
       // 地圖繪製引擎 (Canvas)
@@ -1578,7 +1521,8 @@ function colorForPrefix(prefix) {
             state.displayMode = "point";
             state.drawnItems = state.visiblePoints.map(p => { const pixel = map.latLngToContainerPoint([p.lat, p.lng]); return { type: "point", point: p, x: pixel.x, y: pixel.y, count: 1 }; });
             
-            // 已經移除了舊的會撞色的顏色計算邏輯
+                       if (state.equipmentColorMap.size === 0) state.equipmentColorMap = buildEquipmentColorMap(state.drawnItems);
+
             drawPoints(ctx, state.drawnItems);
           } else {
             state.displayMode = "prefix"; const groups = new Map();
@@ -1596,41 +1540,79 @@ function colorForPrefix(prefix) {
         }
       });
       const renderer = new canvasLayer().addTo(map);
+      function buildEquipmentColorMap(items) {
+        const groups = new Map();
+        for (const item of items) {
+          const prefix = equipmentNamePrefix(item.point.name); if (prefix === UNKNOWN_EQUIPMENT_PREFIX) continue;
+          let group = groups.get(prefix);
+          if (!group) { group = { prefix, count: 0, xSum: 0, ySum: 0, minX: item.x, maxX: item.x, minY: item.y, maxY: item.y, color: "" }; groups.set(prefix, group); }
+          group.count += 1; group.xSum += item.x; group.ySum += item.y; group.minX = Math.min(group.minX, item.x); group.maxX = Math.max(group.maxX, item.x); group.minY = Math.min(group.minY, item.y); group.maxY = Math.max(group.maxY, item.y);
+        }
+        const colorMap = new Map([[UNKNOWN_EQUIPMENT_PREFIX, UNKNOWN_EQUIPMENT_COLOR]]);
+        const colorUse = new Map(PREFIX_COLORS.map(c => [c, 0]));
+        const sortedGroups = [...groups.values()].map(g => ({ ...g, x: g.xSum / g.count, y: g.ySum / g.count })).sort((a, b) => b.count - a.count);
+        for (const group of sortedGroups) {
+          const start = hashText(group.prefix) % PREFIX_COLORS.length;
+          const rankedColors = PREFIX_COLORS.map((_, i) => PREFIX_COLORS[(start + i) % PREFIX_COLORS.length]).sort((a, b) => (colorUse.get(a) || 0) - (colorUse.get(b) || 0));
+          group.color = rankedColors[0]; colorMap.set(group.prefix, group.color); colorUse.set(group.color, (colorUse.get(group.color) || 0) + 1);
+        }
+        return colorMap;
+      }
+      function colorForEquipmentName(name) { return state.equipmentColorMap.get(equipmentNamePrefix(name)) || colorForPrefix(equipmentNamePrefix(name)); }
 
       function drawPoints(ctx, items) { for (const item of items) { ctx.beginPath(); ctx.arc(item.x, item.y, 4.5, 0, Math.PI * 2); ctx.fillStyle = colorForEquipmentName(item.point.name); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255, 255, 255, 0.95)"; ctx.stroke(); } }
-    function getPrefixColors(items) {
-  const THRESHOLD = 160;
-  const adj = new Map(items.map(it => [it.prefix, new Set()]));
-  for (let i = 0; i < items.length; i++)
-    for (let j = i + 1; j < items.length; j++) {
-      const dx = items[i].x - items[j].x, dy = items[i].y - items[j].y;
-      if (Math.sqrt(dx*dx + dy*dy) < THRESHOLD) {
-        adj.get(items[i].prefix).add(items[j].prefix);
-        adj.get(items[j].prefix).add(items[i].prefix);
-      }
-    }
-  const sorted = [...items].sort((a,b) => adj.get(b.prefix).size - adj.get(a.prefix).size);
-  const idxMap = new Map();
-  for (const {prefix} of sorted) {
-    const used = new Set([...adj.get(prefix)].map(n => idxMap.get(n)).filter(v => v != null));
-    let c = 0; while (used.has(c)) c++;
-    idxMap.set(prefix, c);
-  }
-  const out = new Map();
-  for (const [p, idx] of idxMap) {
-    const hue = (idx * 60 + Math.floor(idx/6) * 30) % 360;
-    out.set(p, `hsl(${hue}, ${65 + idx%3*10}%, ${28 + idx%2*12}%)`);
-  }
-  return out;
+       // 前綴標籤著色快取（每次 redraw 重新計算）
+      let currentPrefixColors = new Map();
+
+      function buildPrefixColorsByProximity(items) {
+        // 步驟 1：建立鄰近圖（畫面上距離 < 閾值 px 視為相鄰）
+        const THRESHOLD = 160; // px，約等於兩個標籤寬度
+        const adj = new Map(items.map(it => [it.prefix, new Set()]));
+        for (let i = 0; i < items.length; i++) {
+          for (let j = i + 1; j < items.length; j++) {
+            const dx = items[i].x - items[j].x, dy = items[i].y - items[j].y;
+            if (Math.sqrt(dx*dx + dy*dy) < THRESHOLD) {
+              adj.get(items[i].prefix).add(items[j].prefix);
+              adj.get(items[j].prefix).add(items[i].prefix);
+            }
+          }
+        }
+        // 步驟 2：貪婪著色（鄰居最多的先著色，確保最難的先分配）
+        const sorted = [...items].sort((a, b) => adj.get(b.prefix).size - adj.get(a.prefix).size);
+        const colorIdx = new Map();
+        for (const { prefix } of sorted) {
+          const usedIdx = new Set([...adj.get(prefix)].map(n => colorIdx.get(n)).filter(v => v !== undefined));
+          let c = 0; while (usedIdx.has(c)) c++;
+          colorIdx.set(prefix, c);
+        }
+        // 步驟 3：色號 → 明顯可分辨的顏色（每 6 個一輪，色相差 60°；亮度/飽和度交錯）
+        const result = new Map();
+        for (const [prefix, idx] of colorIdx) {
+          const hue = (idx * 60 + Math.floor(idx / 6) * 30) % 360; // 環內60°間距，每輪偏移30°
+          const sat = 65 + (idx % 3) * 10;   // 65 / 75 / 85%
+          const lit = 28 + (idx % 2) * 12;   // 28 / 40%（深淺交錯讓白字清楚）
+          result.set(prefix, `hsl(${hue}, ${sat}%, ${lit}%)`);
+        }
+        return result;
 }     
 
-	 function drawPrefixLabels(ctx, items) {
-	 const prefixColors = getPrefixColors(items);
+      function drawPrefixLabels(ctx, items) {
+        // 每次重繪前，依當前畫面鄰近關係重新計算色彩分配
+        currentPrefixColors = buildPrefixColorsByProximity(items);
+
+
         for (const item of items) {
-          const label = `${item.prefix} · ${formatNumber(item.count)}`, width = Math.max(74, Math.min(128, 28 + label.length * 7)), height = 30, x = item.x - width / 2, y = item.y - height / 2;
-          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, width, height, 8); else ctx.rect(x,y,width,height);
-          ctx.fillStyle = prefixColors.get(item.prefix) || colorForPrefix(item.prefix);ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
-          ctx.fillStyle = "#fff"; ctx.font = "800 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, item.x, item.y + 0.5);
+          const color = currentPrefixColors.get(item.prefix) || colorForPrefix(item.prefix);
+          const label = `${item.prefix} · ${formatNumber(item.count)}`;
+          const width = Math.max(74, Math.min(128, 28 + label.length * 7)), height = 30;
+          const x = item.x - width / 2, y = item.y - height / 2;
+          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, width, height, 8); else ctx.rect(x, y, width, height);
+          ctx.fillStyle = color; ctx.fill();
+          ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+          ctx.fillStyle = "#fff"; ctx.font = "800 12px system-ui, sans-serif";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(label, item.x, item.y + 0.5);
+
           item.hitBox = { x, y, width, height };
         }
       }
@@ -1762,8 +1744,7 @@ function colorForPrefix(prefix) {
           state.meta = meta;
           state.points = points;
           
-          // 【已修正】資料載入完畢後，立刻分析並永久綁定所有線路顏色！
-          buildGlobalColorMap(); 
+
           
           fillAreas();
           renderResults([]);
