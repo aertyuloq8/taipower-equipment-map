@@ -1,7 +1,0 @@
-__pycache__/
-*.py[cod]
-v2/
-~$*.xls*
-*.xls*
-.DS_Store
-Thumbs.db
