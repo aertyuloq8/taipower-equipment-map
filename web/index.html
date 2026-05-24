@@ -801,18 +801,27 @@
             line-height: 1.5;
           "
         ></p>
-        <input
-          type="text"
-          id="gmInput"
-          style="
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            display: none;
-          "
-        />
+<div id="gmInputWrapper" style="display: none; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+          <input
+            type="text"
+            id="gmInput"
+            style="
+              width: 100%;
+              padding: 10px;
+              border: 1px solid #ccc;
+              border-radius: 6px;
+              box-sizing: border-box;
+            "
+          />
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 12px; color: var(--muted); font-weight: bold;">📅 插入日期：</span>
+            <input 
+              type="date" 
+              id="gmDateInput" 
+              style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; cursor: pointer; color: var(--text); flex-grow: 1;" 
+            />
+          </div>
+        </div>
         <select
           id="gmSelect"
           style="
@@ -1140,7 +1149,7 @@
     <!-- Leaflet 地圖函式庫與本頁主要程式。 -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-      // ==========================================
+// ==========================================
       // 全局自訂彈出視窗 (Modal)
       // ==========================================
       // 共用 Modal 控制器：統一處理提示、確認、文字輸入與下拉選擇。
@@ -1148,7 +1157,9 @@
         overlay: document.getElementById("globalModal"),
         titleEl: document.getElementById("gmTitle"),
         contentEl: document.getElementById("gmContent"),
+        inputWrapper: document.getElementById("gmInputWrapper"), // [新增] 控制整個輸入區塊
         inputEl: document.getElementById("gmInput"),
+        dateInputEl: document.getElementById("gmDateInput"),     // [新增] 日期選擇器元件
         selectEl: document.getElementById("gmSelect"),
         cancelBtn: document.getElementById("gmCancelBtn"),
         confirmBtn: document.getElementById("gmConfirmBtn"),
@@ -1163,8 +1174,13 @@
         }) {
           this.titleEl.textContent = title;
           this.contentEl.innerHTML = content;
-          this.inputEl.style.display = type === "prompt" ? "block" : "none";
+          
+          // [修改] 顯示 Wrapper 而非單一 input
+          this.inputWrapper.style.display = type === "prompt" ? "flex" : "none";
           this.inputEl.value = defaultVal;
+          // [新增] 每次開啟時重置日期選擇器
+          if (this.dateInputEl) this.dateInputEl.value = "";
+
           this.selectEl.style.display = type === "select" ? "block" : "none";
           this.selectEl.innerHTML = selectHtml;
           this.cancelBtn.style.display = type === "alert" ? "none" : "block";
@@ -1212,6 +1228,28 @@
           });
         },
       };
+
+      // ==========================================
+      // [新增] 監聽日期選擇事件，自動帶入文字框
+      // ==========================================
+      if (GlobalModal.dateInputEl) {
+        GlobalModal.dateInputEl.addEventListener("change", (e) => {
+          if (e.target.value) {
+            const selectedDate = e.target.value; // 取得格式為 YYYY-MM-DD 的日期
+            
+            // 智慧插入邏輯：
+            // 若原本有文字，先移除最前面的舊日期 (防呆設計)，再換上新日期
+            // 這樣你連續點選不同日期時，不會變成 "2026-05-242026-05-25巡視"
+            const oldTextWithoutDate = GlobalModal.inputEl.value.replace(/^\d{4}-\d{2}-\d{2}/, '');
+            GlobalModal.inputEl.value = selectedDate + oldTextWithoutDate;
+            
+            // 將焦點移回文字框，並把游標推到最後面，方便你繼續輸入「巡視」等文字
+            GlobalModal.inputEl.focus();
+            const len = GlobalModal.inputEl.value.length;
+            GlobalModal.inputEl.setSelectionRange(len, len);
+          }
+        });
+      }
 
       // ==========================================
       // 分頁切換邏輯（搜尋已移到地圖浮層，此函式保留相容性）
