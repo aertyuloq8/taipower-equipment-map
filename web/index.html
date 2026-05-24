@@ -4,9 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>土木設備分布地圖</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
+      /*
+       * 全域設計變數：集中管理背景、文字、按鈕、陰影與圖層高度。
+       * 後續樣式多以 var(...) 取用，方便調整整體視覺。
+       */
       :root {
         --bg: #eef2f5;
         --panel: #ffffff;
@@ -21,12 +28,24 @@
         --shadow: 0 12px 36px rgba(22, 36, 52, 0.16);
         --control-z: 900;
       }
-      * { box-sizing: border-box; }
-      html, body, .app { height: 100%; margin: 0; }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body,
+      .app {
+        height: 100%;
+        margin: 0;
+      }
       body {
         background: var(--bg);
         color: var(--text);
-        font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, -apple-system, sans-serif;
+        font-family:
+          "Microsoft JhengHei",
+          "Noto Sans TC",
+          system-ui,
+          -apple-system,
+          sans-serif;
       }
       .app {
         display: grid;
@@ -34,7 +53,11 @@
         min-width: 0;
         transition: grid-template-columns 180ms ease;
       }
-      .app.is-panel-collapsed { grid-template-columns: 0 1fr; }
+      .app.is-panel-collapsed {
+        grid-template-columns: 0 1fr;
+      }
+
+      /* 左側資料面板：負責資料夾、巡視紀錄與批次操作區。 */
       .panel {
         background: var(--panel);
         border-right: 1px solid var(--line);
@@ -52,7 +75,9 @@
         box-shadow: none;
         pointer-events: none;
       }
-      .panel.is-collapsed > * { display: none; }
+      .panel.is-collapsed > * {
+        display: none;
+      }
       .panel-head {
         align-items: start;
         display: flex;
@@ -60,11 +85,32 @@
         gap: 12px;
         padding: 64px 18px 12px;
       }
-      .panel-title { width: 100%; }
-      h1, h2 { margin: 0; }
-      h1 { font-size: 24px; line-height: 1.2; }
-      h2 { font-size: 14px; }
-      .icon-button, button, select, input {
+      .panel-title {
+        width: 100%;
+      }
+      .panel-toggle-button {
+        box-shadow: 0 8px 20px rgba(22, 36, 52, 0.18);
+        left: calc(10px + env(safe-area-inset-left, 0px));
+        position: fixed;
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        z-index: calc(var(--control-z) + 30);
+      }
+      h1,
+      h2 {
+        margin: 0;
+      }
+      h1 {
+        font-size: 24px;
+        line-height: 1.2;
+      }
+      h2 {
+        font-size: 14px;
+      }
+
+      .icon-button,
+      button,
+      select,
+      input {
         border: 1px solid var(--line);
         border-radius: 6px;
         font: inherit;
@@ -77,8 +123,14 @@
         font-weight: 800;
         padding: 0 12px;
       }
-      button:hover { background: var(--accent-dark); }
-      button:disabled { cursor: progress; opacity: 0.7; }
+      button:hover {
+        background: var(--accent-dark);
+      }
+      button:disabled {
+        cursor: progress;
+        opacity: 0.7;
+      }
+
       .icon-button {
         align-items: center;
         background: #f7fafc;
@@ -101,9 +153,18 @@
         cursor: pointer;
         transition: background 0.2s;
       }
-      .btn-global-toggle:hover { background: var(--accent-dark); }
-      .btn-global-toggle.is-hidden { background: #64748b; }
-      .tab-nav { display: flex; border-bottom: 1px solid var(--line); background: #f8fafc; }
+      .btn-global-toggle:hover {
+        background: var(--accent-dark);
+      }
+      .btn-global-toggle.is-hidden {
+        background: #64748b;
+      }
+
+      .tab-nav {
+        display: flex;
+        border-bottom: 1px solid var(--line);
+        background: #f8fafc;
+      }
       .tab-btn {
         flex: 1;
         background: transparent;
@@ -114,10 +175,26 @@
         min-height: 44px;
         font-size: 14px;
       }
-      .tab-btn:hover { background: #f1f5f9; color: var(--text); }
-      .tab-btn.is-active { background: #fff; color: var(--accent-dark); border-bottom-color: var(--accent); }
-      .tab-content { display: none; flex-direction: column; min-height: 0; overflow: hidden; }
-      .tab-content.is-active { display: flex; }
+      .tab-btn:hover {
+        background: #f1f5f9;
+        color: var(--text);
+      }
+      .tab-btn.is-active {
+        background: #fff;
+        color: var(--accent-dark);
+        border-bottom-color: var(--accent);
+      }
+      .tab-content {
+        display: none;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .tab-content.is-active {
+        display: flex;
+      }
+
+      /* 搜尋統計與搜尋結果清單：顯示總點位、視窗內點位與繪製數量。 */
       .stats {
         display: grid;
         gap: 8px;
@@ -133,12 +210,39 @@
         min-width: 0;
         padding: 9px;
       }
-      .stats span, label span, .result-item span { color: var(--muted); font-size: 12px; }
-      .stats strong { font-size: 18px; line-height: 1.2; }
-      .tools { border-top: 1px solid var(--line); display: grid; gap: 12px; padding: 14px 18px; }
-      label { display: grid; gap: 5px; }
-      select, input[type="search"], input[type="text"] { background: #fff; color: var(--text); padding: 0 10px; width: 100%; }
-      .button-row { display: grid; gap: 8px; grid-template-columns: 1fr; }
+      .stats span,
+      label span,
+      .result-item span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .stats strong {
+        font-size: 18px;
+        line-height: 1.2;
+      }
+      .tools {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 12px;
+        padding: 14px 18px;
+      }
+      label {
+        display: grid;
+        gap: 5px;
+      }
+      select,
+      input[type="search"],
+      input[type="text"] {
+        background: #fff;
+        color: var(--text);
+        padding: 0 10px;
+        width: 100%;
+      }
+      .button-row {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 1fr;
+      }
       .results-wrap {
         border-top: 1px solid var(--line);
         display: flex;
@@ -147,7 +251,13 @@
         min-height: 0;
         padding: 12px 18px 18px;
       }
-      .results { margin-top: 8px; min-height: 0; overflow-y: auto; flex-grow: 1; padding-right: 4px; }
+      .results {
+        margin-top: 8px;
+        min-height: 0;
+        overflow-y: auto;
+        flex-grow: 1;
+        padding-right: 4px;
+      }
       .result-item {
         background: #fff;
         border: 1px solid var(--line);
@@ -160,7 +270,12 @@
         text-align: left;
         width: 100%;
       }
-      .result-item:hover { background: #eef8f9; color: var(--text); }
+      .result-item:hover {
+        background: #eef8f9;
+        color: var(--text);
+      }
+
+      /* 巡視紀錄資料夾：支援階層、勾選、匯入匯出與顯示/隱藏標記。 */
       .folders-section {
         display: flex;
         flex-direction: column;
@@ -169,13 +284,45 @@
         padding: 14px 18px 18px;
         overflow-y: auto;
       }
-      .folder-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-      .folder-btn-group { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
-      .btn-action { flex: 1; min-height: 32px; font-size: 13px; border-radius: 4px; background: #fff; }
-      .btn-add-folder { color: var(--accent); border: 1px dashed var(--accent); }
-      .btn-import-csv { background: #f0fdf4; color: #16a34a; border: 1px dashed #16a34a; }
-      .btn-export-json { background: #fffbeb; color: #d97706; border: 1px dashed #d97706; }
-      .btn-import-json { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }
+      .folder-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .folder-btn-group {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+      }
+      .btn-action {
+        flex: 1;
+        min-height: 32px;
+        font-size: 13px;
+        border-radius: 4px;
+        background: #fff;
+      }
+      .btn-add-folder {
+        color: var(--accent);
+        border: 1px dashed var(--accent);
+      }
+      .btn-import-csv {
+        background: #f0fdf4;
+        color: #16a34a;
+        border: 1px dashed #16a34a;
+      }
+      .btn-export-json {
+        background: #fffbeb;
+        color: #d97706;
+        border: 1px dashed #d97706;
+      }
+      .btn-import-json {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px dashed #dc2626;
+      }
+
       .folder-list {
         flex-grow: 1;
         min-height: 0;
@@ -185,6 +332,7 @@
         padding-top: 10px;
         padding-bottom: 40px;
       }
+
       .folder-item {
         background: #f8fafc;
         border-radius: 6px;
@@ -195,9 +343,20 @@
         gap: 4px;
         transition: background 0.2s;
       }
-      .folder-item:hover { background: #f1f5f9; }
-      .folder-item-top { display: flex; flex-direction: column; gap: 6px; }
-      .folder-item-title-row { display: flex; align-items: center; width: 100%; }
+      .folder-item:hover {
+        background: #f1f5f9;
+      }
+      .folder-item-top {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .folder-item-title-row {
+        display: flex;
+        align-items: center;
+        width: 100%;
+      }
+
       .folder-name-toggle {
         cursor: pointer;
         user-select: none;
@@ -213,9 +372,21 @@
         white-space: nowrap;
         text-overflow: ellipsis;
       }
-      .folder-name-toggle:hover { color: var(--accent); }
-      .record-list { margin-top: 6px; border-top: 1px dashed var(--line); padding-top: 6px; display: none; flex-direction: column; gap: 4px; }
-      .record-list.is-expanded { display: flex; }
+      .folder-name-toggle:hover {
+        color: var(--accent);
+      }
+
+      .record-list {
+        margin-top: 6px;
+        border-top: 1px dashed var(--line);
+        padding-top: 6px;
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .record-list.is-expanded {
+        display: flex;
+      }
       .record-item {
         background: #fff;
         border: 1px solid var(--line);
@@ -231,10 +402,27 @@
         flex-grow: 1;
         min-width: 0;
       }
-      .record-item:hover { background: #eef8f9; border-color: var(--accent); }
-      .record-item-title { font-weight: bold; color: var(--accent-dark); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-      .record-item-meta { font-size: 11px; color: var(--muted); }
-      .folder-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+      .record-item:hover {
+        background: #eef8f9;
+        border-color: var(--accent);
+      }
+      .record-item-title {
+        font-weight: bold;
+        color: var(--accent-dark);
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      .record-item-meta {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .folder-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
       .btn-small {
         background: transparent;
         color: var(--muted);
@@ -246,9 +434,18 @@
         font-weight: normal;
         cursor: pointer;
       }
-      .btn-small:hover { background: #e2e8f0; color: var(--text); }
-      .text-danger { color: var(--red) !important; font-weight: bold; }
-      .text-danger:hover { background: #fee2e2; }
+      .btn-small:hover {
+        background: #e2e8f0;
+        color: var(--text);
+      }
+      .text-danger {
+        color: var(--red) !important;
+        font-weight: bold;
+      }
+      .text-danger:hover {
+        background: #fee2e2;
+      }
+
       .batch-action-bar {
         display: none;
         justify-content: space-between;
@@ -269,8 +466,17 @@
         color: var(--muted);
         min-height: unset;
       }
-      .text-button:hover { text-decoration: underline; color: var(--accent); background: transparent; }
-      .map-shell { min-width: 0; position: relative; }
+      .text-button:hover {
+        text-decoration: underline;
+        color: var(--accent);
+        background: transparent;
+      }
+
+      /* 地圖容器與地圖上浮動控制項。 */
+      .map-shell {
+        min-width: 0;
+        position: relative;
+      }
       .map-locate-button {
         background: rgba(255, 255, 255, 0.96);
         border: 1px solid var(--line);
@@ -284,9 +490,19 @@
         top: 14px;
         z-index: var(--control-z);
       }
-      .map-locate-button:hover { background: #eef8f9; }
-      .map-locate-button.is-active { background: var(--blue); border-color: var(--blue); color: #fff; }
-      #map { background: #edf3f5; height: 100%; width: 100%; }
+      .map-locate-button:hover {
+        background: #eef8f9;
+      }
+      .map-locate-button.is-active {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+      #map {
+        background: #edf3f5;
+        height: 100%;
+        width: 100%;
+      }
       .status {
         background: rgba(255, 255, 255, 0.94);
         border: 1px solid var(--line);
@@ -300,10 +516,27 @@
         transform: translateX(-50%);
         z-index: 500;
       }
-      .status:empty { display: none; }
-      .popup-title { font-weight: 900; margin-bottom: 4px; }
-      .popup-meta { color: var(--muted); font-size: 12px; line-height: 1.5; }
-      .popup-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; margin-bottom: 6px; }
+      .status:empty {
+        display: none;
+      }
+
+      /* Leaflet popup：設備資訊、導航、街景與巡視紀錄表單。 */
+      .popup-title {
+        font-weight: 900;
+        margin-bottom: 4px;
+      }
+      .popup-meta {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .popup-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+        margin-bottom: 6px;
+      }
       .popup-actions a {
         background: var(--accent);
         border-radius: 6px;
@@ -317,7 +550,13 @@
         padding: 6px 10px;
         text-decoration: none;
       }
-      .point-label { cursor: pointer; font-size: 12px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+      .point-label {
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.15;
+        white-space: nowrap;
+      }
       .point-label-chip {
         background: color-mix(in srgb, var(--label-color) 14%, #ffffff);
         border: 1px solid color-mix(in srgb, var(--label-color) 58%, #ffffff);
@@ -328,9 +567,26 @@
         display: inline-flex;
         padding: 3px 6px 3px 5px;
       }
-      .popup-form { margin-top: 6px; padding-top: 8px; border-top: 1px dashed #ccc; display: flex; flex-direction: column; gap: 6px; }
-      .popup-form label { font-size: 12px; font-weight: bold; color: var(--text); }
-      .popup-form select, .popup-form input { min-height: 28px; padding: 2px 6px; font-size: 12px; margin-top: 2px; }
+      .popup-form {
+        margin-top: 6px;
+        padding-top: 8px;
+        border-top: 1px dashed #ccc;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .popup-form label {
+        font-size: 12px;
+        font-weight: bold;
+        color: var(--text);
+      }
+      .popup-form select,
+      .popup-form input {
+        min-height: 28px;
+        padding: 2px 6px;
+        font-size: 12px;
+        margin-top: 2px;
+      }
       .btn-save-record {
         background: var(--amber);
         color: #fff;
@@ -340,26 +596,94 @@
         font-size: 13px;
         min-height: 32px;
       }
-      .btn-save-record:hover { background: #c27a1e; }
-      .saved-star-marker { display: flex; justify-content: center; align-items: center; font-size: 16px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.4)); cursor: pointer; }
-      .popup-layout { display: flex; flex-direction: column; }
-      .popup-left { margin-bottom: 2px; }
-      .popup-right { max-height: 55vh; overflow-y: auto; padding-right: 2px; }
-      .leaflet-popup-content { min-width: 225px !important; max-width: 70vw !important; width: auto !important; }
-      @media (min-width: 550px) { .leaflet-popup-content { min-width: 340px !important; } }
-      @media (max-width: 950px) and (max-height: 500px) and (orientation: landscape) {
-        .leaflet-popup-content { width: 420px !important; min-width: 420px !important; }
-        .popup-layout { flex-direction: row; gap: 12px; align-items: stretch; }
-        .popup-left { flex: 1; min-width: 160px; border-right: 1px dashed #ccc; padding-right: 10px; margin-bottom: 0; }
-        .popup-right { flex: 1.3; max-height: 75vh; }
-        .popup-form { border-top: none; margin-top: 0; padding-top: 0; }
+      .btn-save-record:hover {
+        background: #c27a1e;
       }
+      .saved-star-marker {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 16px;
+        filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.4));
+        cursor: pointer;
+      }
+
+      /* ========================================== */
+      /* 彈出視窗：基本結構 (直式預設) */
+      .popup-layout {
+        display: flex;
+        flex-direction: column;
+      }
+      .popup-left {
+        margin-bottom: 2px;
+      }
+      .popup-right {
+        max-height: 55vh;
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+
+/* ========================================== */
+      /* Leaflet 彈窗寬度自適應設定 (強制覆寫 JS 預設) */
+      /* ========================================== */
+      
+      /* 1. 預設狀態 (手機直式)：
+         保護小螢幕，寬度會自動伸展但不超過螢幕的 70%，最小確保有 250px */
+      .leaflet-popup-content {
+        min-width: 225px !important;
+        max-width: 70vw !important; 
+        width: auto !important; /* 解除 JS 寫死的固定寬度 */
+      }
+
+      /* 2. 較大螢幕 (大尺寸手機直式、小平板)：
+         螢幕寬度大於 550px 時，給予按鈕更舒適的 340px 空間 */
+      @media (min-width: 550px) {
+        .leaflet-popup-content {
+          min-width: 340px !important;
+        }
+      }
+
+      /* 3. 手機橫式 (Landscape) 專用雙欄佈局：
+         保留你原本的設定，橫放時強制加寬爭取左右並排空間 */
+      @media (max-width: 950px) and (max-height: 500px) and (orientation: landscape) {
+        .leaflet-popup-content {
+          width: 420px !important;
+          min-width: 420px !important;
+        }
+        
+        .popup-layout {
+          flex-direction: row;
+          gap: 12px;
+          align-items: stretch;
+        }
+        .popup-left {
+          flex: 1;
+          min-width: 160px;
+          border-right: 1px dashed #ccc;
+          padding-right: 10px;
+          margin-bottom: 0;
+        }
+        .popup-right {
+          flex: 1.3;
+          max-height: 75vh;
+        }
+        .popup-form {
+          border-top: none;
+          margin-top: 0;
+          padding-top: 0;
+        }
+      }
+      /* ========================================== */
+
+      /* 自訂 Modal：取代 alert / confirm / prompt，讓互動樣式一致。 */
       .custom-modal-overlay {
         display: none;
         position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0,0,0,0.6);
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
         z-index: 10000;
         justify-content: center;
         align-items: center;
@@ -371,8 +695,9 @@
         border-radius: 12px;
         width: 90%;
         max-width: 400px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
       }
+      /* ── 地圖浮動搜尋 ── */
       .top-controls {
         position: fixed;
         top: calc(12px + env(safe-area-inset-top, 0px));
@@ -383,10 +708,10 @@
         align-items: center;
       }
       .map-search-btn {
-        background: rgba(255,255,255,0.96);
+        background: rgba(255, 255, 255, 0.96);
         border: 1px solid var(--line);
         border-radius: 6px;
-        box-shadow: 0 8px 20px rgba(22,36,52,0.18);
+        box-shadow: 0 8px 20px rgba(22, 36, 52, 0.18);
         color: var(--accent-dark);
         min-height: 38px;
         padding: 0 12px;
@@ -394,7 +719,10 @@
         font-weight: 800;
         cursor: pointer;
       }
-      .map-search-btn:hover { background: #eef8f9; color: var(--accent); }
+      .map-search-btn:hover {
+        background: #eef8f9;
+        color: var(--accent);
+      }
       .map-search-panel {
         position: fixed;
         left: calc(10px + env(safe-area-inset-left, 0px));
@@ -410,120 +738,195 @@
         max-height: calc(100vh - 80px);
         overflow: hidden;
       }
-      .map-search-panel.is-open { display: flex; }
-      .map-search-inner { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
-      .map-search-inner select, .map-search-inner input { min-height: 34px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; padding: 0 10px; width: 100%; background: #fff; }
-      .map-search-stats { display: flex; gap: 8px; font-size: 11px; color: var(--muted); padding: 6px 12px; }
-      .map-search-results { overflow-y: auto; flex: 1; min-height: 0; padding: 0 10px 10px; }
-      .map-search-results .result-item { margin-bottom: 6px; }
-
-      /* ── 分享選項彈窗（手機專用）── */
-      .share-action-sheet {
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        z-index: 20000;
-        background: rgba(0,0,0,0.5);
-        display: none;
-        align-items: flex-end;
-        backdrop-filter: blur(2px);
-      }
-      .share-action-sheet.is-open { display: flex; }
-      .share-action-sheet-inner {
-        background: #fff;
-        border-radius: 16px 16px 0 0;
-        padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-        width: 100%;
-        box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
-      }
-      .share-sheet-title {
-        font-size: 13px;
-        color: var(--muted);
-        text-align: center;
-        margin-bottom: 12px;
-        font-weight: bold;
-      }
-      .share-sheet-filename {
-        font-size: 12px;
-        color: var(--accent-dark);
-        text-align: center;
-        margin-bottom: 16px;
-        background: #f0fdf4;
-        padding: 6px 12px;
-        border-radius: 8px;
-        word-break: break-all;
-      }
-      .share-sheet-btns { display: flex; flex-direction: column; gap: 10px; }
-      .share-sheet-btn {
-        width: 100%;
-        min-height: 52px;
-        border-radius: 12px;
-        font-size: 16px;
-        font-weight: 800;
-        border: none;
-        cursor: pointer;
+      .map-search-panel.is-open {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
       }
-      .share-sheet-btn.btn-share { background: var(--accent); color: #fff; }
-      .share-sheet-btn.btn-share:hover { background: var(--accent-dark); }
-      .share-sheet-btn.btn-local { background: #f1f5f9; color: var(--text); }
-      .share-sheet-btn.btn-local:hover { background: #e2e8f0; }
-      .share-sheet-btn.btn-cancel { background: transparent; color: var(--muted); font-weight: normal; font-size: 14px; min-height: 36px; }
+      .map-search-inner {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .map-search-inner select,
+      .map-search-inner input {
+        min-height: 34px;
+        font-size: 13px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 10px;
+        width: 100%;
+        background: #fff;
+      }
+      .map-search-stats {
+        display: flex;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--muted);
+        padding: 6px 12px;
+      }
+      /* 加入 flex: 1 與 min-height: 0，並拿掉死板的 max-height: 320px */
+      .map-search-results {
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+        padding: 0 10px 10px;
+      }
+      .map-search-results .result-item {
+        margin-bottom: 6px;
+      }
     </style>
   </head>
 
+  <!-- 畫面主體：Modal、浮動搜尋、左側資料面板與 Leaflet 地圖。 -->
   <body>
-    <!-- 共用 Modal -->
+    <!-- 共用彈出視窗：所有提示、確認、輸入與選單都透過 GlobalModal 控制。 -->
     <div id="globalModal" class="custom-modal-overlay">
       <div class="custom-modal-box">
-        <h3 id="gmTitle" style="margin-top:0; font-size:18px; font-weight:900; color:var(--text);"></h3>
-        <p id="gmContent" style="margin:10px 0 15px; font-size:14px; color:var(--muted); line-height:1.5;"></p>
-        <div id="gmInputWrapper" style="display:none; flex-direction:column; gap:8px; margin-bottom:15px;">
-          <input type="text" id="gmInput" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;" />
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:12px; color:var(--muted); font-weight:bold;">📅 插入日期：</span>
-            <input type="date" id="gmDateInput" style="padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; cursor:pointer; color:var(--text); flex-grow:1;" />
+        <h3
+          id="gmTitle"
+          style="
+            margin-top: 0;
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--text);
+          "
+        ></h3>
+        <p
+          id="gmContent"
+          style="
+            margin: 10px 0 15px;
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.5;
+          "
+        ></p>
+<div id="gmInputWrapper" style="display: none; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+          <input
+            type="text"
+            id="gmInput"
+            style="
+              width: 100%;
+              padding: 10px;
+              border: 1px solid #ccc;
+              border-radius: 6px;
+              box-sizing: border-box;
+            "
+          />
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 12px; color: var(--muted); font-weight: bold;">📅 插入日期：</span>
+            <input 
+              type="date" 
+              id="gmDateInput" 
+              style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; cursor: pointer; color: var(--text); flex-grow: 1;" 
+            />
           </div>
         </div>
-        <select id="gmSelect" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; display:none;"></select>
-        <div style="display:flex; justify-content:flex-end; gap:10px">
-          <button id="gmCancelBtn" style="padding:8px 16px; background:#e2e8f0; color:#333; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">取消</button>
-          <button id="gmConfirmBtn" style="padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">確定</button>
+        <select
+          id="gmSelect"
+          style="
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            display: none;
+          "
+        ></select>
+        <div style="display: flex; justify-content: flex-end; gap: 10px">
+          <button
+            id="gmCancelBtn"
+            style="
+              padding: 8px 16px;
+              background: #e2e8f0;
+              color: #333;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+          >
+            取消
+          </button>
+          <button
+            id="gmConfirmBtn"
+            style="
+              padding: 8px 16px;
+              background: var(--accent);
+              color: #fff;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+          >
+            確定
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- ── 手機分享 Action Sheet ── -->
-    <div id="shareActionSheet" class="share-action-sheet">
-      <div class="share-action-sheet-inner">
-        <div class="share-sheet-title">📤 選擇匯出方式</div>
-        <div id="shareSheetFilename" class="share-sheet-filename"></div>
-        <div class="share-sheet-btns">
-          <button id="shareSheetShareBtn" class="share-sheet-btn btn-share">☁️ 傳送至其他 App（LINE / 雲端）</button>
-          <button id="shareSheetLocalBtn" class="share-sheet-btn btn-local">💾 儲存到本機裝置</button>
-          <button id="shareSheetCancelBtn" class="share-sheet-btn btn-cancel">取消</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 左上控制列 -->
+    <!-- 左上角固定控制列：面板展開/收合與地圖搜尋入口。 -->
     <div class="top-controls">
-      <button id="panelToggle" class="icon-button" type="button" aria-expanded="false" title="展開面板" style="box-shadow:0 8px 20px rgba(22,36,52,0.18)">≡</button>
-      <button id="mapSearchToggle" class="map-search-btn" title="搜尋設備">🔍 搜尋</button>
+      <button
+        id="panelToggle"
+        class="icon-button"
+        type="button"
+        aria-expanded="false"
+        title="展開面板"
+        style="box-shadow: 0 8px 20px rgba(22, 36, 52, 0.18)"
+      >
+        ≡
+      </button>
+      <button id="mapSearchToggle" class="map-search-btn" title="搜尋設備">
+        🔍 搜尋
+      </button>
     </div>
 
-    <!-- 地圖浮動搜尋面板 -->
+    <!-- 浮動搜尋面板（fixed，跟隨左上角） -->
+
+    <!-- 地圖浮動搜尋面板：可依區域、圖號前綴或設備名稱搜尋。 -->
     <div id="mapSearchPanel" class="map-search-panel">
       <div class="map-search-inner">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-weight:800; font-size:14px; color:var(--accent-dark)">🔍 搜尋設備</span>
-          <button id="mapSearchClose" style="background:transparent; color:var(--muted); border:none; min-height:unset; padding:4px 8px; font-size:16px; cursor:pointer;">✕</button>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+          "
+        >
+          <span
+            style="font-weight: 800; font-size: 14px; color: var(--accent-dark)"
+            >🔍 搜尋設備</span
+          >
+          <button
+            id="mapSearchClose"
+            style="
+              background: transparent;
+              color: var(--muted);
+              border: none;
+              min-height: unset;
+              padding: 4px 8px;
+              font-size: 16px;
+              cursor: pointer;
+            "
+          >
+            ✕
+          </button>
         </div>
-        <select id="areaSelect"><option value="">全部區域</option></select>
-        <input id="searchInput" type="search" placeholder="例如 Q1295.Q1395.尖峰" autocomplete="off" />
-        <p style="font-size:11px; color:var(--muted); margin:0">💡 右鍵地圖可反推圖號座標並手動新增設備</p>
+        <select id="areaSelect">
+          <option value="">全部區域</option>
+        </select>
+        <input
+          id="searchInput"
+          type="search"
+          placeholder="例如 Q1295.Q1395.尖峰"
+          autocomplete="off"
+        />
+        <p style="font-size: 11px; color: var(--muted); margin: 0">
+          💡 右鍵地圖可反推圖號座標並手動新增設備
+        </p>
       </div>
       <div class="map-search-stats">
         <span>總點位 <strong id="totalCount">--</strong></span>
@@ -533,87 +936,257 @@
       <div id="results" class="map-search-results"></div>
     </div>
 
-    <!-- 主布局 -->
+    <!-- 主應用布局：左側巡視紀錄面板 + 右側地圖。 -->
     <main class="app is-panel-collapsed">
       <aside id="panel" class="panel is-collapsed">
         <header class="panel-head">
-          <div class="panel-title"><h1>土木設備分布地圖</h1></div>
-          <button id="toggleLabelsBtn" class="btn-global-toggle">隱藏所有主圖標籤</button>
+          <div class="panel-title">
+            <h1>土木設備分布地圖</h1>
+          </div>
+          <button id="toggleLabelsBtn" class="btn-global-toggle">
+            隱藏所有主圖標籤
+          </button>
         </header>
-        <nav class="tab-nav" style="display:none"></nav>
-        <div id="tabSearch" class="tab-content" style="display:none"></div>
+
+        <nav class="tab-nav" style="display: none"></nav>
+        <!-- tab-nav hidden, kept for JS compat -->
+
+        <div id="tabSearch" class="tab-content" style="display: none"></div>
+        <!-- hidden search tab placeholder -->
+
         <div id="tabRecords" class="tab-content is-active">
           <section class="folders-section" aria-label="巡視紀錄">
             <div class="folder-header">
-              <div style="display:flex; gap:8px; width:100%; justify-content:space-between;">
-                <span style="font-weight:bold; font-size:14px">全部地圖標記：</span>
+              <div
+                style="
+                  display: flex;
+                  gap: 8px;
+                  width: 100%;
+                  justify-content: space-between;
+                "
+              >
+                <span style="font-weight: bold; font-size: 14px"
+                  >全部地圖標記：</span
+                >
                 <div>
-                  <button id="showAllStarsBtn" class="text-button" style="font-size:12px; margin-right:8px">全部顯示⭐</button>
-                  <button id="hideAllStarsBtn" class="text-button" style="font-size:12px">全部隱藏🙈</button>
+                  <button
+                    id="showAllStarsBtn"
+                    class="text-button"
+                    style="font-size: 12px; margin-right: 8px"
+                  >
+                    全部顯示⭐
+                  </button>
+                  <button
+                    id="hideAllStarsBtn"
+                    class="text-button"
+                    style="font-size: 12px"
+                  >
+                    全部隱藏🙈
+                  </button>
                 </div>
               </div>
             </div>
+
             <div class="folder-btn-group">
-              <button id="addFolderBtn" class="btn-action btn-add-folder">+ 新增最上層資料夾</button>
-              <button id="importCsvBtn" class="btn-action btn-import-csv" title="支援 .xlsx, .xls, .csv">📥 匯入 Excel</button>
-              <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls,.xlsm" style="display:none" />
+              <button id="addFolderBtn" class="btn-action btn-add-folder">
+                + 新增最上層資料夾
+              </button>
+              <button
+                id="importCsvBtn"
+                class="btn-action btn-import-csv"
+                title="支援 .xlsx, .xls, .csv"
+              >
+                📥 匯入 Excel
+              </button>
+              <input
+                type="file"
+                id="importFileInput"
+                accept=".csv, .xlsx, .xls, .xlsm"
+                style="display: none"
+              />
             </div>
             <div class="folder-btn-group">
-              <button id="exportSystemBtn" class="btn-action btn-export-json" title="將所有資料夾與紀錄打包下載">💾 資料備份</button>
-              <button id="importSystemBtn" class="btn-action btn-import-json" title="從備份檔還原所有資料">📂 資料還原</button>
-              <input type="file" id="importSystemInput" accept=".json" style="display:none" />
+              <button
+                id="exportSystemBtn"
+                class="btn-action btn-export-json"
+                title="將所有資料夾與紀錄打包下載"
+              >
+                💾 資料備份
+              </button>
+              <button
+                id="importSystemBtn"
+                class="btn-action btn-import-json"
+                title="從備份檔還原所有資料"
+              >
+                📂 資料還原
+              </button>
+              <input
+                type="file"
+                id="importSystemInput"
+                accept=".json"
+                style="display: none"
+              />
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; padding:8px 12px; border-radius:6px; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <button id="selectAllBtn" style="background:#0f766e; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">全選 ☑️</button>
-                <span style="color:#b91c1c; font-size:13px; font-weight:bold">已選：<span id="selectedCount">0 項</span></span>
+
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #f8fafc;
+                border: 1px solid #cbd5e1;
+                padding: 8px 12px;
+                border-radius: 6px;
+                margin-bottom: 8px;
+                flex-wrap: wrap;
+                gap: 8px;
+              "
+            >
+              <div style="display: flex; align-items: center; gap: 8px">
+                <button
+                  id="selectAllBtn"
+                  style="
+                    background: #0f766e;
+                    color: white;
+                    border: none;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    min-height: 0;
+                  "
+                >
+                  全選 ☑️
+                </button>
+                <span style="color: #b91c1c; font-size: 13px; font-weight: bold"
+                  >已選：<span id="selectedCount">0 項</span></span
+                >
               </div>
-              <div id="batchActionGroup" style="display:none; gap:6px; flex-wrap:wrap">
-                <button id="batchExportBtn" style="background:#16a34a; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">匯出 📤</button>
-                <button id="batchMoveBtn" style="background:#2563eb; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">移動 🚚</button>
-                <button id="batchDeleteBtn" style="background:#dc2626; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">刪除 🗑️</button>
+
+              <div
+                id="batchActionGroup"
+                style="display: none; gap: 6px; flex-wrap: wrap"
+              >
+                <button
+                  id="batchExportBtn"
+                  style="
+                    background: #16a34a;
+                    color: white;
+                    border: none;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    min-height: 0;
+                  "
+                >
+                  匯出 📤
+                </button>
+                <button
+                  id="batchMoveBtn"
+                  style="
+                    background: #2563eb;
+                    color: white;
+                    border: none;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    min-height: 0;
+                  "
+                >
+                  移動 🚚
+                </button>
+                <button
+                  id="batchDeleteBtn"
+                  style="
+                    background: #dc2626;
+                    color: white;
+                    border: none;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    min-height: 0;
+                  "
+                >
+                  刪除 🗑️
+                </button>
               </div>
             </div>
+
             <div id="folderList" class="folder-list"></div>
           </section>
         </div>
       </aside>
+
       <section class="map-shell">
         <div id="map"></div>
-        <button id="locateButton" class="map-locate-button" type="button" aria-pressed="false" title="定位目前位置">定位</button>
+        <button
+          id="locateButton"
+          class="map-locate-button"
+          type="button"
+          aria-pressed="false"
+          title="定位目前位置"
+        >
+          定位
+        </button>
         <div id="status" class="status">載入資料中...</div>
       </section>
     </main>
 
+    <!-- 搜尋結果項目的模板，JS 會複製後填入設備名稱與圖號。 -->
     <template id="resultTemplate">
-      <button type="button" class="result-item"><strong></strong><span></span></button>
+      <button type="button" class="result-item">
+        <strong></strong><span></span>
+      </button>
     </template>
 
+    <!-- Leaflet 地圖函式庫與本頁主要程式。 -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+// ==========================================
+      // 全局自訂彈出視窗 (Modal)
       // ==========================================
-      // 全局 Modal
-      // ==========================================
+      // 共用 Modal 控制器：統一處理提示、確認、文字輸入與下拉選擇。
       const GlobalModal = {
         overlay: document.getElementById("globalModal"),
         titleEl: document.getElementById("gmTitle"),
         contentEl: document.getElementById("gmContent"),
-        inputWrapper: document.getElementById("gmInputWrapper"),
+        inputWrapper: document.getElementById("gmInputWrapper"), // [新增] 控制整個輸入區塊
         inputEl: document.getElementById("gmInput"),
-        dateInputEl: document.getElementById("gmDateInput"),
+        dateInputEl: document.getElementById("gmDateInput"),     // [新增] 日期選擇器元件
         selectEl: document.getElementById("gmSelect"),
         cancelBtn: document.getElementById("gmCancelBtn"),
         confirmBtn: document.getElementById("gmConfirmBtn"),
-        show({ title, content, type = "alert", defaultVal = "", selectHtml = "", onConfirm }) {
+
+        show({
+          title,
+          content,
+          type = "alert",
+          defaultVal = "",
+          selectHtml = "",
+          onConfirm,
+        }) {
           this.titleEl.textContent = title;
           this.contentEl.innerHTML = content;
+          
+          // [修改] 顯示 Wrapper 而非單一 input
           this.inputWrapper.style.display = type === "prompt" ? "flex" : "none";
           this.inputEl.value = defaultVal;
+          // [新增] 每次開啟時重置日期選擇器
           if (this.dateInputEl) this.dateInputEl.value = "";
+
           this.selectEl.style.display = type === "select" ? "block" : "none";
           this.selectEl.innerHTML = selectHtml;
           this.cancelBtn.style.display = type === "alert" ? "none" : "block";
-          this.cancelBtn.onclick = () => { this.overlay.style.display = "none"; };
+          this.cancelBtn.onclick = () => {
+            this.overlay.style.display = "none";
+          };
           this.confirmBtn.onclick = () => {
             this.overlay.style.display = "none";
             if (onConfirm) {
@@ -625,21 +1198,52 @@
           this.overlay.style.display = "flex";
           if (type === "prompt") setTimeout(() => this.inputEl.focus(), 100);
         },
-        alert(msg) { this.show({ title: "提示", content: msg, type: "alert" }); },
-        confirm(msg, onConfirm) { this.show({ title: "請確認", content: msg, type: "confirm", onConfirm }); },
-        prompt(msg, defaultVal, onConfirm) { this.show({ title: "輸入", content: msg, type: "prompt", defaultVal, onConfirm }); },
-        select(title, msg, selectHtml, onConfirm) { this.show({ title, content: msg, type: "select", selectHtml, onConfirm }); },
+        alert(msg) {
+          this.show({ title: "提示", content: msg, type: "alert" });
+        },
+        confirm(msg, onConfirm) {
+          this.show({
+            title: "請確認",
+            content: msg,
+            type: "confirm",
+            onConfirm,
+          });
+        },
+        prompt(msg, defaultVal, onConfirm) {
+          this.show({
+            title: "輸入",
+            content: msg,
+            type: "prompt",
+            defaultVal,
+            onConfirm,
+          });
+        },
+        select(title, msg, selectHtml, onConfirm) {
+          this.show({
+            title,
+            content: msg,
+            type: "select",
+            selectHtml,
+            onConfirm,
+          });
+        },
       };
 
       // ==========================================
-      // 日期選擇器自動帶入
+      // [新增] 監聽日期選擇事件，自動帶入文字框
       // ==========================================
       if (GlobalModal.dateInputEl) {
         GlobalModal.dateInputEl.addEventListener("change", (e) => {
           if (e.target.value) {
-            const selectedDate = e.target.value;
+            const selectedDate = e.target.value; // 取得格式為 YYYY-MM-DD 的日期
+            
+            // 智慧插入邏輯：
+            // 若原本有文字，先移除最前面的舊日期 (防呆設計)，再換上新日期
+            // 這樣你連續點選不同日期時，不會變成 "2026-05-242026-05-25巡視"
             const oldTextWithoutDate = GlobalModal.inputEl.value.replace(/^\d{4}-\d{2}-\d{2}/, '');
             GlobalModal.inputEl.value = selectedDate + oldTextWithoutDate;
+            
+            // 將焦點移回文字框，並把游標推到最後面，方便你繼續輸入「巡視」等文字
             GlobalModal.inputEl.focus();
             const len = GlobalModal.inputEl.value.length;
             GlobalModal.inputEl.setSelectionRange(len, len);
@@ -648,218 +1252,369 @@
       }
 
       // ==========================================
-      // 智慧匯出 Action Sheet（手機分享 / 桌機下載）
+      // 分頁切換邏輯（搜尋已移到地圖浮層，此函式保留相容性）
       // ==========================================
-      const shareSheet = {
-        el: document.getElementById("shareActionSheet"),
-        filenameEl: document.getElementById("shareSheetFilename"),
-        shareBtn: document.getElementById("shareSheetShareBtn"),
-        localBtn: document.getElementById("shareSheetLocalBtn"),
-        cancelBtn: document.getElementById("shareSheetCancelBtn"),
-        _pendingFile: null,
-        _pendingDownload: null,
-
-        open(file, downloadFn) {
-          this._pendingFile = file;
-          this._pendingDownload = downloadFn;
-          this.filenameEl.textContent = file.name;
-          this.el.classList.add("is-open");
-        },
-        close() {
-          this.el.classList.remove("is-open");
-          this._pendingFile = null;
-          this._pendingDownload = null;
-        },
-      };
-
-      // 分享按鈕：在使用者點擊的瞬間呼叫 navigator.share（確保手勢有效）
-      shareSheet.shareBtn.addEventListener("click", async () => {
-        const file = shareSheet._pendingFile;
-        const downloadFn = shareSheet._pendingDownload;
-        shareSheet.close();
-        if (!file) return;
-        try {
-          await navigator.share({ title: file.name, files: [file] });
-        } catch (err) {
-          // AbortError = 使用者自行取消，不需 fallback
-          if (err.name !== "AbortError") {
-            downloadFn && downloadFn();
-          }
-        }
-      });
-
-      shareSheet.localBtn.addEventListener("click", () => {
-        const downloadFn = shareSheet._pendingDownload;
-        shareSheet.close();
-        downloadFn && downloadFn();
-      });
-
-      shareSheet.cancelBtn.addEventListener("click", () => shareSheet.close());
-
-      // 點擊背景關閉
-      shareSheet.el.addEventListener("click", (e) => {
-        if (e.target === shareSheet.el) shareSheet.close();
-      });
-
-      /**
-       * exportOrShareFile
-       * - 桌機：直接下載
-       * - 手機（支援 Web Share API 檔案分享）：顯示 Action Sheet 讓使用者選擇
-       */
-      function exportOrShareFile(fileData, fileName, mimeType) {
-        const file = new File([fileData], fileName, { type: mimeType });
-
-        function downloadLocally() {
-          const blob = new Blob([fileData], { type: mimeType });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-
-        const canShare = !!(
-          navigator.share &&
-          navigator.canShare &&
-          navigator.canShare({ files: [file] })
-        );
-
-        if (canShare) {
-          // 顯示 Action Sheet，讓使用者在 Sheet 的按鈕點擊事件中呼叫 share
-          shareSheet.open(file, downloadLocally);
-        } else {
-          downloadLocally();
-        }
-      }
-
-      // ==========================================
-      // 分頁相容
-      // ==========================================
+      const tabSearchBtn = document.getElementById("tabSearchBtn"); // null (hidden)
+      const tabRecordsBtn = document.getElementById("tabRecordsBtn"); // null (hidden)
+      const tabSearch = document.getElementById("tabSearch");
       const tabRecords = document.getElementById("tabRecords");
+
       function switchTab(tabId) {
-        if (tabId === "records") tabRecords.classList.add("is-active");
+        // 搜尋已移到地圖浮層，切換到 records 僅確保面板可見
+        if (tabId === "records") {
+          tabRecords.classList.add("is-active");
+        }
       }
 
-      document.getElementById("mapSearchToggle").addEventListener("click", () => {
-        document.getElementById("mapSearchPanel").classList.toggle("is-open");
-      });
-      document.getElementById("mapSearchClose").addEventListener("click", () => {
-        document.getElementById("mapSearchPanel").classList.remove("is-open");
-      });
+      // 地圖浮動搜尋面板開關
+      const mapSearchPanel = document.getElementById("mapSearchPanel");
+      document
+        .getElementById("mapSearchToggle")
+        .addEventListener("click", () => {
+          mapSearchPanel.classList.toggle("is-open");
+        });
+      document
+        .getElementById("mapSearchClose")
+        .addEventListener("click", () => {
+          mapSearchPanel.classList.remove("is-open");
+        });
 
       // ==========================================
-      // 座標轉換
+      // 反推圖號座標核心邏輯
       // ==========================================
       const PI = Math.PI;
+
+      // 座標轉換：WGS84 經緯度轉 TWD67 TM2，再推算台電圖號。
       function wgs84ToTwd67Tm2(latDeg, lngDeg) {
-        const lat = (latDeg * PI) / 180.0, lng = (lngDeg * PI) / 180.0;
-        const a84 = 6378137.0, b84 = 6356752.314245, a67 = 6378160.0, b67 = 6356774.7192;
+        const lat = (latDeg * PI) / 180.0,
+          lng = (lngDeg * PI) / 180.0;
+        const a84 = 6378137.0,
+          b84 = 6356752.314245,
+          a67 = 6378160.0,
+          b67 = 6356774.7192;
         const e2_84 = 1 - b84 ** 2 / a84 ** 2;
         const n84 = a84 / Math.sqrt(1 - e2_84 * Math.sin(lat) ** 2);
-        const x84 = n84 * Math.cos(lat) * Math.cos(lng), y84 = n84 * Math.cos(lat) * Math.sin(lng), z84 = n84 * (1 - e2_84) * Math.sin(lat);
-        const dx = -752.0, dy = -358.0, dz = -179.0, rx = -0.0000011698, ry = 0.0000018398, rz = 0.0000009822, s = 0.00002329;
-        const x67 = x84 - dx - s * x84 + rz * y84 - ry * z84, y67 = y84 - dy - rz * x84 - s * y84 + rx * z84, z67 = z84 - dz + ry * x84 - rx * y84 - s * z84;
-        const e2_67 = 1 - b67 ** 2 / a67 ** 2, ep2_67 = (a67 ** 2 - b67 ** 2) / b67 ** 2;
-        const p = Math.sqrt(x67 ** 2 + y67 ** 2), theta = Math.atan2(z67 * a67, p * b67);
-        const lat67 = Math.atan2(z67 + ep2_67 * b67 * Math.sin(theta) ** 3, p - e2_67 * a67 * Math.cos(theta) ** 3), lng67 = Math.atan2(y67, x67);
-        const lng0 = (121.0 * PI) / 180.0, k0 = 0.9999, e_prime2 = e2_67 / (1.0 - e2_67), nu = a67 / Math.sqrt(1.0 - e2_67 * Math.sin(lat67) ** 2), p_lon = lng67 - lng0;
-        const A = a67 * (1.0 - e2_67 / 4.0 - (3.0 * e2_67 ** 2) / 64.0 - (5.0 * e2_67 ** 3) / 256.0), B = a67 * ((3.0 * e2_67) / 8.0 + (3.0 * e2_67 ** 2) / 32.0 + (45.0 * e2_67 ** 3) / 1024.0);
-        const C = a67 * ((15.0 * e2_67 ** 2) / 256.0 + (45.0 * e2_67 ** 3) / 1024.0), D = a67 * ((35.0 * e2_67 ** 3) / 3072.0);
-        const M = A * lat67 - B * Math.sin(2.0 * lat67) + C * Math.sin(4.0 * lat67) - D * Math.sin(6.0 * lat67);
-        const sinLat = Math.sin(lat67), cosLat = Math.cos(lat67), tanLat = Math.tan(lat67), t = tanLat ** 2, c = e_prime2 * cosLat ** 2;
-        const tm2_x = k0 * nu * p_lon * cosLat * (1.0 + (p_lon ** 2 / 6.0) * cosLat ** 2 * (1.0 - t + c) + (p_lon ** 4 / 120.0) * cosLat ** 4 * (5.0 - 18.0 * t + t ** 2 + 72.0 * c - 58.0 * e_prime2));
-        const tm2_y = k0 * (M + nu * tanLat * ((p_lon ** 2 / 2.0) * cosLat ** 2 + (p_lon ** 4 / 24.0) * cosLat ** 4 * (5.0 - t + 9.0 * c + 4.0 * c ** 2) + (p_lon ** 6 / 720.0) * cosLat ** 6 * (61.0 - 58.0 * t + t ** 2 + 600.0 * c - 330.0 * e_prime2)));
+        const x84 = n84 * Math.cos(lat) * Math.cos(lng),
+          y84 = n84 * Math.cos(lat) * Math.sin(lng),
+          z84 = n84 * (1 - e2_84) * Math.sin(lat);
+        const dx = -752.0,
+          dy = -358.0,
+          dz = -179.0,
+          rx = -0.0000011698,
+          ry = 0.0000018398,
+          rz = 0.0000009822,
+          s = 0.00002329;
+        const x67 = x84 - dx - s * x84 + rz * y84 - ry * z84,
+          y67 = y84 - dy - rz * x84 - s * y84 + rx * z84,
+          z67 = z84 - dz + ry * x84 - rx * y84 - s * z84;
+        const e2_67 = 1 - b67 ** 2 / a67 ** 2,
+          ep2_67 = (a67 ** 2 - b67 ** 2) / b67 ** 2;
+        const p = Math.sqrt(x67 ** 2 + y67 ** 2),
+          theta = Math.atan2(z67 * a67, p * b67);
+        const lat67 = Math.atan2(
+            z67 + ep2_67 * b67 * Math.sin(theta) ** 3,
+            p - e2_67 * a67 * Math.cos(theta) ** 3,
+          ),
+          lng67 = Math.atan2(y67, x67);
+        const lng0 = (121.0 * PI) / 180.0,
+          k0 = 0.9999,
+          e_prime2 = e2_67 / (1.0 - e2_67),
+          nu = a67 / Math.sqrt(1.0 - e2_67 * Math.sin(lat67) ** 2),
+          p_lon = lng67 - lng0;
+        const A =
+            a67 *
+            (1.0 -
+              e2_67 / 4.0 -
+              (3.0 * e2_67 ** 2) / 64.0 -
+              (5.0 * e2_67 ** 3) / 256.0),
+          B =
+            a67 *
+            ((3.0 * e2_67) / 8.0 +
+              (3.0 * e2_67 ** 2) / 32.0 +
+              (45.0 * e2_67 ** 3) / 1024.0);
+        const C =
+            a67 * ((15.0 * e2_67 ** 2) / 256.0 + (45.0 * e2_67 ** 3) / 1024.0),
+          D = a67 * ((35.0 * e2_67 ** 3) / 3072.0);
+        const M =
+          A * lat67 -
+          B * Math.sin(2.0 * lat67) +
+          C * Math.sin(4.0 * lat67) -
+          D * Math.sin(6.0 * lat67);
+        const sinLat = Math.sin(lat67),
+          cosLat = Math.cos(lat67),
+          tanLat = Math.tan(lat67),
+          t = tanLat ** 2,
+          c = e_prime2 * cosLat ** 2;
+        const tm2_x =
+          k0 *
+          nu *
+          p_lon *
+          cosLat *
+          (1.0 +
+            (p_lon ** 2 / 6.0) * cosLat ** 2 * (1.0 - t + c) +
+            (p_lon ** 4 / 120.0) *
+              cosLat ** 4 *
+              (5.0 - 18.0 * t + t ** 2 + 72.0 * c - 58.0 * e_prime2));
+        const tm2_y =
+          k0 *
+          (M +
+            nu *
+              tanLat *
+              ((p_lon ** 2 / 2.0) * cosLat ** 2 +
+                (p_lon ** 4 / 24.0) *
+                  cosLat ** 4 *
+                  (5.0 - t + 9.0 * c + 4.0 * c ** 2) +
+                (p_lon ** 6 / 720.0) *
+                  cosLat ** 6 *
+                  (61.0 - 58.0 * t + t ** 2 + 600.0 * c - 330.0 * e_prime2)));
         return { x: tm2_x + 250000.0, y: tm2_y };
       }
+
       const GRID_BASES = {
-        A:[170000,2750000], B:[250000,2750000], C:[330000,2750000], D:[170000,2700000], E:[250000,2700000], F:[330000,2700000],
-        G:[170000,2650000], H:[250000,2650000], J:[90000,2600000], K:[170000,2600000], L:[250000,2600000], M:[90000,2550000],
-        N:[170000,2550000], O:[250000,2550000], P:[90000,2500000], Q:[170000,2500000], R:[250000,2500000], T:[170000,2450000],
-        U:[250000,2450000], V:[170000,2400000], W:[250000,2400000], X:[275000,2614000], Y:[275000,2564000],
+        A: [170000, 2750000],
+        B: [250000, 2750000],
+        C: [330000, 2750000],
+        D: [170000, 2700000],
+        E: [250000, 2700000],
+        F: [330000, 2700000],
+        G: [170000, 2650000],
+        H: [250000, 2650000],
+        J: [90000, 2600000],
+        K: [170000, 2600000],
+        L: [250000, 2600000],
+        M: [90000, 2550000],
+        N: [170000, 2550000],
+        O: [250000, 2550000],
+        P: [90000, 2500000],
+        Q: [170000, 2500000],
+        R: [250000, 2500000],
+        T: [170000, 2450000],
+        U: [250000, 2450000],
+        V: [170000, 2400000],
+        W: [250000, 2400000],
+        X: [275000, 2614000],
+        Y: [275000, 2564000],
       };
+
       function tm2ToTpc(x, y) {
-        let bestBase = "", bx = 0, by = 0;
+        let bestBase = "",
+          bx = 0,
+          by = 0;
         for (const [char, [cx, cy]] of Object.entries(GRID_BASES)) {
-          const dx = x - cx, dy = y - cy;
-          if (dx >= 0 && dx < 80000 && dy >= 0 && dy < 50000) { bestBase = char; bx = cx; by = cy; break; }
+          const dx = x - cx,
+            dy = y - cy;
+          if (dx >= 0 && dx < 80000 && dy >= 0 && dy < 50000) {
+            bestBase = char;
+            bx = cx;
+            by = cy;
+            break;
+          }
         }
         if (!bestBase) return "座標超出範圍";
-        const dx = x - bx, dy = y - by;
-        const t2x = String(Math.floor(dx / 800)).padStart(2, "0"), t2y = String(Math.floor(dy / 500)).padStart(2, "0");
-        const remX = dx % 800, remY = dy % 500;
-        const t3x = String.fromCharCode(65 + Math.floor(remX / 100)), t3y = String.fromCharCode(65 + Math.floor(remY / 100));
-        const rremX = remX % 100, rremY = remY % 100;
-        const t5x = String(Math.floor(rremX / 10)), t5y = String(Math.floor(rremY / 10));
-        const rrremX = rremX % 10, rrremY = rremY % 10;
-        return `${bestBase}${t2x}${t2y}${t3x}${t3y}${t5x}${t5y}${Math.floor(rrremX)}${Math.floor(rrremY)}`;
+        const dx = x - bx,
+          dy = y - by;
+        const t2x = String(Math.floor(dx / 800)).padStart(2, "0"),
+          t2y = String(Math.floor(dy / 500)).padStart(2, "0");
+        const remX = dx % 800,
+          remY = dy % 500;
+        const t3x = String.fromCharCode(65 + Math.floor(remX / 100)),
+          t3y = String.fromCharCode(65 + Math.floor(remY / 100));
+        const rremX = remX % 100,
+          rremY = remY % 100;
+        const t5x = String(Math.floor(rremX / 10)),
+          t5y = String(Math.floor(rremY / 10));
+        const rrremX = rremX % 10,
+          rrremY = rremY % 10;
+        const t99x = String(Math.floor(rrremX)),
+          t99y = String(Math.floor(rrremY));
+        return `${bestBase}${t2x}${t2y}${t3x}${t3y}${t5x}${t5y}${t99x}${t99y}`;
       }
+
       function latLngToTpcCode(lat, lng) {
-        try { const { x, y } = wgs84ToTwd67Tm2(lat, lng); return tm2ToTpc(x, y); }
-        catch (e) { return `GPS_${lat.toFixed(4)}_${lng.toFixed(4)}`; }
+        try {
+          const { x, y } = wgs84ToTwd67Tm2(lat, lng);
+          return tm2ToTpc(x, y);
+        } catch (e) {
+          return `GPS_${lat.toFixed(4)}_${lng.toFixed(4)}`;
+        }
       }
+
+      // ==========================================
+      // [新增] 反向：TPC 圖號 → WGS84 經緯度
+      // 格式：字母(1) + 2碼X + 2碼Y + 字母X + 字母Y + 數字X + 數字Y [+ 數字X + 數字Y]
+      // ==========================================
+
+      // 反向座標轉換：將台電圖號粗略還原成 WGS84 經緯度。
       function tpcCodeToLatLng(code) {
         try {
           const c = code.trim().toUpperCase().replace(/\s+/g, "");
           if (c.length < 9) return null;
-          const base = c[0], baseCoords = GRID_BASES[base];
+          const base = c[0];
+          const baseCoords = GRID_BASES[base];
           if (!baseCoords) return null;
           const [bx, by] = baseCoords;
-          const t2x = parseInt(c.slice(1, 3)), t2y = parseInt(c.slice(3, 5));
-          const t3x = c.charCodeAt(5) - 65, t3y = c.charCodeAt(6) - 65;
-          const t5x = parseInt(c[7]), t5y = parseInt(c[8]);
+
+          const t2x = parseInt(c.slice(1, 3));
+          const t2y = parseInt(c.slice(3, 5));
+          const t3x = c.charCodeAt(5) - 65; // A=0, B=1...
+          const t3y = c.charCodeAt(6) - 65;
+          const t5x = parseInt(c[7]);
+          const t5y = parseInt(c[8]);
           if ([t2x, t2y, t3x, t3y, t5x, t5y].some(isNaN)) return null;
-          let t99x = 5, t99y = 5;
-          if (c.length >= 11) { t99x = parseInt(c[9]) + 0.5; t99y = parseInt(c[10]) + 0.5; }
-          const dx = t2x * 800 + t3x * 100 + t5x * 10 + t99x, dy = t2y * 500 + t3y * 100 + t5y * 10 + t99y;
-          const tm2_x_fe = bx + dx, tm2_y = by + dy;
-          const a67 = 6378160.0, b67 = 6356774.7192, e2_67 = 1 - (b67 * b67) / (a67 * a67), e_p2 = e2_67 / (1 - e2_67), k0 = 0.9999, lng0 = (121.0 * PI) / 180.0;
-          const A = a67 * (1 - e2_67 / 4 - (3 * e2_67 ** 2) / 64 - (5 * e2_67 ** 3) / 256);
-          const M0 = tm2_y / k0, mu = M0 / A;
+
+          // 若有第10、11碼則精確到個位，否則取格子中心
+          let t99x = 5,
+            t99y = 5;
+          if (c.length >= 11) {
+            t99x = parseInt(c[9]) + 0.5;
+            t99y = parseInt(c[10]) + 0.5;
+          }
+
+          const dx = t2x * 800 + t3x * 100 + t5x * 10 + t99x;
+          const dy = t2y * 500 + t3y * 100 + t5y * 10 + t99y;
+          const tm2_x_fe = bx + dx; // 含 250000 false easting
+          const tm2_y = by + dy;
+
+          // ── Step 2: 逆 TM 投影 → TWD67 弧度座標 ──
+          const a67 = 6378160.0,
+            b67 = 6356774.7192;
+          const e2_67 = 1 - (b67 * b67) / (a67 * a67);
+          const e_p2 = e2_67 / (1 - e2_67);
+          const k0 = 0.9999;
+          const lng0 = (121.0 * PI) / 180.0;
+
+          const A =
+            a67 *
+            (1 - e2_67 / 4 - (3 * e2_67 ** 2) / 64 - (5 * e2_67 ** 3) / 256);
+          const M0 = tm2_y / k0;
+          const mu = M0 / A;
+
           const e1 = (1 - Math.sqrt(1 - e2_67)) / (1 + Math.sqrt(1 - e2_67));
-          const lat1 = mu + ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu) + ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu) + ((151 * e1 ** 3) / 96) * Math.sin(6 * mu) + ((1097 * e1 ** 4) / 512) * Math.sin(8 * mu);
-          const sinL1 = Math.sin(lat1), cosL1 = Math.cos(lat1), tanL1 = Math.tan(lat1);
-          const N1 = a67 / Math.sqrt(1 - e2_67 * sinL1 ** 2), R1 = (a67 * (1 - e2_67)) / Math.pow(1 - e2_67 * sinL1 ** 2, 1.5);
-          const T1 = tanL1 ** 2, C1 = e_p2 * cosL1 ** 2, Dv = (tm2_x_fe - 250000) / (N1 * k0);
-          const lat67 = lat1 - ((N1 * tanL1) / R1) * (Dv ** 2 / 2 - ((5 + 3 * T1 + 10 * C1 - 4 * C1 ** 2 - 9 * e_p2) * Dv ** 4) / 24 + ((61 + 90 * T1 + 298 * C1 + 45 * T1 ** 2 - 252 * e_p2 - 3 * C1 ** 2) * Dv ** 6) / 720);
-          const lng67 = lng0 + (Dv - ((1 + 2 * T1 + C1) * Dv ** 3) / 6 + ((5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * e_p2 + 24 * T1 ** 2) * Dv ** 5) / 120) / cosL1;
+          const lat1 =
+            mu +
+            ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu) +
+            ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu) +
+            ((151 * e1 ** 3) / 96) * Math.sin(6 * mu) +
+            ((1097 * e1 ** 4) / 512) * Math.sin(8 * mu);
+
+          const sinL1 = Math.sin(lat1),
+            cosL1 = Math.cos(lat1),
+            tanL1 = Math.tan(lat1);
+          const N1 = a67 / Math.sqrt(1 - e2_67 * sinL1 ** 2);
+          const R1 =
+            (a67 * (1 - e2_67)) / Math.pow(1 - e2_67 * sinL1 ** 2, 1.5);
+          const T1 = tanL1 ** 2,
+            C1 = e_p2 * cosL1 ** 2;
+          const D = (tm2_x_fe - 250000) / (N1 * k0);
+
+          const lat67 =
+            lat1 -
+            ((N1 * tanL1) / R1) *
+              (D ** 2 / 2 -
+                ((5 + 3 * T1 + 10 * C1 - 4 * C1 ** 2 - 9 * e_p2) * D ** 4) /
+                  24 +
+                ((61 +
+                  90 * T1 +
+                  298 * C1 +
+                  45 * T1 ** 2 -
+                  252 * e_p2 -
+                  3 * C1 ** 2) *
+                  D ** 6) /
+                  720);
+          const lng67 =
+            lng0 +
+            (D -
+              ((1 + 2 * T1 + C1) * D ** 3) / 6 +
+              ((5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * e_p2 + 24 * T1 ** 2) *
+                D ** 5) /
+                120) /
+              cosL1;
+
+          // ── Step 3: TWD67 弧度 → TWD67 ECEF ──
           const N67 = a67 / Math.sqrt(1 - e2_67 * Math.sin(lat67) ** 2);
-          const x67 = N67 * Math.cos(lat67) * Math.cos(lng67), y67 = N67 * Math.cos(lat67) * Math.sin(lng67), z67 = N67 * (1 - e2_67) * Math.sin(lat67);
-          const dxH = -752.0, dyH = -358.0, dzH = -179.0, rx = -0.0000011698, ry = 0.0000018398, rz = 0.0000009822, sH = 0.00002329;
-          const x84 = x67 + dxH + sH * x67 - rz * y67 + ry * z67, y84 = y67 + dyH + rz * x67 + sH * y67 - rx * z67, z84 = z67 + dzH - ry * x67 + rx * y67 + sH * z67;
-          const a84 = 6378137.0, b84 = 6356752.314245, e2_84 = 1 - (b84 * b84) / (a84 * a84), ep2_84 = (a84 * a84 - b84 * b84) / (b84 * b84);
-          const pv = Math.sqrt(x84 ** 2 + y84 ** 2), theta84 = Math.atan2(z84 * a84, pv * b84);
-          const lat84 = Math.atan2(z84 + ep2_84 * b84 * Math.sin(theta84) ** 3, pv - e2_84 * a84 * Math.cos(theta84) ** 3);
+          const x67 = N67 * Math.cos(lat67) * Math.cos(lng67);
+          const y67 = N67 * Math.cos(lat67) * Math.sin(lng67);
+          const z67 = N67 * (1 - e2_67) * Math.sin(lat67);
+
+          // ── Step 4: 逆 Helmert → WGS84 ECEF（一階近似）──
+          const dxH = -752.0,
+            dyH = -358.0,
+            dzH = -179.0;
+          const rx = -0.0000011698,
+            ry = 0.0000018398,
+            rz = 0.0000009822,
+            s = 0.00002329;
+          const x84 = x67 + dxH + s * x67 - rz * y67 + ry * z67;
+          const y84 = y67 + dyH + rz * x67 + s * y67 - rx * z67;
+          const z84 = z67 + dzH - ry * x67 + rx * y67 + s * z67;
+
+          // ── Step 5: WGS84 ECEF → WGS84 弧度 → 度 ──
+          const a84 = 6378137.0,
+            b84 = 6356752.314245;
+          const e2_84 = 1 - (b84 * b84) / (a84 * a84);
+          const ep2_84 = (a84 * a84 - b84 * b84) / (b84 * b84);
+          const p = Math.sqrt(x84 ** 2 + y84 ** 2);
+          const theta = Math.atan2(z84 * a84, p * b84);
+          const lat84 = Math.atan2(
+            z84 + ep2_84 * b84 * Math.sin(theta) ** 3,
+            p - e2_84 * a84 * Math.cos(theta) ** 3,
+          );
           const lng84 = Math.atan2(y84, x84);
+
           return { lat: (lat84 * 180) / PI, lng: (lng84 * 180) / PI };
-        } catch (e) { return null; }
+        } catch (e) {
+          return null;
+        }
       }
 
       // ==========================================
-      // 地圖初始化
+      // 核心變數與地圖初始化
       // ==========================================
-      const map = L.map("map", { preferCanvas: true, zoomControl: false, attributionControl: true });
-      L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
 
-      const SHOW_POINTS_ZOOM = 15, MAX_POINT_LABELS = 1200, MAX_DIRECT_POINTS = 3500;
+      // Leaflet 地圖初始化：設定縮放控制、底圖來源與最大縮放層級。
+      const map = L.map("map", {
+        preferCanvas: true,
+        zoomControl: false,
+        attributionControl: true,
+      });
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      // 將地圖上限調到 21，但跟底圖來源說圖片最多只下載到 19 級，超過的級數用第 19 級的圖片去數位放大
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 21, // 讓按鈕可以點到 21 級
+        maxNativeZoom: 19, // 實際上圖片下載到 19 級為止，防止變空白畫面
+        attribution: "© OpenStreetMap",
+      }).addTo(map);
+
+      const SHOW_POINTS_ZOOM = 15;
+      const MAX_POINT_LABELS = 1200;
+      const MAX_DIRECT_POINTS = 3500;
       const STORAGE_KEY = "taipower_inspection_v7";
 
+      // 全域狀態：集中保存設備資料、搜尋條件、資料夾、紀錄與顯示設定。
       const state = {
-        points: [], meta: null, area: "", query: "",
+        points: [],
+        meta: null,
+        area: "",
+        query: "",
         search: { prefixes: [], terms: [] },
-        visiblePoints: [], drawnItems: [], equipmentColorMap: new Map(),
-        displayMode: "prefix", folders: [], records: [],
-        hiddenRecordFolders: new Set(), expandedFolders: new Set(),
-        selectedFolders: new Set(), selectedRecords: new Set(),
-        labelsHidden: false, lastFolderId: null,
+        visiblePoints: [],
+        drawnItems: [],
+        equipmentColorMap: new Map(),
+        displayMode: "prefix",
+        folders: [],
+        records: [],
+        hiddenRecordFolders: new Set(),
+        expandedFolders: new Set(),
+        selectedFolders: new Set(),
+        selectedRecords: new Set(),
+        labelsHidden: false,
+        lastFolderId: null, // 【新增】用來記錄最後一次使用的資料夾 ID
       };
 
       const statusBox = document.querySelector("#status");
       const folderList = document.querySelector("#folderList");
       const selectedCountText = document.getElementById("selectedCount");
+      const batchActionBar = document.getElementById("batchActionBar");
       const areaSelect = document.getElementById("areaSelect");
       const searchInput = document.getElementById("searchInput");
       const results = document.getElementById("results");
@@ -872,52 +1627,81 @@
       let recordsLayer = L.featureGroup().addTo(map);
 
       // ==========================================
-      // 工具函式
+      // 自然排序（數字段按數值比較，如 尖峰1 < 尖峰2 < 尖峰10 < 尖峰11）
       // ==========================================
-      function compareNatural(a, b) { return a.localeCompare(b, "zh-Hant", { numeric: true, sensitivity: "base" }); }
-      function comparePointsByName(a, b) { return compareNatural(a.name || a.code || "", b.name || b.code || ""); }
-      function escapeHtml(v) { return String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;"); }
-      function formatNumber(v) { return new Intl.NumberFormat("zh-TW").format(v); }
-      function debounce(fn, wait = 180) { let t = 0; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), wait); }; }
-      function setStatus(text) { statusBox.textContent = text; }
+      function compareNatural(strA, strB) {
+        return strA.localeCompare(strB, "zh-Hant", {
+          numeric: true,
+          sensitivity: "base",
+        });
+      }
+      function comparePointsByName(a, b) {
+        const nameA = a.name || a.code || "";
+        const nameB = b.name || b.code || "";
+        return compareNatural(nameA, nameB);
+      }
 
+      // [新增] 遞迴取得資料夾（含所有子層）的全部紀錄
       function getAllRecordsInFolder(folderId) {
-        const direct = state.records.filter(r => r.folderId === folderId);
-        const children = state.folders.filter(f => f.parentId === folderId);
+        const direct = state.records.filter((r) => r.folderId === folderId);
+        const children = state.folders.filter((f) => f.parentId === folderId);
         let all = [...direct];
-        for (const child of children) all = all.concat(getAllRecordsInFolder(child.id));
+        for (const child of children) {
+          all = all.concat(getAllRecordsInFolder(child.id));
+        }
         return all;
       }
-      function getAllRecordIdsInFolder(folderId) { return getAllRecordsInFolder(folderId).map(r => r.id); }
 
-      // ==========================================
-      // ✅ 修正：全域遞迴刪除資料夾（供單刪與批次刪共用）
-      // ==========================================
-      function deleteFolderRecursive(fId) {
-        state.folders.filter(f => f.parentId === fId).forEach(child => deleteFolderRecursive(child.id));
-        state.records = state.records.filter(r => r.folderId !== fId);
-        state.folders = state.folders.filter(f => f.id !== fId);
-        state.hiddenRecordFolders.delete(fId);
-        state.expandedFolders.delete(fId);
-        state.selectedFolders.delete(fId);
+      // [新增] 遞迴取得資料夾（含所有子層）的全部紀錄 ID
+      function getAllRecordIdsInFolder(folderId) {
+        return getAllRecordsInFolder(folderId).map((r) => r.id);
       }
 
+      // ==========================================
+      // 【全域設定】不良項目快捷標籤清單（未來只要修改這裡即可）
+      // 分類只是用來整理快捷按鈕；實際儲存仍然只存輸入框的一段文字。
+      // ==========================================
       const DEFECT_GROUPS = [
-        { label: "樹修", open: true, items: ["樹木修剪", "藤蔓清除", "竹枝清除", "椰樹修剪"] },
-        { label: "導線", open: false, items: ["防雷脫落", "低壓脫落"] },
-        { label: "設計", open: false, items: ["不良", "游休TR", "橫擔腐蝕"] },
-        { label: "雜項", open: false, items: ["桿上異物"] },
+        {
+          label: "樹修",
+          open: true,
+          items: ["樹木修剪", "藤蔓清除", "竹枝清除", "椰樹修剪"],
+        },
+        {
+          label: "導線",
+          open: false,
+          items: ["防雷脫落", "低壓脫落"],
+        },
+		 {
+          label: "設計",
+          open: false,
+          items: ["不良", "游休TR", "橫擔腐蝕"],
+        },
+        {
+          label: "雜項",
+          open: false,
+          items: ["桿上異物"],
+        },
       ];
 
+      // [修正] 依路徑字串（含斜線階層）找到或建立資料夾，傳回最底層資料夾 id
+      // 支援格式：「5月21日」或「5月21日 / 子資料夾 / 孫資料夾」
       function findOrCreateFolderByPath(pathStr) {
-        const parts = pathStr.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
+        const parts = pathStr
+          .split(/\s*\/\s*/)
+          .map((s) => s.trim())
+          .filter(Boolean);
         if (!parts.length) return null;
-        let parentId = null, currentFolder = null;
+        let parentId = null;
+        let currentFolder = null;
         for (const part of parts) {
-          currentFolder = state.folders.find(f => f.name === part && f.parentId === parentId);
+          currentFolder = state.folders.find(
+            (f) => f.name === part && f.parentId === parentId,
+          );
           if (!currentFolder) {
-            const newId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-            currentFolder = { id: newId, name: part, parentId };
+            const newId =
+              Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+            currentFolder = { id: newId, name: part, parentId: parentId };
             state.folders.push(currentFolder);
             state.expandedFolders.add(newId);
           }
@@ -927,156 +1711,277 @@
       }
 
       function setPanelCollapsed(collapsed) {
-        document.querySelector("#panel").classList.toggle("is-collapsed", collapsed);
-        document.querySelector(".app").classList.toggle("is-panel-collapsed", collapsed);
+        document
+          .querySelector("#panel")
+          .classList.toggle("is-collapsed", collapsed);
+        document
+          .querySelector(".app")
+          .classList.toggle("is-panel-collapsed", collapsed);
         window.setTimeout(() => map.invalidateSize(), 220);
       }
+
       document.getElementById("panelToggle").addEventListener("click", () => {
         const panel = document.querySelector("#panel");
         const collapsed = !panel.classList.contains("is-collapsed");
         setPanelCollapsed(collapsed);
-        document.getElementById("panelToggle").setAttribute("aria-expanded", String(!collapsed));
+        document
+          .getElementById("panelToggle")
+          .setAttribute("aria-expanded", String(!collapsed));
       });
 
       // ==========================================
-      // LocalStorage
+      // LocalStorage 資料存取與遷移
       // ==========================================
+
+      // LocalStorage：保存資料夾、紀錄與最後使用的資料夾，讓下次開啟可延續使用。
       function saveToLocalStorage() {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({ folders: state.folders, records: state.records, lastFolderId: state.lastFolderId }));
-        } catch (e) { console.error("儲存失敗:", e); }
+          // 【修改】將 lastFolderId 也明確寫入 localStorage 中保存
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              folders: state.folders,
+              records: state.records,
+              lastFolderId: state.lastFolderId,
+            }),
+          );
+        } catch (e) {
+          console.error("儲存失敗:", e);
+        }
         renderFolders();
         updateRecordMarkers();
       }
+
       function loadFromLocalStorage() {
         try {
-          let dataStr = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("taipower_inspection_v6") || localStorage.getItem("taipower_inspection_v5");
+          let dataStr =
+            localStorage.getItem(STORAGE_KEY) ||
+            localStorage.getItem("taipower_inspection_v6") ||
+            localStorage.getItem("taipower_inspection_v5");
           if (dataStr) {
             const parsed = JSON.parse(dataStr);
             state.folders = parsed.folders || [];
             state.records = parsed.records || [];
+
+            // 【修改】直接從 localStorage 讀取上次存檔的 lastFolderId
             state.lastFolderId = parsed.lastFolderId || null;
-            state.folders.forEach(f => { if (typeof f.parentId === "undefined") f.parentId = null; });
-            state.records.forEach(r => { if (!r.id) r.id = "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 6); });
-            if (!state.lastFolderId && state.records.length > 0) state.lastFolderId = state.records[state.records.length - 1].folderId;
+
+            // 升級遷移
+            state.folders.forEach((f) => {
+              if (typeof f.parentId === "undefined") f.parentId = null;
+            });
+            state.records.forEach((r) => {
+              if (!r.id)
+                r.id =
+                  "rec_" +
+                  Date.now().toString(36) +
+                  Math.random().toString(36).substr(2, 6);
+            });
+
+            // 作為備用機制：如果沒有存到 lastFolderId，才拿最後一筆紀錄來用
+            if (!state.lastFolderId && state.records.length > 0) {
+              state.lastFolderId =
+                state.records[state.records.length - 1].folderId;
+            }
+
             if (!localStorage.getItem(STORAGE_KEY)) saveToLocalStorage();
           }
-        } catch (e) { console.error("讀取 localStorage 失敗:", e); }
+        } catch (e) {
+          console.error("讀取 localStorage 失敗:", e);
+        }
       }
+
       function getFullFolderPath(folderId) {
-        let path = [], curr = state.folders.find(f => f.id === folderId);
-        while (curr) { path.unshift(curr.name); curr = state.folders.find(f => f.id === curr.parentId); }
+        let path = [];
+        let curr = state.folders.find((f) => f.id === folderId);
+        while (curr) {
+          path.unshift(curr.name);
+          curr = state.folders.find((f) => f.id === curr.parentId);
+        }
         return path.join(" / ");
       }
-      function getFolderOptionsHtml(selectedId = null, excludeFolderId = null, includeRoot = false) {
-        let html = includeRoot ? '<option value="">(最上層)</option>' : '<option value="">(請選擇資料夾)</option>';
+
+      function getFolderOptionsHtml(
+        selectedId = null,
+        excludeFolderId = null,
+        includeRoot = false,
+      ) {
+        let html = includeRoot
+          ? '<option value="">(最上層)</option>'
+          : '<option value="">(請選擇資料夾)</option>';
         function buildOpts(pId, depth) {
-          state.folders.filter(f => f.parentId === pId).forEach(f => {
+          const kids = state.folders.filter((f) => f.parentId === pId);
+          kids.forEach((f) => {
             if (f.id === excludeFolderId) return;
             const prefix = "　".repeat(depth) + (depth > 0 ? "└ " : "");
-            html += `<option value="${f.id}" ${f.id === selectedId ? "selected" : ""}>${prefix}${escapeHtml(f.name)}</option>`;
+            const sel = f.id === selectedId ? "selected" : "";
+            html += `<option value="${f.id}" ${sel}>${prefix}${escapeHtml(f.name)}</option>`;
             buildOpts(f.id, depth + 1);
           });
         }
         buildOpts(null, 0);
         return html;
       }
+
       function isDescendant(targetParentId, folderId) {
-        let curr = state.folders.find(f => f.id === targetParentId);
-        while (curr) { if (curr.id === folderId) return true; curr = state.folders.find(f => f.id === curr.parentId); }
+        let curr = state.folders.find((f) => f.id === targetParentId);
+        while (curr) {
+          if (curr.id === folderId) return true;
+          curr = state.folders.find((f) => f.id === curr.parentId);
+        }
         return false;
       }
 
       // ==========================================
-      // 渲染資料夾
+      // UI 渲染
       // ==========================================
-      function renderFolders() {
-        for (const id of state.selectedFolders) { if (!state.folders.some(f => f.id === id)) state.selectedFolders.delete(id); }
-        for (const id of state.selectedRecords) { if (!state.records.some(r => r.id === id)) state.selectedRecords.delete(id); }
 
-        const folderCount = state.selectedFolders.size, recordCount = state.selectedRecords.size;
-        const selCount = folderCount + recordCount, totalItemsCount = state.folders.length + state.records.length;
+      // 左側資料夾渲染：產生階層資料夾、直屬紀錄、勾選狀態與操作按鈕。
+      function renderFolders() {
+        // 清理幽靈選取
+        for (const id of state.selectedFolders) {
+          if (!state.folders.some((f) => f.id === id))
+            state.selectedFolders.delete(id);
+        }
+        for (const id of state.selectedRecords) {
+          if (!state.records.some((r) => r.id === id))
+            state.selectedRecords.delete(id);
+        }
+
+        const folderCount = state.selectedFolders.size;
+        const recordCount = state.selectedRecords.size;
+        const selCount = folderCount + recordCount;
+        const totalItemsCount = state.folders.length + state.records.length;
+
+        // 【修正】明確顯示資料夾與紀錄數量，不再只顯示總和讓使用者誤會
         let countText = "";
-        if (folderCount > 0 && recordCount > 0) countText = `${folderCount} 個資料夾，${recordCount} 筆紀錄`;
-        else if (folderCount > 0) countText = `${folderCount} 個資料夾`;
-        else if (recordCount > 0) countText = `${recordCount} 筆紀錄`;
-        else countText = "0 項";
+        if (folderCount > 0 && recordCount > 0) {
+          countText = `${folderCount} 個資料夾，${recordCount} 筆紀錄`;
+        } else if (folderCount > 0) {
+          countText = `${folderCount} 個資料夾`;
+        } else if (recordCount > 0) {
+          countText = `${recordCount} 筆紀錄`;
+        } else {
+          countText = "0 項";
+        }
         selectedCountText.textContent = countText;
 
+        // 控制右側 匯出/移動/刪除 按鈕的顯示狀態
         const batchActionGroup = document.getElementById("batchActionGroup");
-        if (batchActionGroup) batchActionGroup.style.display = selCount > 0 ? "flex" : "none";
+        if (batchActionGroup) {
+          batchActionGroup.style.display = selCount > 0 ? "flex" : "none";
+        }
 
+        // 動態切換「全選 / 取消全選」按鈕樣式與文字
         const selectAllBtn = document.getElementById("selectAllBtn");
         if (selectAllBtn) {
-          if (selCount === totalItemsCount && totalItemsCount > 0) { selectAllBtn.textContent = "取消 ❌"; selectAllBtn.style.background = "#64748b"; }
-          else { selectAllBtn.textContent = "全選 ☑️"; selectAllBtn.style.background = "#0f766e"; }
+          if (selCount === totalItemsCount && totalItemsCount > 0) {
+            selectAllBtn.textContent = "取消 ❌";
+            selectAllBtn.style.background = "#64748b";
+          } else {
+            selectAllBtn.textContent = "全選 ☑️";
+            selectAllBtn.style.background = "#0f766e";
+          }
         }
 
         function buildFoldersHtml(parentId, depth) {
           let html = "";
-          state.folders.filter(f => f.parentId === parentId).forEach(folder => {
-            const directRecords = state.records.filter(r => r.folderId === folder.id).sort(comparePointsByName);
-            const totalCount_ = getAllRecordsInFolder(folder.id).length;
+          const children = state.folders.filter((f) => f.parentId === parentId);
+          children.forEach((folder) => {
+            // 直屬紀錄（顯示用）
+            const directRecords = state.records.filter(
+              (r) => r.folderId === folder.id,
+            );
+            directRecords.sort((a, b) => comparePointsByName(a, b));
+            // [修正] 總數含子層，顯示在括號內
+            const totalCount = getAllRecordsInFolder(folder.id).length;
             const directCount = directRecords.length;
+
             const isHidden = state.hiddenRecordFolders.has(folder.id);
             const isExpanded = state.expandedFolders.has(folder.id);
-            const isChecked = state.selectedFolders.has(folder.id) ? "checked" : "";
-            const allDirectSelected = directCount > 0 && directRecords.every(r => state.selectedRecords.has(r.id));
-            const hasChildren = state.folders.some(f => f.parentId === folder.id);
-            const countLabel = hasChildren ? `${totalCount_} (含子層)` : `${totalCount_}`;
+            const isChecked = state.selectedFolders.has(folder.id)
+              ? "checked"
+              : "";
+
+            // 判斷此資料夾的所有直屬紀錄是否已全選
+            const allDirectSelected =
+              directCount > 0 &&
+              directRecords.every((r) => state.selectedRecords.has(r.id));
 
             let recordsHTML = "";
             if (directCount > 0) {
-              recordsHTML += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; padding-bottom:4px; border-bottom:1px dotted #e2e8f0;">
-                <span style="font-size:11px; color:var(--muted);">直屬紀錄 ${directCount} 筆</span>
-                <button class="btn-small" data-select-all-folder="${folder.id}" style="font-size:11px; padding:2px 6px; min-height:0;">${allDirectSelected ? "取消全選" : "全選"}</button>
-              </div>`;
-              recordsHTML += directRecords.map(r => {
-                const rChecked = state.selectedRecords.has(r.id) ? "checked" : "";
-                return `<div id="record-row-${r.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding:4px; border-radius:4px; transition:background-color 1.5s ease;">
-                  <input type="checkbox" class="cb-record" data-id="${r.id}" ${rChecked} style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
-                  <button class="record-item" data-fly-lat="${r.lat}" data-fly-lng="${r.lng}" title="飛轉至此設備">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <span class="record-item-title">📍 ${escapeHtml(r.name || r.code)}</span>
-                      <span class="btn-small text-danger" data-delete-record="${r.id}" title="刪除此紀錄" style="border:none; padding:2px 4px; min-height:0; margin-left:4px;">✖</span>
-                    </div>
-                    <span class="record-item-meta">不良: ${escapeHtml(r.defect || "無")} | 緩急: ${escapeHtml(r.urgency || "C")}</span>
-                  </button>
-                </div>`;
-              }).join("");
+              // [新增] 直屬紀錄標題列 + 全選按鈕
+              recordsHTML += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; padding-bottom:4px; border-bottom:1px dotted #e2e8f0;">
+                        <span style="font-size:11px; color:var(--muted);">直屬紀錄 ${directCount} 筆</span>
+                        <button class="btn-small" data-select-all-folder="${folder.id}" style="font-size:11px; padding:2px 6px; min-height:0;">
+                          ${allDirectSelected ? "取消全選" : "全選"}
+                        </button>
+                    </div>`;
+              recordsHTML += directRecords
+                .map((r) => {
+                  const rChecked = state.selectedRecords.has(r.id)
+                    ? "checked"
+                    : "";
+                  return `
+                        <div id="record-row-${r.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding:4px; border-radius:4px; transition: background-color 1.5s ease;">
+                            <input type="checkbox" class="cb-record" data-id="${r.id}" ${rChecked} style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
+                            <button class="record-item" data-fly-lat="${r.lat}" data-fly-lng="${r.lng}" title="飛轉至此設備">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span class="record-item-title">📍 ${escapeHtml(r.name || r.code)}</span>
+                                    <span class="btn-small text-danger" data-delete-record="${r.id}" title="刪除此紀錄" style="border:none; padding:2px 4px; min-height:0; margin-left:4px;">✖</span>
+                                </div>
+                                <span class="record-item-meta">不良: ${escapeHtml(r.defect || "無")} | 緩急: ${escapeHtml(r.urgency || "C")}</span>
+                            </button>
+                        </div>`;
+                })
+                .join("");
             } else {
               recordsHTML = `<div style="font-size:12px; color:#999; padding:4px;">(此層無直屬紀錄)</div>`;
             }
+
             let childrenHTML = "";
-            if (isExpanded) childrenHTML = buildFoldersHtml(folder.id, depth + 1);
+            if (isExpanded)
+              childrenHTML = buildFoldersHtml(folder.id, depth + 1);
+
+            const borderLeft =
+              depth > 0 ? "border-left: 2px solid #cbd5e1;" : "";
             const marginLeft = depth > 0 ? "10px" : "0px";
             const bg = depth % 2 === 0 ? "#f8fafc" : "#ffffff";
-            const borderLeft = depth > 0 ? "border-left: 2px solid #cbd5e1;" : "";
 
-            html += `<div class="folder-item" style="margin-left:${marginLeft}; ${borderLeft} border-radius:${depth > 0 ? "0 6px 6px 0" : "6px"}; background:${bg}; border-top:1px solid var(--line); border-bottom:1px solid var(--line); border-right:1px solid var(--line);">
-              <div class="folder-item-top" style="flex-wrap:wrap;">
-                <div style="display:flex; align-items:center; flex-grow:1; min-width:60%;">
-                  <input type="checkbox" class="cb-folder" data-id="${folder.id}" ${isChecked} style="width:16px; height:16px; cursor:pointer; margin-right:6px; flex-shrink:0;">
-                  <span class="folder-name-toggle" data-toggle="${folder.id}" title="展開/收合">
-                    ${escapeHtml(folder.name)} (${countLabel})
-                    <span style="font-size:10px; color:var(--muted); margin-left:4px;">${isExpanded ? "▲" : "▼"}</span>
-                  </span>
-                </div>
-                <div class="folder-actions" style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end; margin-top:6px; width:100%;">
-                  <button class="btn-small" data-add-sub="${folder.id}">➕子層</button>
-                  <button class="btn-small" data-rename="${folder.id}">✏️改名</button>
-                  <button class="btn-small" data-move-up="${folder.id}">⬆️</button>
-                  <button class="btn-small" data-move-down="${folder.id}">⬇️</button>
-                  <button class="btn-small" data-export="${folder.id}">📤匯出</button>
-                  <button class="btn-small" data-toggle-visibility="${folder.id}">${isHidden ? "🙈" : "👁️"}</button>
-                  <button class="btn-small text-danger" data-delete-folder="${folder.id}">✖</button>
-                </div>
-              </div>
-              <div class="record-list ${isExpanded ? "is-expanded" : ""}" style="margin-left:22px;">
-                ${recordsHTML}
-                ${childrenHTML}
-              </div>
-            </div>`;
+            // totalCount 顯示含子層總數；若有子層則加備註
+            const hasChildren = state.folders.some(
+              (f) => f.parentId === folder.id,
+            );
+            const countLabel = hasChildren
+              ? `${totalCount} (含子層)`
+              : `${totalCount}`;
+
+            html += `
+                <div class="folder-item" style="margin-left: ${marginLeft}; ${borderLeft} border-radius: ${depth > 0 ? "0 6px 6px 0" : "6px"}; background: ${bg}; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);">
+                  <div class="folder-item-top" style="flex-wrap: wrap;">
+                    <div style="display:flex; align-items:center; flex-grow:1; min-width:60%;">
+                        <input type="checkbox" class="cb-folder" data-id="${folder.id}" ${isChecked} style="width:16px; height:16px; cursor:pointer; margin-right:6px; flex-shrink:0;">
+                        <span class="folder-name-toggle" data-toggle="${folder.id}" title="展開/收合">
+                          ${escapeHtml(folder.name)} (${countLabel})
+                          <span style="font-size:10px; color:var(--muted); margin-left:4px;">${isExpanded ? "▲" : "▼"}</span>
+                        </span>
+                    </div>
+                    <div class="folder-actions" style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end; margin-top:6px; width:100%;">
+                      <button class="btn-small" data-add-sub="${folder.id}" title="新增子層資料夾">➕子層</button>
+                      <button class="btn-small" data-rename="${folder.id}" title="重新命名">✏️改名</button>
+                      <button class="btn-small" data-move-up="${folder.id}" title="向上移">⬆️</button>
+                      <button class="btn-small" data-move-down="${folder.id}" title="向下移">⬇️</button>
+                      <button class="btn-small" data-export="${folder.id}" title="匯出此層+子層 Excel">📤匯出</button>
+                      <button class="btn-small ${isHidden ? "" : "active-eye"}" data-toggle-visibility="${folder.id}" title="顯示/隱藏">${isHidden ? "🙈" : "👁️"}</button>
+                      <button class="btn-small text-danger" data-delete-folder="${folder.id}" title="刪除">✖</button>
+                    </div>
+                  </div>
+                  <div class="record-list ${isExpanded ? "is-expanded" : ""}" style="margin-left: 22px;">
+                     ${recordsHTML}
+                     ${childrenHTML}
+                  </div>
+                </div>`;
           });
           return html;
         }
@@ -1084,451 +1989,1005 @@
       }
 
       // ==========================================
-      // 批次操作
+      // 事件委派：批次操作 (匯出、移動、刪除)
       // ==========================================
-      document.getElementById("batchExportBtn").addEventListener("click", () => {
-        if (state.selectedFolders.size === 0 && state.selectedRecords.size === 0) { GlobalModal.alert("請先勾選要匯出的資料夾或紀錄。"); return; }
-        const uniqueRecordIds = new Set();
-        state.selectedFolders.forEach(fId => getAllRecordIdsInFolder(fId).forEach(id => uniqueRecordIds.add(id)));
-        state.selectedRecords.forEach(id => uniqueRecordIds.add(id));
-        const exportData = [];
-        uniqueRecordIds.forEach(rId => {
-          const r = state.records.find(x => x.id === rId);
-          if (r) exportData.push({ "巡視日期(目錄)": getFullFolderPath(r.folderId), 土木設備: r.name || "", 圖號座標: r.code || "", 不良項目: r.defect || "", 緩急程度: r.urgency || "", 設計單號: "", 設計日期: "", 施工單位: "", 施工單號: "", 施工日期: "" });
-        });
-        if (exportData.length === 0) { GlobalModal.alert("勾選範圍內沒有紀錄可匯出。"); return; }
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
-        const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-        exportOrShareFile(buf, `批次匯出_${new Date().toISOString().slice(0, 10)}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      });
+      document
+        .getElementById("batchExportBtn")
+        .addEventListener("click", () => {
+          if (
+            state.selectedFolders.size === 0 &&
+            state.selectedRecords.size === 0
+          ) {
+            GlobalModal.alert("請先勾選要匯出的資料夾或紀錄。");
+            return;
+          }
 
-      document.getElementById("batchDeleteBtn").addEventListener("click", () => {
-        const uniqueRecordIds = new Set();
-        state.selectedFolders.forEach(fId => getAllRecordIdsInFolder(fId).forEach(id => uniqueRecordIds.add(id)));
-        state.selectedRecords.forEach(id => uniqueRecordIds.add(id));
-        GlobalModal.confirm(`確定要刪除選取的 ${state.selectedFolders.size} 個資料夾（含子層）嗎？\n共將移除 ${uniqueRecordIds.size} 筆不重複紀錄。`, () => {
-          state.selectedFolders.forEach(fId => deleteFolderRecursive(fId));
-          state.selectedRecords.forEach(rId => { state.records = state.records.filter(r => r.id !== rId); });
-          state.selectedFolders.clear();
-          state.selectedRecords.clear();
-          saveToLocalStorage();
-          renderer.redraw();
+          // 【修正 2】使用 Set 收集不重複的紀錄 ID (避免全選時重複匯出)
+          const uniqueRecordIds = new Set();
+          state.selectedFolders.forEach((fId) => {
+            getAllRecordIdsInFolder(fId).forEach((id) =>
+              uniqueRecordIds.add(id),
+            );
+          });
+          state.selectedRecords.forEach((id) => uniqueRecordIds.add(id));
+
+          const exportData = [];
+          uniqueRecordIds.forEach((rId) => {
+            const r = state.records.find((x) => x.id === rId);
+            if (r) {
+              exportData.push({
+                "巡視日期(目錄)": getFullFolderPath(r.folderId),
+                土木設備: r.name || "",
+                圖號座標: r.code || "",
+                不良項目: r.defect || "",
+                緩急程度: r.urgency || "",
+                設計單號: "",
+                設計日期: "",
+                施工單位: "",
+                施工單號: "",
+                施工日期: "",
+              });
+            }
+          });
+
+          if (exportData.length === 0) {
+            GlobalModal.alert("勾選範圍內沒有紀錄可匯出。");
+            return;
+          }
+          const ws = XLSX.utils.json_to_sheet(exportData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
+          XLSX.writeFile(
+            wb,
+            `批次匯出_${new Date().toISOString().slice(0, 10)}.xlsx`,
+          );
         });
-      });
+
+      document
+        .getElementById("batchDeleteBtn")
+        .addEventListener("click", () => {
+          // 【修正 3】精準計算不重複的刪除數量
+          const uniqueRecordIds = new Set();
+          state.selectedFolders.forEach((fId) => {
+            getAllRecordIdsInFolder(fId).forEach((id) =>
+              uniqueRecordIds.add(id),
+            );
+          });
+          state.selectedRecords.forEach((id) => uniqueRecordIds.add(id));
+
+          const totalRecords = uniqueRecordIds.size;
+          const folderCount = state.selectedFolders.size;
+
+          GlobalModal.confirm(
+            `確定要刪除選取的 ${folderCount} 個資料夾（含子層）與單獨勾選的紀錄嗎？\n共將移除 ${totalRecords} 筆不重複紀錄。`,
+            () => {
+              function deleteFolderRecursive(fId) {
+                state.folders
+                  .filter((f) => f.parentId === fId)
+                  .forEach((child) => deleteFolderRecursive(child.id));
+                state.records = state.records.filter((r) => r.folderId !== fId);
+                state.folders = state.folders.filter((f) => f.id !== fId);
+                state.hiddenRecordFolders.delete(fId);
+                state.expandedFolders.delete(fId);
+              }
+              state.selectedFolders.forEach((fId) =>
+                deleteFolderRecursive(fId),
+              );
+              state.selectedRecords.forEach((rId) => {
+                state.records = state.records.filter((r) => r.id !== rId);
+              });
+
+              state.selectedFolders.clear();
+              state.selectedRecords.clear();
+              saveToLocalStorage();
+              renderer.redraw();
+            },
+          );
+        });
 
       document.getElementById("batchMoveBtn").addEventListener("click", () => {
-        GlobalModal.select("🚚 批次移動至...", "請選擇要將勾選項搬移到哪個資料夾：", getFolderOptionsHtml(null, null, true), (targetId) => {
-          const safeTarget = targetId === "" ? null : targetId;
-          for (const fId of state.selectedFolders) {
-            if (fId === safeTarget || (safeTarget && isDescendant(safeTarget, fId))) continue;
-            const folder = state.folders.find(f => f.id === fId);
-            if (folder) folder.parentId = safeTarget;
-          }
-          const recordsInMovingFolders = new Set();
-          state.selectedFolders.forEach(fId => getAllRecordIdsInFolder(fId).forEach(id => recordsInMovingFolders.add(id)));
-          for (const rId of state.selectedRecords) {
-            if (recordsInMovingFolders.has(rId)) continue;
-            if (safeTarget === null) { GlobalModal.alert("❌ 設備紀錄必須放置在資料夾內！"); break; }
-            const record = state.records.find(r => r.id === rId);
-            if (record) record.folderId = safeTarget;
-          }
-          state.selectedFolders.clear();
-          state.selectedRecords.clear();
-          saveToLocalStorage();
-        });
-      });
+        GlobalModal.select(
+          "🚚 批次移動至...",
+          "請選擇要將勾選項搬移到哪個資料夾：",
+          getFolderOptionsHtml(null, null, true),
+          (targetId) => {
+            const safeTarget = targetId === "" ? null : targetId;
 
+            for (const fId of state.selectedFolders) {
+              if (
+                fId === safeTarget ||
+                (safeTarget && isDescendant(safeTarget, fId))
+              )
+                continue;
+              const folder = state.folders.find((f) => f.id === fId);
+              if (folder) folder.parentId = safeTarget;
+            }
+
+            // 【修正 4】避免「跟著資料夾移動的紀錄」被錯誤拔出變成直屬紀錄
+            const recordsInMovingFolders = new Set();
+            state.selectedFolders.forEach((fId) => {
+              getAllRecordIdsInFolder(fId).forEach((id) =>
+                recordsInMovingFolders.add(id),
+              );
+            });
+
+            for (const rId of state.selectedRecords) {
+              // 如果這筆紀錄所在的父資料夾已經被移動了，它就會自動跟著走，不需單獨改變
+              if (recordsInMovingFolders.has(rId)) continue;
+
+              if (safeTarget === null) {
+                GlobalModal.alert("❌ 設備紀錄必須放置在資料夾內！");
+                break;
+              }
+              const record = state.records.find((r) => r.id === rId);
+              if (record) record.folderId = safeTarget;
+            }
+
+            state.selectedFolders.clear();
+            state.selectedRecords.clear();
+            saveToLocalStorage();
+          },
+        );
+      });
+      // ==========================================
+      // 全選按鈕點擊事件
+      // ==========================================
+
+      // 全選/取消全選：同步處理資料夾與紀錄勾選狀態。
       document.getElementById("selectAllBtn").addEventListener("click", () => {
         const totalItemsCount = state.folders.length + state.records.length;
-        const currentSelectedCount = state.selectedFolders.size + state.selectedRecords.size;
-        if (currentSelectedCount === totalItemsCount && totalItemsCount > 0) { state.selectedFolders.clear(); state.selectedRecords.clear(); }
-        else { state.folders.forEach(f => state.selectedFolders.add(f.id)); state.records.forEach(r => state.selectedRecords.add(r.id)); }
+        const currentSelectedCount =
+          state.selectedFolders.size + state.selectedRecords.size;
+
+        // 判斷目前是否已經是「全選狀態」
+        if (currentSelectedCount === totalItemsCount && totalItemsCount > 0) {
+          // 已經全選了 -> 執行清空
+          state.selectedFolders.clear();
+          state.selectedRecords.clear();
+        } else {
+          // 尚未全選 -> 執行全選
+          state.folders.forEach((f) => state.selectedFolders.add(f.id));
+          state.records.forEach((r) => state.selectedRecords.add(r.id));
+        }
         renderFolders();
       });
+      // [修正 2] showAllStarsBtn / hideAllStarsBtn 事件綁定
+      document
+        .getElementById("showAllStarsBtn")
+        .addEventListener("click", () => {
+          state.hiddenRecordFolders.clear();
+          renderFolders();
+          updateRecordMarkers();
+        });
+      document
+        .getElementById("hideAllStarsBtn")
+        .addEventListener("click", () => {
+          state.folders.forEach((f) => state.hiddenRecordFolders.add(f.id));
+          renderFolders();
+          updateRecordMarkers();
+        });
 
-      document.getElementById("showAllStarsBtn").addEventListener("click", () => { state.hiddenRecordFolders.clear(); renderFolders(); updateRecordMarkers(); });
-      document.getElementById("hideAllStarsBtn").addEventListener("click", () => { state.folders.forEach(f => state.hiddenRecordFolders.add(f.id)); renderFolders(); updateRecordMarkers(); });
-
-      // ==========================================
-      // 資料夾清單事件委派
-      // ==========================================
+      // 資料夾清單事件委派：集中處理展開、勾選、改名、移動、刪除與匯出。
       folderList.addEventListener("click", (e) => {
         const target = e.target;
 
         const folderToggle = target.closest("[data-toggle]");
         if (folderToggle) {
           const fId = folderToggle.dataset.toggle;
-          state.expandedFolders.has(fId) ? state.expandedFolders.delete(fId) : state.expandedFolders.add(fId);
-          renderFolders(); return;
+          if (state.expandedFolders.has(fId)) state.expandedFolders.delete(fId);
+          else state.expandedFolders.add(fId);
+          renderFolders();
+          return;
         }
 
+        // ==========================================
+        // 點擊資料夾的勾選框：自動向下全選 / 取消
+        // ==========================================
         if (target.classList.contains("cb-folder")) {
           const fId = target.dataset.id;
+          const isChecked = target.checked;
+
+          // 輔助函式：取得所有子孫資料夾 ID
           function getAllDescendantFolderIds(id) {
             let ids = [];
-            state.folders.filter(f => f.parentId === id).forEach(child => { ids.push(child.id); ids = ids.concat(getAllDescendantFolderIds(child.id)); });
+            state.folders
+              .filter((f) => f.parentId === id)
+              .forEach((child) => {
+                ids.push(child.id);
+                ids = ids.concat(getAllDescendantFolderIds(child.id));
+              });
             return ids;
           }
+
           const descendantFolderIds = getAllDescendantFolderIds(fId);
           const allRecordIds = getAllRecordIdsInFolder(fId);
-          if (target.checked) {
+
+          if (isChecked) {
+            // 打勾時：包含自己、所有子資料夾、所有紀錄，全部加進選取清單
             state.selectedFolders.add(fId);
-            descendantFolderIds.forEach(id => state.selectedFolders.add(id));
-            allRecordIds.forEach(id => state.selectedRecords.add(id));
+            descendantFolderIds.forEach((id) => state.selectedFolders.add(id));
+            allRecordIds.forEach((id) => state.selectedRecords.add(id));
           } else {
+            // 取消時：全部從選取清單移除
             state.selectedFolders.delete(fId);
-            descendantFolderIds.forEach(id => state.selectedFolders.delete(id));
-            allRecordIds.forEach(id => state.selectedRecords.delete(id));
-            let curr = state.folders.find(f => f.id === fId);
-            while (curr && curr.parentId) { state.selectedFolders.delete(curr.parentId); curr = state.folders.find(f => f.id === curr.parentId); }
+            descendantFolderIds.forEach((id) =>
+              state.selectedFolders.delete(id),
+            );
+            allRecordIds.forEach((id) => state.selectedRecords.delete(id));
+
+            // 【防呆】若取消勾選，必須連帶取消其「父層資料夾」的勾選，避免誤刪
+            let curr = state.folders.find((f) => f.id === fId);
+            while (curr && curr.parentId) {
+              state.selectedFolders.delete(curr.parentId);
+              curr = state.folders.find((f) => f.id === curr.parentId);
+            }
           }
-          renderFolders(); return;
+          renderFolders();
+          return;
         }
 
+        // [新增] 全選/取消全選此資料夾的直屬紀錄
         if (target.dataset.selectAllFolder) {
           const fId = target.dataset.selectAllFolder;
-          const directRecords = state.records.filter(r => r.folderId === fId);
-          const allSelected = directRecords.length > 0 && directRecords.every(r => state.selectedRecords.has(r.id));
-          if (allSelected) directRecords.forEach(r => state.selectedRecords.delete(r.id));
-          else directRecords.forEach(r => state.selectedRecords.add(r.id));
-          renderFolders(); return;
+          const directRecords = state.records.filter((r) => r.folderId === fId);
+          const allSelected =
+            directRecords.length > 0 &&
+            directRecords.every((r) => state.selectedRecords.has(r.id));
+          if (allSelected) {
+            directRecords.forEach((r) => state.selectedRecords.delete(r.id));
+          } else {
+            directRecords.forEach((r) => state.selectedRecords.add(r.id));
+          }
+          renderFolders();
+          return;
         }
 
+        // ==========================================
+        // 點擊單筆紀錄的勾選框：向上連動取消
+        // ==========================================
         if (target.classList.contains("cb-record")) {
           const rId = target.dataset.id;
-          if (target.checked) { state.selectedRecords.add(rId); }
-          else {
+          if (target.checked) {
+            state.selectedRecords.add(rId);
+          } else {
             state.selectedRecords.delete(rId);
-            const record = state.records.find(r => r.id === rId);
-            if (record) { let currId = record.folderId; while (currId) { state.selectedFolders.delete(currId); const pf = state.folders.find(f => f.id === currId); currId = pf ? pf.parentId : null; } }
+
+            // 【防呆】若取消勾選單筆紀錄，必須連帶取消其「所屬資料夾」的勾選
+            const record = state.records.find((r) => r.id === rId);
+            if (record) {
+              let currId = record.folderId;
+              while (currId) {
+                state.selectedFolders.delete(currId);
+                const parentFolder = state.folders.find((f) => f.id === currId);
+                currId = parentFolder ? parentFolder.parentId : null;
+              }
+            }
           }
-          renderFolders(); return;
+          renderFolders();
+          return;
         }
 
         const recordBtn = target.closest(".record-item");
         if (recordBtn && !target.dataset.deleteRecord) {
-          const lat = parseFloat(recordBtn.dataset.flyLat), lng = parseFloat(recordBtn.dataset.flyLng);
-          const point = state.points.find(p => p.lat === lat && p.lng === lng) || state.records.find(r => r.lat === lat && r.lng === lng);
-          if (point) { map.flyTo([lat, lng], map.getMaxZoom(), { duration: 0.45 }); L.popup().setLatLng([lat, lng]).setContent(popupHtml(point)).openOn(map); if (window.innerWidth <= 820) setPanelCollapsed(true); }
+          const lat = parseFloat(recordBtn.dataset.flyLat),
+            lng = parseFloat(recordBtn.dataset.flyLng);
+          const point =
+            state.points.find((p) => p.lat === lat && p.lng === lng) ||
+            state.records.find((r) => r.lat === lat && r.lng === lng);
+          if (point) {
+            map.flyTo([lat, lng], map.getMaxZoom(), { duration: 0.45 });
+            L.popup()
+              .setLatLng([lat, lng])
+              .setContent(popupHtml(point))
+              .openOn(map);
+            if (window.innerWidth <= 820) setPanelCollapsed(true);
+          }
           return;
         }
 
         if (target.dataset.deleteRecord) {
           const rId = target.dataset.deleteRecord;
-          GlobalModal.confirm("確定要刪除此筆紀錄嗎？", () => { state.records = state.records.filter(r => r.id !== rId); state.selectedRecords.delete(rId); saveToLocalStorage(); renderer.redraw(); });
+          GlobalModal.confirm("確定要刪除此筆紀錄嗎？", () => {
+            state.records = state.records.filter((r) => r.id !== rId);
+            state.selectedRecords.delete(rId);
+            saveToLocalStorage();
+            renderer.redraw();
+          });
           return;
         }
 
         if (target.dataset.addSub) {
+          const pId = target.dataset.addSub;
           GlobalModal.prompt("請輸入子資料夾名稱：", "", (newName) => {
-            if (newName && newName.trim()) { const newId = Date.now().toString(); state.folders.push({ id: newId, name: newName.trim(), parentId: target.dataset.addSub }); state.expandedFolders.add(target.dataset.addSub); state.expandedFolders.add(newId); saveToLocalStorage(); }
+            if (newName && newName.trim()) {
+              const newId = Date.now().toString();
+              state.folders.push({
+                id: newId,
+                name: newName.trim(),
+                parentId: pId,
+              });
+              state.expandedFolders.add(pId);
+              state.expandedFolders.add(newId);
+              saveToLocalStorage();
+            }
           });
         } else if (target.dataset.rename) {
-          const f = state.folders.find(x => x.id === target.dataset.rename);
+          const fId = target.dataset.rename;
+          const f = state.folders.find((x) => x.id === fId);
           if (!f) return;
-          GlobalModal.prompt("重新命名資料夾：", f.name, (newName) => { if (newName && newName.trim()) { f.name = newName.trim(); saveToLocalStorage(); } });
+          GlobalModal.prompt("重新命名資料夾：", f.name, (newName) => {
+            if (newName && newName.trim()) {
+              f.name = newName.trim();
+              saveToLocalStorage();
+            }
+          });
         }
-
+        // 替換為使用 closest 確保點到內部圖示也能成功觸發
         const moveUpBtn = target.closest("[data-move-up]");
         const moveDownBtn = target.closest("[data-move-down]");
         if (moveUpBtn || moveDownBtn) {
           const btn = moveUpBtn || moveDownBtn;
           const fId = btn.dataset.moveUp || btn.dataset.moveDown;
           const direction = moveUpBtn ? -1 : 1;
-          const folder = state.folders.find(f => f.id === fId);
+          const folder = state.folders.find((f) => f.id === fId);
           if (!folder) return;
-          const siblings = state.folders.filter(f => f.parentId === folder.parentId);
-          const sIdx = siblings.findIndex(f => f.id === fId);
-          if (direction === -1 && sIdx > 0) swapInArray(state.folders, fId, siblings[sIdx - 1].id);
-          else if (direction === 1 && sIdx < siblings.length - 1) swapInArray(state.folders, fId, siblings[sIdx + 1].id);
+          const siblings = state.folders.filter(
+            (f) => f.parentId === folder.parentId,
+          );
+          const sIdx = siblings.findIndex((f) => f.id === fId);
+          if (direction === -1 && sIdx > 0)
+            swapInArray(state.folders, fId, siblings[sIdx - 1].id);
+          else if (direction === 1 && sIdx < siblings.length - 1)
+            swapInArray(state.folders, fId, siblings[sIdx + 1].id);
           return;
-        }
-
-        if (target.dataset.toggleVisibility) {
+        } else if (target.dataset.toggleVisibility) {
           const fId = target.dataset.toggleVisibility;
           const nowHidden = state.hiddenRecordFolders.has(fId);
-          function getAllDescIds(id) { const ids = [id]; state.folders.filter(f => f.parentId === id).forEach(child => getAllDescIds(child.id).forEach(cid => ids.push(cid))); return ids; }
-          const affectedIds = getAllDescIds(fId);
-          if (nowHidden) affectedIds.forEach(id => state.hiddenRecordFolders.delete(id));
-          else affectedIds.forEach(id => state.hiddenRecordFolders.add(id));
-          renderFolders(); updateRecordMarkers();
+          // 遞迴取得此資料夾及所有子孫資料夾的 id
+          function getAllDescendantFolderIds(id) {
+            const ids = [id];
+            state.folders
+              .filter((f) => f.parentId === id)
+              .forEach((child) => {
+                getAllDescendantFolderIds(child.id).forEach((cid) =>
+                  ids.push(cid),
+                );
+              });
+            return ids;
+          }
+          const affectedIds = getAllDescendantFolderIds(fId);
+          if (nowHidden) {
+            affectedIds.forEach((id) => state.hiddenRecordFolders.delete(id));
+          } else {
+            affectedIds.forEach((id) => state.hiddenRecordFolders.add(id));
+          }
+          renderFolders();
+          updateRecordMarkers();
         } else if (target.dataset.export) {
           const fId = target.dataset.export;
-          const folder = state.folders.find(f => f.id === fId);
+          const folder = state.folders.find((f) => f.id === fId);
           if (!folder) return;
+          // [修正] 遞迴取得含子層的所有紀錄
           const targetRecords = getAllRecordsInFolder(fId);
           const pathName = getFullFolderPath(fId);
-          const exportData = targetRecords.map(r => ({ "巡視日期(目錄)": getFullFolderPath(r.folderId), 土木設備: r.name || "", 圖號座標: r.code || "", 不良項目: r.defect || "", 緩急程度: r.urgency || "", 設計單號: "", 設計日期: "", 施工單位: "", 施工單號: "", 施工日期: "" }));
-          if (exportData.length === 0) exportData.push({ "巡視日期(目錄)": pathName, 土木設備: "", 圖號座標: "", 不良項目: "", 緩急程度: "", 設計單號: "", 設計日期: "", 施工單位: "", 施工單號: "", 施工日期: "" });
+          const exportData = targetRecords.map((r) => ({
+            "巡視日期(目錄)": getFullFolderPath(r.folderId),
+            土木設備: r.name || "",
+            圖號座標: r.code || "",
+            不良項目: r.defect || "",
+            緩急程度: r.urgency || "",
+            設計單號: "",
+            設計日期: "",
+            施工單位: "",
+            施工單號: "",
+            施工日期: "",
+          }));
+          if (exportData.length === 0)
+            exportData.push({
+              "巡視日期(目錄)": pathName,
+              土木設備: "",
+              圖號座標: "",
+              不良項目: "",
+              緩急程度: "",
+              設計單號: "",
+              設計日期: "",
+              施工單位: "",
+              施工單號: "",
+              施工日期: "",
+            });
           const ws = XLSX.utils.json_to_sheet(exportData);
           const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
-          const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-          exportOrShareFile(buf, `巡視紀錄_${folder.name}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          XLSX.writeFile(wb, `巡視紀錄_${folder.name}.xlsx`);
         } else if (target.dataset.deleteFolder) {
-          // ✅ 修正：改用全域遞迴刪除
           const fId = target.dataset.deleteFolder;
-          const folder = state.folders.find(f => f.id === fId);
+          const folder = state.folders.find((f) => f.id === fId);
           if (!folder) return;
-          const totalToDelete = getAllRecordsInFolder(fId).length;
-          GlobalModal.confirm(`確定要刪除資料夾「${folder.name}」及其所有子層嗎？\n共將移除 ${totalToDelete} 筆紀錄。`, () => {
-            deleteFolderRecursive(fId);
-            saveToLocalStorage();
-            renderer.redraw();
-          });
+          GlobalModal.confirm(
+            `確定要刪除資料夾「${folder.name}」及其中所有紀錄嗎？`,
+            () => {
+              state.records = state.records.filter((r) => r.folderId !== fId);
+              state.folders = state.folders.filter((f) => f.id !== fId);
+              state.hiddenRecordFolders.delete(fId);
+              state.selectedFolders.delete(fId);
+              saveToLocalStorage();
+              renderer.redraw();
+            },
+          );
         }
       });
 
       function swapInArray(arr, id1, id2) {
-        const idx1 = arr.findIndex(i => i.id === id1), idx2 = arr.findIndex(i => i.id === id2);
+        const idx1 = arr.findIndex((i) => i.id === id1),
+          idx2 = arr.findIndex((i) => i.id === id2);
         if (idx1 < 0 || idx2 < 0) return;
-        const temp = arr[idx1]; arr[idx1] = arr[idx2]; arr[idx2] = temp;
+        const temp = arr[idx1];
+        arr[idx1] = arr[idx2];
+        arr[idx2] = temp;
         saveToLocalStorage();
       }
 
       document.querySelector("#addFolderBtn").addEventListener("click", () => {
         GlobalModal.prompt("請輸入新的最上層資料夾名稱：", "", (newName) => {
-          if (newName && newName.trim()) { const newId = Date.now().toString(); state.folders.push({ id: newId, name: newName.trim(), parentId: null }); state.expandedFolders.add(newId); saveToLocalStorage(); }
+          if (newName && newName.trim()) {
+            const newId = Date.now().toString();
+            state.folders.push({
+              id: newId,
+              name: newName.trim(),
+              parentId: null,
+            });
+            state.expandedFolders.add(newId);
+            saveToLocalStorage();
+          }
         });
       });
 
-      // ==========================================
-      // 匯入 Excel（手機可從雲端/檔案 App 選取）
-      // ==========================================
-      document.querySelector("#importCsvBtn").addEventListener("click", () => document.querySelector("#importFileInput").click());
-      document.querySelector("#importFileInput").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function (event) {
-          try {
-            const data = new Uint8Array(event.target.result);
-            const workbook = XLSX.read(data, { type: "array" });
-            const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false });
-            let importedCount = 0, skippedCount = 0, manualCount = 0;
-            let skipHeader = true;
-            for (const row of rows) {
-              if (skipHeader) { skipHeader = false; continue; }
-              if (!row || row.length < 3) continue;
-              const folderPath = String(row[0] || "").trim(), name = String(row[1] || "").trim(), code = String(row[2] || "").trim(), defect = String(row[3] || "").trim(), urgency = String(row[4] || "C").trim();
-              if (!folderPath || !name) continue;
-              let resolvedLat = null, resolvedLng = null, resolvedName = name, resolvedCode = code;
-              let point = code ? state.points.find(p => (p.code || "") === code) : null;
-              if (!point && name) point = state.points.find(p => (p.name || "") === name);
-              if (point) { resolvedLat = point.lat; resolvedLng = point.lng; resolvedName = point.name || name; resolvedCode = point.code || code; }
-              else {
-                const gpsMatch = code.match(/^GPS_([\d.]+)_([\d.]+)$/i);
-                if (gpsMatch) { resolvedLat = parseFloat(gpsMatch[1]); resolvedLng = parseFloat(gpsMatch[2]); resolvedCode = code; resolvedName = name; manualCount++; }
-                else {
-                  const reversed = tpcCodeToLatLng(code);
-                  if (reversed) { resolvedLat = reversed.lat; resolvedLng = reversed.lng; resolvedCode = code; resolvedName = name; skippedCount++; }
-                  else { skippedCount++; continue; }
+      // 匯入 Excel
+      document
+        .querySelector("#importCsvBtn")
+        .addEventListener("click", () =>
+          document.querySelector("#importFileInput").click(),
+        );
+      document
+        .querySelector("#importFileInput")
+        .addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function (event) {
+            try {
+              const data = new Uint8Array(event.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
+              const rows = XLSX.utils.sheet_to_json(
+                workbook.Sheets[workbook.SheetNames[0]],
+                { header: 1, raw: false },
+              );
+              let importedCount = 0,
+                skippedCount = 0,
+                manualCount = 0;
+              let skipHeader = true;
+
+              for (const row of rows) {
+                if (skipHeader) {
+                  skipHeader = false;
+                  continue;
                 }
+                if (!row || row.length < 3) continue;
+
+                const folderPath = String(row[0] || "").trim();
+                const name = String(row[1] || "").trim();
+                const code = String(row[2] || "").trim();
+                const defect = String(row[3] || "").trim();
+                const urgency = String(row[4] || "C").trim();
+                if (!folderPath || !name) continue;
+
+                let resolvedLat = null,
+                  resolvedLng = null,
+                  resolvedName = name,
+                  resolvedCode = code;
+
+                // ── 第一優先：圖號精確比對（圖號唯一，改過名稱也能找到）──
+                let point = code
+                  ? state.points.find((p) => (p.code || "") === code)
+                  : null;
+
+                // ── 第二優先：名稱比對（圖號欄空白或找不到）──
+                if (!point && name) {
+                  point = state.points.find((p) => (p.name || "") === name);
+                }
+
+                if (point) {
+                  resolvedLat = point.lat;
+                  resolvedLng = point.lng;
+                  resolvedName = point.name || name;
+                  resolvedCode = point.code || code;
+                } else {
+                  // ── 第三優先：GPS_ 手動點位，從圖號欄萃取經緯度 ──
+                  const gpsMatch = code.match(/^GPS_([\d.]+)_([\d.]+)$/i);
+                  if (gpsMatch) {
+                    resolvedLat = parseFloat(gpsMatch[1]);
+                    resolvedLng = parseFloat(gpsMatch[2]);
+                    resolvedCode = code;
+                    resolvedName = name;
+                    manualCount++;
+                  } else {
+                    // ── 第四：圖號不在資料庫，用反推公式解算座標 ──
+                    const reversed = tpcCodeToLatLng(code);
+                    if (reversed) {
+                      resolvedLat = reversed.lat;
+                      resolvedLng = reversed.lng;
+                      resolvedCode = code;
+                      resolvedName = name;
+                      skippedCount++;
+                      // 繼續往下走正常存入流程
+                    } else {
+                      // 圖號格式也無法解析，才真的略過
+                      skippedCount++;
+                      continue;
+                    }
+                  }
+                }
+
+                const folderId = findOrCreateFolderByPath(folderPath);
+                if (!folderId) continue;
+
+                const existingIndex = state.records.findIndex(
+                  (r) =>
+                    r.folderId === folderId &&
+                    r.lat === resolvedLat &&
+                    r.lng === resolvedLng,
+                );
+                const recordData = {
+                  id:
+                    existingIndex >= 0
+                      ? state.records[existingIndex].id
+                      : "rec_" +
+                        Date.now().toString(36) +
+                        Math.random().toString(36).substr(2, 5),
+                  lat: resolvedLat,
+                  lng: resolvedLng,
+                  name: resolvedName,
+                  code: resolvedCode,
+                  folderId: folderId,
+                  defect: defect,
+                  urgency: urgency,
+                };
+
+                if (existingIndex >= 0)
+                  state.records[existingIndex] = recordData;
+                else state.records.push(recordData);
+                importedCount++;
               }
-              const folderId = findOrCreateFolderByPath(folderPath);
-              if (!folderId) continue;
-              const existingIndex = state.records.findIndex(r => r.folderId === folderId && r.lat === resolvedLat && r.lng === resolvedLng);
-              const recordData = { id: existingIndex >= 0 ? state.records[existingIndex].id : "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 5), lat: resolvedLat, lng: resolvedLng, name: resolvedName, code: resolvedCode, folderId, defect, urgency };
-              if (existingIndex >= 0) state.records[existingIndex] = recordData;
-              else state.records.push(recordData);
-              importedCount++;
+
+              saveToLocalStorage();
+              let msg = `✅ 匯入完成！成功匯入/更新 ${importedCount} 筆紀錄`;
+              if (manualCount > 0)
+                msg += `（含 ${manualCount} 筆 GPS 手動點位）`;
+              msg += `。`;
+              if (skippedCount > 0)
+                msg += `\n📐 有 ${skippedCount} 筆不在資料庫，已用圖號反推座標自動補全。`;
+              GlobalModal.alert(msg);
+            } catch (err) {
+              GlobalModal.alert(
+                "讀取檔案失敗！請確認格式是否正確。\n" + err.message,
+              );
             }
-            saveToLocalStorage();
-            let msg = `✅ 匯入完成！成功匯入/更新 ${importedCount} 筆紀錄`;
-            if (manualCount > 0) msg += `（含 ${manualCount} 筆 GPS 手動點位）`;
-            msg += "。";
-            if (skippedCount > 0) msg += `\n📐 有 ${skippedCount} 筆不在資料庫，已用圖號反推座標自動補全。`;
-            GlobalModal.alert(msg);
-          } catch (err) { GlobalModal.alert("讀取檔案失敗！請確認格式是否正確。\n" + err.message); }
-          e.target.value = "";
-        };
-        reader.readAsArrayBuffer(file);
-      });
+            e.target.value = "";
+          };
+          reader.readAsArrayBuffer(file);
+        });
+
+      // 資料備份與還原
+      document
+        .getElementById("exportSystemBtn")
+        .addEventListener("click", () => {
+          const data = JSON.stringify(
+            { folders: state.folders, records: state.records },
+            null,
+            2,
+          );
+          const blob = new Blob([data], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `資料備份_${new Date().toISOString().slice(0, 10)}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+      document
+        .getElementById("importSystemBtn")
+        .addEventListener("click", () =>
+          document.getElementById("importSystemInput").click(),
+        );
+      document
+        .getElementById("importSystemInput")
+        .addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function (event) {
+            try {
+              const parsed = JSON.parse(event.target.result);
+              if (!parsed.folders || !parsed.records)
+                throw new Error("格式錯誤");
+              GlobalModal.confirm(
+                "⚠️ 確定要還原備份嗎？現有資料將被覆蓋！",
+                () => {
+                  state.folders = parsed.folders;
+                  state.records = parsed.records;
+                  state.hiddenRecordFolders.clear();
+                  state.expandedFolders.clear();
+                  state.selectedFolders.clear();
+                  state.selectedRecords.clear();
+                  saveToLocalStorage();
+                  renderer.redraw();
+                  GlobalModal.alert("還原成功！");
+                },
+              );
+            } catch (err) {
+              GlobalModal.alert("還原失敗：" + err.message);
+            }
+            e.target.value = "";
+          };
+          reader.readAsText(file);
+        });
 
       // ==========================================
-      // 資料備份與還原（支援手機分享 / 接收）
+      // Popup 內容與儲存邏輯
       // ==========================================
-      document.getElementById("exportSystemBtn").addEventListener("click", () => {
-        const data = JSON.stringify({ folders: state.folders, records: state.records }, null, 2);
-        exportOrShareFile(data, `資料備份_${new Date().toISOString().slice(0, 10)}.json`, "application/json");
-      });
-      document.getElementById("importSystemBtn").addEventListener("click", () => document.getElementById("importSystemInput").click());
-      document.getElementById("importSystemInput").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function (event) {
-          try {
-            const parsed = JSON.parse(event.target.result);
-            if (!parsed.folders || !parsed.records) throw new Error("格式錯誤");
-            GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋！", () => {
-              state.folders = parsed.folders;
-              state.records = parsed.records;
-              state.hiddenRecordFolders.clear(); state.expandedFolders.clear(); state.selectedFolders.clear(); state.selectedRecords.clear();
-              saveToLocalStorage(); renderer.redraw();
-              GlobalModal.alert("還原成功！");
-            });
-          } catch (err) { GlobalModal.alert("還原失敗：" + err.message); }
-          e.target.value = "";
-        };
-        reader.readAsText(file);
-      });
-
-      // ==========================================
-      // Popup
-      // ==========================================
-      function googleNavUrl(point) { return `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}`; }
-      function streetViewUrl(point) { return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point.lat},${point.lng}`; }
-
-      function popupHtml(point) {
-        const allRecordsForPoint = state.records.filter(r => r.lat === point.lat && r.lng === point.lng);
-        const existingRecord = allRecordsForPoint[0] || null;
-        let warningHtml = "";
-        if (allRecordsForPoint.length > 0) {
-          const folderLinks = allRecordsForPoint.map(r => `<span class="goto-folder-link" data-folder-id="${r.folderId}" data-record-id="${r.id}" style="cursor:pointer; text-decoration:underline; color:#b91c1c; margin-right:4px;" title="點擊跳轉至此紀錄">📂 ${escapeHtml(getFullFolderPath(r.folderId))}</span>`).join("");
-          warningHtml = `<div style="font-size:11px; margin-bottom:6px; font-weight:bold; background:#fff5f5; padding:4px 6px; border-radius:4px; line-height:1.8;">⚠️ 已記錄於：<br>${folderLinks}</div>`;
-        }
-        const defectVal = existingRecord ? existingRecord.defect || "" : "";
-        const nameVal = existingRecord ? existingRecord.name || point.name || "手動新增設備" : point.name || "手動新增設備";
-        const uA = existingRecord && existingRecord.urgency === "A" ? "selected" : "";
-        const uB = existingRecord && existingRecord.urgency === "B" ? "selected" : "";
-        const uC = !existingRecord || existingRecord.urgency === "C" || (!uA && !uB && !(existingRecord && existingRecord.urgency === "D")) ? "selected" : "";
-        const uD = existingRecord && existingRecord.urgency === "D" ? "selected" : "";
-        const defectGroupsHtml = DEFECT_GROUPS.map(group => {
-          const chipsHtml = group.items.map(opt => {
-            const len = opt.length;
-            let line1 = escapeHtml(opt), line2 = "";
-            if (len >= 3) { const cut = Math.ceil(len / 2); line1 = escapeHtml(opt.substring(0, cut)); line2 = escapeHtml(opt.substring(cut)); }
-            return `<div class="defect-chip-btn" data-val="${escapeHtml(opt)}" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer; user-select:none; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:44px; flex:1 1 auto; padding:6px 8px; box-sizing:border-box;">
-              <span style="pointer-events:none; font-size:13px; color:#475569; line-height:1.25;">${line1}</span>
-              ${line2 ? `<span style="pointer-events:none; font-size:13px; color:#475569; line-height:1.25; margin-top:2px;">${line2}</span>` : ""}
-            </div>`;
-          }).join("");
-          return `<details class="defect-group" ${group.open ? "open" : ""} style="border:1px solid #e2e8f0; border-radius:5px; background:#fff; padding:6px; margin-top:5px;">
-            <summary style="cursor:pointer; color:#475569; font-size:13px; font-weight:bold; user-select:none;">${escapeHtml(group.label)} (${group.items.length})</summary>
-            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">${chipsHtml}</div>
-          </details>`;
-        }).join("");
-        const defaultFolderId = existingRecord ? existingRecord.folderId : state.lastFolderId || null;
-        const folderOptsHtml = getFolderOptionsHtml(defaultFolderId);
-        return `<div class="popup-layout">
-          <div class="popup-left">
-            ${warningHtml}
-            <div class="popup-title">${escapeHtml(point.name || "未命名設備")}</div>
-            <div class="popup-meta" style="margin-bottom:2px;">圖號：${escapeHtml(point.code || "")}</div>
-            <div class="popup-meta" style="margin-bottom:6px;">${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>
-            <div class="popup-actions" style="margin-bottom:4px; flex-wrap:nowrap;">
-              <a href="${googleNavUrl(point)}" target="_blank" rel="noopener" style="flex:1; text-align:center;">🧭 導航</a>
-              <a href="${streetViewUrl(point)}" target="_blank" rel="noopener" style="flex:1; text-align:center;">🏙️ 街景</a>
-            </div>
-          </div>
-          <div class="popup-right popup-form">
-            <div style="display:flex; flex-direction:column; gap:5px;">
-              <label style="font-size:12px; font-weight:bold;">🏷️ 設備名稱
-                <input id="popup-name-input" type="text" value="${escapeHtml(nameVal)}" placeholder="輸入設備名稱" style="width:100%; min-height:32px; padding:4px 8px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
-              </label>
-              <label style="font-size:12px; font-weight:bold;">📁 存入資料夾
-                <select id="popup-folder" style="width:100%; min-height:32px; padding:4px 6px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px;">${folderOptsHtml}</select>
-              </label>
-              <label style="font-size:12px; font-weight:bold;">🔧 不良項目
-                <div style="margin-top:3px;">
-                  <input type="text" id="popup-defect-input" value="${escapeHtml(defectVal)}" placeholder="輸入或點選標籤" style="width:100%; min-height:28px; padding:4px 8px; font-size:12px; border:1px solid #94a3b8; border-radius:4px; box-sizing:border-box;">
-                  ${defectGroupsHtml}
-                </div>
-              </label>
-              <label style="font-size:12px; font-weight:bold; margin-top:2px;">🚦 緩急程度
-                <select id="popup-urgency" style="width:100%; min-height:32px; padding:4px 6px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px;">
-                  <option value="A" ${uA}>A：極嚴重不良</option>
-                  <option value="B" ${uB}>B：次嚴重不良</option>
-                  <option value="C" ${uC}>C：較輕不良</option>
-                  <option value="D" ${uD}>D：巡檢當場處理</option>
-                </select>
-              </label>
-              <button class="btn-save-record" data-lat="${point.lat}" data-lng="${point.lng}" data-name="${escapeHtml(point.name || "")}" data-code="${escapeHtml(point.code || "")}" style="margin-top:6px;">💾 儲存紀錄</button>
-            </div>
-          </div>
-        </div>`;
+      function googleNavUrl(point) {
+        return `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}`;
+      }
+      function streetViewUrl(point) {
+        return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point.lat},${point.lng}`;
       }
 
+      // 設備 popup 內容：顯示設備資訊、既有紀錄提醒、缺失項目與儲存表單。
+      function popupHtml(point) {
+        const existingRecord = state.records.find(
+          (r) => r.lat === point.lat && r.lng === point.lng,
+        );
+        const allRecordsForPoint = state.records.filter(
+          (r) => r.lat === point.lat && r.lng === point.lng,
+        );
+
+        let warningHtml = "";
+        if (allRecordsForPoint.length > 0) {
+          const folderLinks = allRecordsForPoint
+            .map((r) => {
+              const fId = r.folderId;
+              const path = getFullFolderPath(fId);
+              return `<span class="goto-folder-link" data-folder-id="${fId}" data-record-id="${r.id}"
+                  style="cursor:pointer; text-decoration:underline; color:#b91c1c; margin-right:4px;"
+                  title="點擊跳轉至此紀錄">📂 ${escapeHtml(path)}</span>`;
+            })
+            .join("");
+          warningHtml = `<div style="font-size:11px; margin-bottom:6px; font-weight:bold; background:#fff5f5; padding:4px 6px; border-radius:4px; line-height:1.8;">⚠️ 已記錄於：<br>${folderLinks}</div>`;
+        }
+
+        const defectVal = existingRecord ? existingRecord.defect || "" : "";
+        const nameVal = existingRecord
+          ? existingRecord.name || point.name || "手動新增設備"
+          : point.name || "手動新增設備";
+        const uA =
+          existingRecord && existingRecord.urgency === "A" ? "selected" : "";
+        const uB =
+          existingRecord && existingRecord.urgency === "B" ? "selected" : "";
+        const uC =
+          !existingRecord ||
+          existingRecord.urgency === "C" ||
+          (!uA && !uB && !(existingRecord && existingRecord.urgency === "D"))
+            ? "selected"
+            : "";
+        const uD =
+          existingRecord && existingRecord.urgency === "D" ? "selected" : "";
+
+        // 緊湊型「輸入框 + 分類收合快捷標籤」
+        // 點快捷標籤只會把文字帶入輸入框，不會改變實際儲存格式。
+const defectGroupsHtml = DEFECT_GROUPS.map((group) => {
+          const chipsHtml = group.items
+            .map((opt) => {
+              const len = opt.length;
+              let line1 = escapeHtml(opt);
+              let line2 = "";
+              
+              // 🧠 智慧斷行：大於等於 3 個字時，依據你要求的邏輯完美切半 (上2下1, 上3下2...)
+              if (len >= 3) {
+                const cutIndex = Math.ceil(len / 2); // 向上取整，確保上排字數大於等於下排
+                line1 = escapeHtml(opt.substring(0, cutIndex));
+                line2 = escapeHtml(opt.substring(cutIndex));
+              }
+
+              // 🎨 樣式徹底解放：
+              // 1. 拿掉任何 nowrap、overflow 裁切屬性。
+              // 2. 加上 flex: 1 1 auto; 讓按鈕像水一樣自動填滿、自動換行。
+              // 3. 字體統一維持清晰的 13px，不再委屈縮小。
+              return `<div class="defect-chip-btn" data-val="${escapeHtml(opt)}"
+                style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer; user-select:none; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:44px; flex: 1 1 auto; padding:6px 8px; box-sizing:border-box;">
+                <span style="pointer-events:none; font-size:13px; color:#475569; line-height:1.25; letter-spacing:0.5px;">${line1}</span>
+                ${line2 ? `<span style="pointer-events:none; font-size:13px; color:#475569; line-height:1.25; letter-spacing:0.5px; margin-top:2px;">${line2}</span>` : ""}
+              </div>`;
+            })
+            .join("");
+
+          // 🏗️ 外層容器從 display: grid 改為 display: flex; flex-wrap: wrap; 
+          // 這是解決版面擠壓的最關鍵設定！
+          return `
+            <details class="defect-group" ${group.open ? "open" : ""} style="border:1px solid #e2e8f0; border-radius:5px; background:#fff; padding:6px; margin-top:5px;">
+              <summary style="cursor:pointer; color:#475569; font-size:13px; font-weight:bold; user-select:none;">
+                ${escapeHtml(group.label)} (${group.items.length})
+              </summary>
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                ${chipsHtml}
+              </div>
+            </details>
+          `;
+        }).join("");
+
+        const defectFieldHtml = `
+          <input type="text" id="popup-defect-input" 
+            value="${escapeHtml(defectVal)}" placeholder="輸入或點選標籤" 
+            style="width:100%; min-height:28px; padding:4px 8px; font-size:12px; border:1px solid #94a3b8; border-radius:4px; box-sizing:border-box;">
+          ${defectGroupsHtml}
+        `;
+
+        // ==========================================
+        // 【修改區塊】動態決定預設選中的資料夾
+        // 優先度：1. 該點位原本就有的紀錄資料夾 -> 2. 最後一次使用的資料夾 -> 3. 無(請選擇)
+        // ==========================================
+        const defaultFolderId = existingRecord
+          ? existingRecord.folderId
+          : state.lastFolderId || null;
+        const folderOptsHtml = getFolderOptionsHtml(defaultFolderId);
+        // ==========================================
+
+        return `
+          <div class="popup-layout">
+            <div class="popup-left">
+              ${warningHtml}
+              <div class="popup-title">${escapeHtml(point.name || "未命名設備")}</div>
+              <div class="popup-meta" style="margin-bottom:2px;">圖號：${escapeHtml(point.code || "")}</div>
+              <div class="popup-meta" style="margin-bottom:6px;">${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>
+              
+              <div class="popup-actions" style="margin-bottom:4px; flex-wrap:nowrap;">
+                <a href="${googleNavUrl(point)}" target="_blank" rel="noopener" style="flex:1; text-align:center;">🧭 導航</a>
+                <a href="${streetViewUrl(point)}" target="_blank" rel="noopener" style="flex:1; text-align:center;">🏙️ 街景</a>
+              </div>
+            </div>
+
+            <div class="popup-right popup-form">
+              <div style="display:flex; flex-direction:column; gap:5px;">
+                <label style="font-size:12px; font-weight:bold;">
+                  🏷️ 設備名稱
+                  <input id="popup-name-input" type="text" value="${escapeHtml(nameVal)}" placeholder="輸入設備名稱" style="width:100%; min-height:32px; padding:4px 8px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+                </label>
+
+                <label style="font-size:12px; font-weight:bold;">
+                  📁 存入資料夾
+                  <select id="popup-folder" style="width:100%; min-height:32px; padding:4px 6px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px;">
+                    ${folderOptsHtml}
+                  </select>
+                </label>
+                
+                <label style="font-size:12px; font-weight:bold;">
+                  🔧 不良項目
+                  <div style="margin-top:3px;">${defectFieldHtml}</div>
+                </label>
+                
+                <label style="font-size:12px; font-weight:bold; margin-top:2px;">
+                  🚦 緩急程度
+                  <select id="popup-urgency" style="width:100%; min-height:32px; padding:4px 6px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px;">
+                    <option value="A" ${uA}>A：極嚴重不良</option>
+                    <option value="B" ${uB}>B：次嚴重不良</option>
+                    <option value="C" ${uC}>C：較輕不良</option>
+                    <option value="D" ${uD}>D：巡檢當場處理</option>
+                  </select>
+                </label>
+                
+                <button class="btn-save-record" data-lat="${point.lat}" data-lng="${point.lng}" data-name="${escapeHtml(point.name || "")}" data-code="${escapeHtml(point.code || "")}" style="margin-top:6px;">
+                  💾 儲存紀錄
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 全頁 click 事件：處理 popup 內的跳轉、快捷缺失標籤與儲存紀錄。
       document.addEventListener("click", (e) => {
+        // [新增] 點擊「已記錄於」的資料夾連結 → 切換到巡視紀錄分頁並展開該資料夾
         const gotoLink = e.target.closest(".goto-folder-link");
         if (gotoLink) {
-          const fId = gotoLink.dataset.folderId, rId = gotoLink.dataset.recordId;
+          const fId = gotoLink.dataset.folderId;
+          const rId = gotoLink.dataset.recordId; // 取得綁定的紀錄 ID
           if (!fId) return;
-          let curr = state.folders.find(f => f.id === fId);
-          while (curr) { state.expandedFolders.add(curr.id); curr = state.folders.find(f => f.id === curr.parentId); }
-          map.closePopup(); setPanelCollapsed(false); switchTab("records"); renderFolders();
+
+          // 展開該資料夾及其所有祖先
+          let curr = state.folders.find((f) => f.id === fId);
+          while (curr) {
+            state.expandedFolders.add(curr.id);
+            curr = state.folders.find((f) => f.id === curr.parentId);
+          }
+
+          map.closePopup();
+          setPanelCollapsed(false); // 確保在手機版時會強制打開左側面板
+          switchTab("records");
+          renderFolders();
+
+          // 捲動到目標並高亮
           setTimeout(() => {
             const recordRow = document.getElementById(`record-row-${rId}`);
-            if (recordRow) { recordRow.scrollIntoView({ behavior: "smooth", block: "center" }); recordRow.style.backgroundColor = "#fef08a"; setTimeout(() => { recordRow.style.backgroundColor = "transparent"; }, 5000); }
-            else { const el = folderList.querySelector(`[data-toggle="${fId}"]`); if (el) el.closest(".folder-item")?.scrollIntoView({ behavior: "smooth", block: "center" }); }
+            if (recordRow) {
+              // 捲動到畫面中間
+              recordRow.scrollIntoView({ behavior: "smooth", block: "center" });
+              // 背景瞬間變為黃色高亮
+              recordRow.style.backgroundColor = "#fef08a";
+              // 1.5秒後利用 CSS transition 慢慢淡出回原本的透明色
+              setTimeout(() => {
+                recordRow.style.backgroundColor = "transparent";
+              }, 5000);
+            } else {
+              // 如果找不到單筆紀錄(異常)，退回尋找資料夾
+              const el = folderList.querySelector(`[data-toggle="${fId}"]`);
+              if (el)
+                el.closest(".folder-item")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+            }
           }, 80);
           return;
         }
-
+        // ==========================================
+        // 【新增區塊】監聽不良項目快捷按鈕的點擊
+        // ==========================================
         if (e.target.classList.contains("defect-chip-btn")) {
           const inputEl = document.getElementById("popup-defect-input");
           if (inputEl) {
+            // 點擊後，直接將按鈕的值帶入文字輸入框
             inputEl.value = e.target.dataset.val;
-            const origBg = e.target.style.background;
-            e.target.style.background = "#bae6fd";
-            setTimeout(() => { e.target.style.background = origBg; }, 150);
+
+            // 加入簡單的視覺回饋（點擊時閃爍一下顏色）
+            const originalBg = e.target.style.background;
+            e.target.style.background = "#bae6fd"; // 亮藍色
+            setTimeout(() => {
+              e.target.style.background = originalBg;
+            }, 150);
           }
           return;
         }
 
         const defectGroup = e.target.closest(".defect-group");
         if (defectGroup && e.target.tagName === "SUMMARY") {
-          setTimeout(() => { if (!defectGroup.open) return; document.querySelectorAll(".defect-group").forEach(g => { if (g !== defectGroup) g.removeAttribute("open"); }); }, 0);
+          setTimeout(() => {
+            if (!defectGroup.open) return;
+            document.querySelectorAll(".defect-group").forEach((group) => {
+              if (group !== defectGroup) group.removeAttribute("open");
+            });
+          }, 0);
           return;
         }
 
+        // ==========================================
+        // 【修改區塊】按下儲存紀錄時，記憶資料夾 ID
+        // ==========================================
         if (e.target.classList.contains("btn-save-record")) {
           const btn = e.target;
-          const lat = parseFloat(btn.dataset.lat), lng = parseFloat(btn.dataset.lng);
-          const folderEl = document.getElementById("popup-folder"), nameEl = document.getElementById("popup-name-input"), defectEl = document.getElementById("popup-defect-input"), urgencyEl = document.getElementById("popup-urgency");
+          const lat = parseFloat(btn.dataset.lat),
+            lng = parseFloat(btn.dataset.lng);
+          const folderEl = document.getElementById("popup-folder");
+          const nameEl = document.getElementById("popup-name-input");
+          const defectEl = document.getElementById("popup-defect-input");
+          const urgencyEl = document.getElementById("popup-urgency");
+
           if (!folderEl || !nameEl || !defectEl || !urgencyEl) return;
           const folderId = folderEl.value;
-          const customName = nameEl.value.trim() || btn.dataset.name || "手動新增設備";
-          const defect = defectEl.value.trim(), urgency = urgencyEl.value;
-          if (!folderId) { GlobalModal.alert("請先建立並選擇存放資料夾！"); return; }
+          const customName =
+            nameEl.value.trim() || btn.dataset.name || "手動新增設備";
+          const defect = defectEl.value.trim();
+          const urgency = urgencyEl.value;
+
+          if (!folderId) {
+            GlobalModal.alert("請先建立並選擇存放資料夾！");
+            return;
+          }
+
+          // ── 在此處記憶最後一次使用的資料夾 ──
           state.lastFolderId = folderId;
-          state.records = state.records.filter(r => r.folderId !== folderId || r.lat !== lat || r.lng !== lng);
-          state.records.push({ id: "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 6), lat, lng, name: customName, code: btn.dataset.code, folderId, defect, urgency });
+
+          state.records = state.records.filter(
+            (r) => r.folderId !== folderId || r.lat !== lat || r.lng !== lng,
+          );
+          state.records.push({
+            id:
+              "rec_" +
+              Date.now().toString(36) +
+              Math.random().toString(36).substr(2, 6),
+            lat: lat,
+            lng: lng,
+            name: customName,
+            code: btn.dataset.code,
+            folderId: folderId,
+            defect: defect,
+            urgency: urgency,
+          });
           saveToLocalStorage();
           map.closePopup();
           switchTab("records");
         }
       });
 
+      // 巡視紀錄標記：依資料夾顯示狀態在地圖上繪製星號標記。
       function updateRecordMarkers() {
         recordsLayer.clearLayers();
-        const visibleRecords = state.records.filter(r => !state.hiddenRecordFolders.has(r.folderId));
+        const visibleRecords = state.records.filter(
+          (r) => !state.hiddenRecordFolders.has(r.folderId),
+        );
         for (const record of visibleRecords) {
           let htmlContent = '<div class="saved-star-marker">⭐</div>';
           let iconAnchor = [10, 10];
           if (state.labelsHidden) {
             const labelColor = colorForEquipmentName(record.name);
-            htmlContent = `<div style="display:flex; flex-direction:column; align-items:center; transform:translate(-50%, calc(-100% + 10px)); width:max-content;">
-              <span class="point-label-chip" style="--label-color:${labelColor}; margin-bottom:2px;">${escapeHtml(record.name || record.code)}</span>
-              <div class="saved-star-marker">⭐</div>
-            </div>`;
+            htmlContent = `<div style="display:flex; flex-direction:column; align-items:center; transform: translate(-50%, calc(-100% + 10px)); width: max-content;">
+                <span class="point-label-chip" style="--label-color: ${labelColor}; margin-bottom: 2px;">${escapeHtml(record.name || record.code)}</span>
+                <div class="saved-star-marker">⭐</div>
+              </div>`;
             iconAnchor = [0, 0];
           }
-          L.marker([record.lat, record.lng], { icon: L.divIcon({ className: "", html: htmlContent, iconSize: [0, 0], iconAnchor }) })
-            .on("click", () => { L.popup({ autoPanPadding: [10, 10] }).setLatLng([record.lat, record.lng]).setContent(popupHtml(record)).openOn(map); })
+          L.marker([record.lat, record.lng], {
+            icon: L.divIcon({
+              className: "",
+              html: htmlContent,
+              iconSize: [0, 0],
+              iconAnchor: iconAnchor,
+            }),
+          })
+            .on("click", () => {
+              L.popup({ autoPanPadding: [10, 10] })
+                .setLatLng([record.lat, record.lng])
+                .setContent(popupHtml(record))
+                .openOn(map);
+            })
             .addTo(recordsLayer);
         }
       }
 
       // ==========================================
-      // 地圖繪圖引擎
+      // 地圖繪圖與核心邏輯
       // ==========================================
+      function setStatus(text) {
+        statusBox.textContent = text;
+      }
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+      function formatNumber(value) {
+        return new Intl.NumberFormat("zh-TW").format(value);
+      }
+      function debounce(fn, wait = 180) {
+        let timer = 0;
+        return (...args) => {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(() => fn(...args), wait);
+        };
+      }
       function codePrefix(code) {
-        const match = String(code || "").trim().toUpperCase().replace(/\s+/g, "").match(/^([A-Z]\d{4})/);
-        return match ? match[1] : String(code || "").trim().slice(0, 5) || "未知";
+        const match = String(code || "")
+          .trim()
+          .toUpperCase()
+          .replace(/\s+/g, "")
+          .match(/^([A-Z]\d{4})/);
+        return match
+          ? match[1]
+          : String(code || "")
+              .trim()
+              .slice(0, 5) || "未知";
       }
       function searchResultRank(point, search) {
         if (hasSearchTerm(point, search.terms)) return 0;
@@ -1536,213 +2995,701 @@
         return 2;
       }
       function parseSearchQuery(query) {
-        const tokens = String(query || "").trim().split(/[.\s,，、;；|｜/／]+/).map(t => t.trim()).filter(Boolean);
-        const prefixes = [], terms = [];
-        for (const t of tokens) { const n = t.toUpperCase(); if (/^[A-Z]\d{4}$/.test(n)) { if (!prefixes.includes(n)) prefixes.push(n); } else { terms.push(t.toLowerCase()); } }
+        const tokens = String(query || "")
+          .trim()
+          .split(/[.\s,，、;；|｜/／]+/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const prefixes = [];
+        const terms = [];
+        for (const t of tokens) {
+          const n = t.toUpperCase();
+          if (/^[A-Z]\d{4}$/.test(n)) {
+            if (!prefixes.includes(n)) prefixes.push(n);
+          } else {
+            terms.push(t.toLowerCase());
+          }
+        }
         return { prefixes, terms };
       }
-      function pointSearchText(point) { return `${point.name || ""} ${point.code || ""} ${codePrefix(point.code)}`.toLowerCase(); }
-      function hasSearchTerm(point, terms) { if (!terms.length) return false; const text = pointSearchText(point); return terms.some(term => text.includes(term)); }
-      function matchesSearch(point, search) { if (!search.prefixes.length && !search.terms.length) return true; return search.prefixes.includes(codePrefix(point.code)) || hasSearchTerm(point, search.terms); }
-      function pointInBounds(point, bounds) { return point.lat >= bounds.getSouth() && point.lat <= bounds.getNorth() && point.lng >= bounds.getWest() && point.lng <= bounds.getEast(); }
-      function matchesFilters(point) { if (state.area && point.area !== state.area) return false; return matchesSearch(point, state.search); }
-      function visibleFilteredPoints() { const bounds = map.getBounds(), output = []; for (const p of state.points) { if (pointInBounds(p, bounds) && matchesFilters(p)) output.push(p); } return output; }
+      function pointSearchText(point) {
+        return `${point.name || ""} ${point.code || ""} ${codePrefix(point.code)}`.toLowerCase();
+      }
+      function hasSearchTerm(point, terms) {
+        if (!terms.length) return false;
+        const text = pointSearchText(point);
+        return terms.some((term) => text.includes(term));
+      }
+      function matchesSearch(point, search) {
+        if (!search.prefixes.length && !search.terms.length) return true;
+        return (
+          search.prefixes.includes(codePrefix(point.code)) ||
+          hasSearchTerm(point, search.terms)
+        );
+      }
+      function pointInBounds(point, bounds) {
+        return (
+          point.lat >= bounds.getSouth() &&
+          point.lat <= bounds.getNorth() &&
+          point.lng >= bounds.getWest() &&
+          point.lng <= bounds.getEast()
+        );
+      }
+      function matchesFilters(point) {
+        if (state.area && point.area !== state.area) return false;
+        return matchesSearch(point, state.search);
+      }
+      function visibleFilteredPoints() {
+        const bounds = map.getBounds();
+        const output = [];
+        for (const point of state.points) {
+          if (pointInBounds(point, bounds) && matchesFilters(point))
+            output.push(point);
+        }
+        return output;
+      }
 
       const EQUIPMENT_COLOR_PALETTE = [
-        {color:"#b91c1c",hue:0},{color:"#2563eb",hue:220},{color:"#15803d",hue:145},{color:"#d97706",hue:35},
-        {color:"#7e22ce",hue:275},{color:"#0f766e",hue:175},{color:"#be185d",hue:335},{color:"#4d7c0f",hue:95},
-        {color:"#4338ca",hue:245},{color:"#c2410c",hue:20},{color:"#047857",hue:155},{color:"#0e7490",hue:195},
-        {color:"#a21caf",hue:295},{color:"#854d0e",hue:45},{color:"#1d4ed8",hue:225},{color:"#64748b",hue:215},
+        { color: "#b91c1c", hue: 0 },
+        { color: "#2563eb", hue: 220 },
+        { color: "#15803d", hue: 145 },
+        { color: "#d97706", hue: 35 },
+        { color: "#7e22ce", hue: 275 },
+        { color: "#0f766e", hue: 175 },
+        { color: "#be185d", hue: 335 },
+        { color: "#4d7c0f", hue: 95 },
+        { color: "#4338ca", hue: 245 },
+        { color: "#c2410c", hue: 20 },
+        { color: "#047857", hue: 155 },
+        { color: "#0e7490", hue: 195 },
+        { color: "#a21caf", hue: 295 },
+        { color: "#854d0e", hue: 45 },
+        { color: "#1d4ed8", hue: 225 },
+        { color: "#64748b", hue: 215 },
       ];
-      const PREFIX_COLORS = EQUIPMENT_COLOR_PALETTE.map(({color}) => color);
-      const EQUIPMENT_COLOR_HUES = new Map(EQUIPMENT_COLOR_PALETTE.map(({color,hue}) => [color,hue]));
-      const NEARBY_EQUIPMENT_THRESHOLD = 220, UNKNOWN_EQUIPMENT_PREFIX = "未分類", UNKNOWN_EQUIPMENT_COLOR = "#64748b";
-      function hashText(v) { let h = 0; for (const c of v) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
-      function colorForPrefix(prefix) { const h = hashText(prefix), hue = (h * 137.508) % 360, sat = 58 + (h % 22), lit = 30 + (h % 16); return `hsl(${hue.toFixed(0)},${sat}%,${lit}%)`; }
-      function equipmentNamePrefix(name) { const m = String(name || "").trim().match(/^[\u3400-\u9fff]+/); return m ? m[0].slice(0, 4) : UNKNOWN_EQUIPMENT_PREFIX; }
-      function circularHueDistance(a, b) { const diff = Math.abs(a - b) % 360; return Math.min(diff, 360 - diff); }
-      function colorContrastScore(color, usedNeighborColors) { if (!usedNeighborColors.length) return 180; const hue = EQUIPMENT_COLOR_HUES.get(color) ?? hashText(color) % 360; return Math.min(...usedNeighborColors.map(uc => circularHueDistance(hue, EQUIPMENT_COLOR_HUES.get(uc) ?? hashText(uc) % 360))); }
-      function groupScreenGap(a, b) { const dx = Math.max(0, a.minX - b.maxX, b.minX - a.maxX), dy = Math.max(0, a.minY - b.maxY, b.minY - a.maxY); return Math.sqrt(dx * dx + dy * dy); }
-      function buildEquipmentColorMap(items) {
-        const groups = new Map();
-        for (const item of items) { const prefix = equipmentNamePrefix(item.point.name); if (prefix === UNKNOWN_EQUIPMENT_PREFIX) continue; let g = groups.get(prefix); if (!g) { g = {prefix, count:0, xSum:0, ySum:0, minX:item.x, maxX:item.x, minY:item.y, maxY:item.y, color:""}; groups.set(prefix, g); } g.count++; g.xSum+=item.x; g.ySum+=item.y; g.minX=Math.min(g.minX,item.x); g.maxX=Math.max(g.maxX,item.x); g.minY=Math.min(g.minY,item.y); g.maxY=Math.max(g.maxY,item.y); }
-        const colorMap = new Map([[UNKNOWN_EQUIPMENT_PREFIX, UNKNOWN_EQUIPMENT_COLOR]]);
-        const colorUse = new Map(PREFIX_COLORS.map(c => [c, 0]));
-        const sortedGroups = [...groups.values()].map(g => ({...g, x:g.xSum/g.count, y:g.ySum/g.count})).sort((a,b) => b.count - a.count);
-        const adjacency = new Map(sortedGroups.map(g => [g.prefix, new Set()]));
-        for (let i = 0; i < sortedGroups.length; i++) for (let j = i+1; j < sortedGroups.length; j++) if (groupScreenGap(sortedGroups[i], sortedGroups[j]) < NEARBY_EQUIPMENT_THRESHOLD) { adjacency.get(sortedGroups[i].prefix).add(sortedGroups[j].prefix); adjacency.get(sortedGroups[j].prefix).add(sortedGroups[i].prefix); }
-        const orderedGroups = [...sortedGroups].sort((a,b) => { const dd = adjacency.get(b.prefix).size - adjacency.get(a.prefix).size; if (dd !== 0) return dd; if (b.count !== a.count) return b.count - a.count; return compareNatural(a.prefix, b.prefix); });
-        for (const g of orderedGroups) { const usedNeighborColors = [...adjacency.get(g.prefix)].map(p => colorMap.get(p)).filter(Boolean); const start = hashText(g.prefix) % PREFIX_COLORS.length; const ranked = PREFIX_COLORS.map((_,i) => PREFIX_COLORS[(start+i) % PREFIX_COLORS.length]).sort((a,b) => { const cd = colorContrastScore(b, usedNeighborColors) - colorContrastScore(a, usedNeighborColors); return cd !== 0 ? cd : (colorUse.get(a)||0)-(colorUse.get(b)||0); }); g.color = ranked[0]; colorMap.set(g.prefix, g.color); colorUse.set(g.color, (colorUse.get(g.color)||0)+1); }
-        return colorMap;
+      const PREFIX_COLORS = EQUIPMENT_COLOR_PALETTE.map(({ color }) => color);
+      const EQUIPMENT_COLOR_HUES = new Map(
+        EQUIPMENT_COLOR_PALETTE.map(({ color, hue }) => [color, hue]),
+      );
+      const NEARBY_EQUIPMENT_THRESHOLD = 220;
+      const UNKNOWN_EQUIPMENT_PREFIX = "未分類",
+        UNKNOWN_EQUIPMENT_COLOR = "#64748b";
+      function hashText(value) {
+        let hash = 0;
+        for (const char of value) {
+          hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+        }
+        return hash;
       }
-      function colorForEquipmentName(name) { return state.equipmentColorMap.get(equipmentNamePrefix(name)) || colorForPrefix(equipmentNamePrefix(name)); }
+      // 圖號前綴用黃金角度 HSL，確保 Q0158、Q1166、Q1380... 每個都是明顯不同的顏色
+      function colorForPrefix(prefix) {
+        const h = hashText(prefix);
+        const hue = (h * 137.508) % 360;
+        const sat = 58 + (h % 22); // 58~80%
+        const lit = 30 + (h % 16); // 30~46%，夠深讓白字清晰
+        return `hsl(${hue.toFixed(0)}, ${sat}%, ${lit}%)`;
+      }
+      function equipmentNamePrefix(name) {
+        const match = String(name || "")
+          .trim()
+          .match(/^[\u3400-\u9fff]+/);
+        return match ? match[0].slice(0, 4) : UNKNOWN_EQUIPMENT_PREFIX;
+      }
 
+      // ==========================================
+      // 地圖繪製引擎 (Canvas)
+      // ==========================================
+
+      // Canvas 繪圖層：大量點位與圖號群組標籤都在這裡繪製，提升效能。
       const canvasLayer = L.Layer.extend({
-        onAdd(m) { this.canvas = L.DomUtil.create("canvas","leaflet-zoom-animated"); this.canvas.style.pointerEvents="none"; this.context=this.canvas.getContext("2d"); m.getPanes().overlayPane.appendChild(this.canvas); m.on("moveend zoomend resize", this.redraw, this); this.redraw(); },
-        onRemove(m) { L.DomUtil.remove(this.canvas); m.off("moveend zoomend resize", this.redraw, this); },
+        onAdd(currentMap) {
+          this.canvas = L.DomUtil.create("canvas", "leaflet-zoom-animated");
+          this.canvas.style.pointerEvents = "none";
+          this.context = this.canvas.getContext("2d");
+          currentMap.getPanes().overlayPane.appendChild(this.canvas);
+          currentMap.on("moveend zoomend resize", this.redraw, this);
+          this.redraw();
+        },
+        onRemove(currentMap) {
+          L.DomUtil.remove(this.canvas);
+          currentMap.off("moveend zoomend resize", this.redraw, this);
+        },
         redraw() {
           if (!this.canvas || !state.points.length) return;
-          const size = map.getSize(), topLeft = map.containerPointToLayerPoint([0,0]);
+          const size = map.getSize();
+          const topLeft = map.containerPointToLayerPoint([0, 0]);
           L.DomUtil.setPosition(this.canvas, topLeft);
-          this.canvas.width = size.x; this.canvas.height = size.y;
-          this.canvas.style.width = `${size.x}px`; this.canvas.style.height = `${size.y}px`;
-          const ctx = this.context; ctx.clearRect(0, 0, size.x, size.y);
-          if (state.labelsHidden) { state.drawnItems = []; updateLabels(); updateStats(); return; }
+          this.canvas.width = size.x;
+          this.canvas.height = size.y;
+          this.canvas.style.width = `${size.x}px`;
+          this.canvas.style.height = `${size.y}px`;
+          const ctx = this.context;
+          ctx.clearRect(0, 0, size.x, size.y);
+
+          if (state.labelsHidden) {
+            state.drawnItems = [];
+            updateLabels();
+            updateStats();
+            return;
+          }
+
           state.visiblePoints = visibleFilteredPoints();
-          if (map.getZoom() >= SHOW_POINTS_ZOOM && state.visiblePoints.length <= MAX_DIRECT_POINTS) {
+          if (
+            map.getZoom() >= SHOW_POINTS_ZOOM &&
+            state.visiblePoints.length <= MAX_DIRECT_POINTS
+          ) {
             state.displayMode = "point";
-            state.drawnItems = state.visiblePoints.map(p => { const pixel = map.latLngToContainerPoint([p.lat, p.lng]); return {type:"point", point:p, x:pixel.x, y:pixel.y, count:1}; });
+            state.drawnItems = state.visiblePoints.map((p) => {
+              const pixel = map.latLngToContainerPoint([p.lat, p.lng]);
+              return {
+                type: "point",
+                point: p,
+                x: pixel.x,
+                y: pixel.y,
+                count: 1,
+              };
+            });
+
             state.equipmentColorMap = buildEquipmentColorMap(state.drawnItems);
+
             drawPoints(ctx, state.drawnItems);
           } else {
             state.displayMode = "prefix";
             const groups = new Map();
-            for (const p of state.visiblePoints) { const prefix = codePrefix(p.code); let g = groups.get(prefix); if (!g) { g = {type:"prefix", prefix, count:0, latSum:0, lngSum:0}; groups.set(prefix, g); } g.count++; g.latSum+=p.lat; g.lngSum+=p.lng; }
-            state.drawnItems = placePrefixLabels([...groups.values()].map(g => { const lat=g.latSum/g.count, lng=g.lngSum/g.count; const pixel=map.latLngToContainerPoint([lat,lng]); return {...g,lat,lng,x:pixel.x,y:pixel.y}; }).sort((a,b) => b.count-a.count));
+            for (const point of state.visiblePoints) {
+              const prefix = codePrefix(point.code);
+              let group = groups.get(prefix);
+              if (!group) {
+                group = {
+                  type: "prefix",
+                  prefix,
+                  count: 0,
+                  latSum: 0,
+                  lngSum: 0,
+                };
+                groups.set(prefix, group);
+              }
+              group.count += 1;
+              group.latSum += point.lat;
+              group.lngSum += point.lng;
+            }
+            state.drawnItems = placePrefixLabels(
+              [...groups.values()]
+                .map((g) => {
+                  const lat = g.latSum / g.count;
+                  const lng = g.lngSum / g.count;
+                  const pixel = map.latLngToContainerPoint([lat, lng]);
+                  return { ...g, lat, lng, x: pixel.x, y: pixel.y };
+                })
+                .sort((a, b) => b.count - a.count),
+            );
             drawPrefixLabels(ctx, state.drawnItems);
           }
-          updateLabels(); updateStats();
+          updateLabels();
+          updateStats();
         },
       });
       const renderer = new canvasLayer().addTo(map);
 
-      function drawPoints(ctx, items) { for (const item of items) { ctx.beginPath(); ctx.arc(item.x, item.y, 4.5, 0, Math.PI*2); ctx.fillStyle = colorForEquipmentName(item.point.name); ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle="rgba(255,255,255,0.95)"; ctx.stroke(); } }
+      // 設備名稱配色：相鄰設備群優先分配高反差色，避免近距離標籤撞色。
+      function circularHueDistance(a, b) {
+        const diff = Math.abs(a - b) % 360;
+        return Math.min(diff, 360 - diff);
+      }
 
+      function colorContrastScore(color, usedNeighborColors) {
+        if (!usedNeighborColors.length) return 180;
+        const hue = EQUIPMENT_COLOR_HUES.get(color) ?? hashText(color) % 360;
+        return Math.min(
+          ...usedNeighborColors.map((usedColor) =>
+            circularHueDistance(
+              hue,
+              EQUIPMENT_COLOR_HUES.get(usedColor) ?? hashText(usedColor) % 360,
+            ),
+          ),
+        );
+      }
+
+      function groupScreenGap(a, b) {
+        const dx = Math.max(0, a.minX - b.maxX, b.minX - a.maxX);
+        const dy = Math.max(0, a.minY - b.maxY, b.minY - a.maxY);
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      function buildEquipmentColorMap(items) {
+        const groups = new Map();
+        for (const item of items) {
+          const prefix = equipmentNamePrefix(item.point.name);
+          if (prefix === UNKNOWN_EQUIPMENT_PREFIX) continue;
+          let group = groups.get(prefix);
+          if (!group) {
+            group = {
+              prefix,
+              count: 0,
+              xSum: 0,
+              ySum: 0,
+              minX: item.x,
+              maxX: item.x,
+              minY: item.y,
+              maxY: item.y,
+              color: "",
+            };
+            groups.set(prefix, group);
+          }
+          group.count += 1;
+          group.xSum += item.x;
+          group.ySum += item.y;
+          group.minX = Math.min(group.minX, item.x);
+          group.maxX = Math.max(group.maxX, item.x);
+          group.minY = Math.min(group.minY, item.y);
+          group.maxY = Math.max(group.maxY, item.y);
+        }
+        const colorMap = new Map([
+          [UNKNOWN_EQUIPMENT_PREFIX, UNKNOWN_EQUIPMENT_COLOR],
+        ]);
+        const colorUse = new Map(PREFIX_COLORS.map((c) => [c, 0]));
+        const sortedGroups = [...groups.values()]
+          .map((g) => ({ ...g, x: g.xSum / g.count, y: g.ySum / g.count }))
+          .sort((a, b) => b.count - a.count);
+
+        const adjacency = new Map(
+          sortedGroups.map((group) => [group.prefix, new Set()]),
+        );
+        for (let i = 0; i < sortedGroups.length; i++) {
+          for (let j = i + 1; j < sortedGroups.length; j++) {
+            if (
+              groupScreenGap(sortedGroups[i], sortedGroups[j]) <
+              NEARBY_EQUIPMENT_THRESHOLD
+            ) {
+              adjacency.get(sortedGroups[i].prefix).add(sortedGroups[j].prefix);
+              adjacency.get(sortedGroups[j].prefix).add(sortedGroups[i].prefix);
+            }
+          }
+        }
+
+        const orderedGroups = [...sortedGroups].sort((a, b) => {
+          const degreeDiff =
+            adjacency.get(b.prefix).size - adjacency.get(a.prefix).size;
+          if (degreeDiff !== 0) return degreeDiff;
+          if (b.count !== a.count) return b.count - a.count;
+          return compareNatural(a.prefix, b.prefix);
+        });
+
+        for (const group of orderedGroups) {
+          const usedNeighborColors = [...adjacency.get(group.prefix)]
+            .map((prefix) => colorMap.get(prefix))
+            .filter(Boolean);
+          const start = hashText(group.prefix) % PREFIX_COLORS.length;
+          const rankedColors = PREFIX_COLORS.map(
+            (_, i) => PREFIX_COLORS[(start + i) % PREFIX_COLORS.length],
+          ).sort((a, b) => {
+            const contrastDiff =
+              colorContrastScore(b, usedNeighborColors) -
+              colorContrastScore(a, usedNeighborColors);
+            if (contrastDiff !== 0) return contrastDiff;
+            return (colorUse.get(a) || 0) - (colorUse.get(b) || 0);
+          });
+          group.color = rankedColors[0];
+          colorMap.set(group.prefix, group.color);
+          colorUse.set(group.color, (colorUse.get(group.color) || 0) + 1);
+        }
+        return colorMap;
+      }
+      function colorForEquipmentName(name) {
+        return (
+          state.equipmentColorMap.get(equipmentNamePrefix(name)) ||
+          colorForPrefix(equipmentNamePrefix(name))
+        );
+      }
+
+      function drawPoints(ctx, items) {
+        for (const item of items) {
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = colorForEquipmentName(item.point.name);
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+          ctx.stroke();
+        }
+      }
+      // 前綴標籤著色快取（每次 redraw 重新計算）
       let currentPrefixColors = new Map();
+
+      // 圖號群組配色：依目前畫面鄰近關係重新分配顏色，降低相鄰標籤撞色。
       function buildPrefixColorsByProximity(items) {
-        const THRESHOLD = 160, adj = new Map(items.map(it => [it.prefix, new Set()]));
-        for (let i=0; i<items.length; i++) for (let j=i+1; j<items.length; j++) { const dx=items[i].x-items[j].x, dy=items[i].y-items[j].y; if (Math.sqrt(dx*dx+dy*dy)<THRESHOLD) { adj.get(items[i].prefix).add(items[j].prefix); adj.get(items[j].prefix).add(items[i].prefix); } }
-        const sorted = [...items].sort((a,b) => adj.get(b.prefix).size-adj.get(a.prefix).size);
+        // 步驟 1：建立鄰近圖（畫面上距離 < 閾值 px 視為相鄰）
+        const THRESHOLD = 160; // px，約等於兩個標籤寬度
+        const adj = new Map(items.map((it) => [it.prefix, new Set()]));
+        for (let i = 0; i < items.length; i++) {
+          for (let j = i + 1; j < items.length; j++) {
+            const dx = items[i].x - items[j].x,
+              dy = items[i].y - items[j].y;
+            if (Math.sqrt(dx * dx + dy * dy) < THRESHOLD) {
+              adj.get(items[i].prefix).add(items[j].prefix);
+              adj.get(items[j].prefix).add(items[i].prefix);
+            }
+          }
+        }
+        // 步驟 2：貪婪著色（鄰居最多的先著色，確保最難的先分配）
+        const sorted = [...items].sort(
+          (a, b) => adj.get(b.prefix).size - adj.get(a.prefix).size,
+        );
         const colorIdx = new Map();
-        for (const {prefix} of sorted) { const usedIdx = new Set([...adj.get(prefix)].map(n => colorIdx.get(n)).filter(v => v!==undefined)); let c=0; while(usedIdx.has(c)) c++; colorIdx.set(prefix, c); }
+        for (const { prefix } of sorted) {
+          const usedIdx = new Set(
+            [...adj.get(prefix)]
+              .map((n) => colorIdx.get(n))
+              .filter((v) => v !== undefined),
+          );
+          let c = 0;
+          while (usedIdx.has(c)) c++;
+          colorIdx.set(prefix, c);
+        }
+        // 步驟 3：色號 → 明顯可分辨的顏色（每 6 個一輪，色相差 60°；亮度/飽和度交錯）
         const result = new Map();
-        for (const [prefix, idx] of colorIdx) { const hue=(idx*60+Math.floor(idx/6)*30)%360, sat=65+(idx%3)*10, lit=28+(idx%2)*12; result.set(prefix, `hsl(${hue},${sat}%,${lit}%)`); }
+        for (const [prefix, idx] of colorIdx) {
+          const hue = (idx * 60 + Math.floor(idx / 6) * 30) % 360; // 環內60°間距，每輪偏移30°
+          const sat = 65 + (idx % 3) * 10; // 65 / 75 / 85%
+          const lit = 28 + (idx % 2) * 12; // 28 / 40%（深淺交錯讓白字清楚）
+          result.set(prefix, `hsl(${hue}, ${sat}%, ${lit}%)`);
+        }
         return result;
       }
+
+      // 繪製圖號群組標籤：包含背景色、白色外框、文字與點擊 hitBox。
       function drawPrefixLabels(ctx, items) {
+        // 每次重繪前，依當前畫面鄰近關係重新計算色彩分配
         currentPrefixColors = buildPrefixColorsByProximity(items);
+
         for (const item of items) {
-          const color = currentPrefixColors.get(item.prefix) || colorForPrefix(item.prefix);
+          const color =
+            currentPrefixColors.get(item.prefix) || colorForPrefix(item.prefix);
           const label = `${item.prefix} · ${formatNumber(item.count)}`;
-          const width = Math.max(74, Math.min(128, 28+label.length*7)), height = 30;
-          const x = item.x-width/2, y = item.y-height/2;
-          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x,y,width,height,8); else ctx.rect(x,y,width,height);
-          ctx.fillStyle=color; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke();
-          ctx.fillStyle="#fff"; ctx.font="800 12px system-ui,sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-          ctx.fillText(label, item.x, item.y+0.5);
-          item.hitBox = {x, y, width, height};
+          const width = Math.max(74, Math.min(128, 28 + label.length * 7)),
+            height = 30;
+          const x = item.x - width / 2,
+            y = item.y - height / 2;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x, y, width, height, 8);
+          else ctx.rect(x, y, width, height);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#fff";
+          ctx.stroke();
+          ctx.fillStyle = "#fff";
+          ctx.font = "800 12px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, item.x, item.y + 0.5);
+
+          item.hitBox = { x, y, width, height };
         }
       }
       function placePrefixLabels(items) {
-        const occupied = new Set(), output = [], gridW = map.getZoom()<=10?52:36, gridH = map.getZoom()<=10?28:20;
-        for (const item of items) { const key = `${Math.floor(item.x/gridW)}:${Math.floor(item.y/gridH)}`; if (occupied.has(key)) continue; occupied.add(key); output.push(item); if (output.length>=900) break; }
+        const occupied = new Set(),
+          output = [],
+          gridW = map.getZoom() <= 10 ? 52 : 36,
+          gridH = map.getZoom() <= 10 ? 28 : 20;
+        for (const item of items) {
+          const key = `${Math.floor(item.x / gridW)}:${Math.floor(item.y / gridH)}`;
+          if (occupied.has(key)) continue;
+          occupied.add(key);
+          output.push(item);
+          if (output.length >= 900) break;
+        }
         return output;
       }
       function updateLabels() {
         labelsLayer.clearLayers();
-        if (state.labelsHidden || state.displayMode !== "point" || state.visiblePoints.length > MAX_POINT_LABELS) return;
-        for (const p of state.visiblePoints) {
-          const labelColor = colorForEquipmentName(p.name);
-          L.marker([p.lat, p.lng], { icon: L.divIcon({ className:"point-label", html:`<span class="point-label-chip" style="--label-color:${labelColor}">${escapeHtml(p.name)}</span>`, iconSize:null, iconAnchor:[-8,20] }) })
-            .on("click", () => { L.popup({autoPanPadding:[10,10]}).setLatLng([p.lat,p.lng]).setContent(popupHtml(p)).openOn(map); })
+        if (
+          state.labelsHidden ||
+          state.displayMode !== "point" ||
+          state.visiblePoints.length > MAX_POINT_LABELS
+        )
+          return;
+        for (const point of state.visiblePoints) {
+          const labelColor = colorForEquipmentName(point.name);
+          L.marker([point.lat, point.lng], {
+            icon: L.divIcon({
+              className: "point-label",
+              html: `<span class="point-label-chip" style="--label-color: ${labelColor}">${escapeHtml(point.name)}</span>`,
+              iconSize: null,
+              iconAnchor: [-8, 20],
+            }),
+          })
+            .on("click", () => {
+              L.popup({ autoPanPadding: [10, 10] })
+                .setLatLng([point.lat, point.lng])
+                .setContent(popupHtml(point))
+                .openOn(map);
+            })
             .addTo(labelsLayer);
         }
       }
-      function updateStats() { totalCount.textContent=formatNumber(state.points.length); visibleCount.textContent=formatNumber(state.labelsHidden?0:state.visiblePoints.length); drawCount.textContent=formatNumber(state.drawnItems.length); }
-      function fillAreas() { for (const area of state.meta?.areas||[]) { const o=document.createElement("option"); o.value=area.name; o.textContent=`${area.name} (${formatNumber(area.count)})`; areaSelect.append(o); } }
+      function updateStats() {
+        totalCount.textContent = formatNumber(state.points.length);
+        visibleCount.textContent = formatNumber(
+          state.labelsHidden ? 0 : state.visiblePoints.length,
+        );
+        drawCount.textContent = formatNumber(state.drawnItems.length);
+      }
+      function fillAreas() {
+        for (const area of state.meta?.areas || []) {
+          const option = document.createElement("option");
+          option.value = area.name;
+          option.textContent = `${area.name} (${formatNumber(area.count)})`;
+          areaSelect.append(option);
+        }
+      }
 
-      document.getElementById("toggleLabelsBtn").addEventListener("click", (e) => {
-        state.labelsHidden = !state.labelsHidden;
-        e.target.textContent = state.labelsHidden ? "顯示所有主圖標籤" : "隱藏所有主圖標籤";
-        e.target.classList.toggle("is-hidden", state.labelsHidden);
-        renderer.redraw(); updateRecordMarkers();
-      });
+      document
+        .getElementById("toggleLabelsBtn")
+        .addEventListener("click", (e) => {
+          state.labelsHidden = !state.labelsHidden;
+          e.target.textContent = state.labelsHidden
+            ? "顯示所有主圖標籤"
+            : "隱藏所有主圖標籤";
+          e.target.classList.toggle("is-hidden", state.labelsHidden);
+          renderer.redraw();
+          updateRecordMarkers();
+        });
       areaSelect.addEventListener("change", applyFilter);
       searchInput.addEventListener("input", debounce(applyFilter, 180));
 
-      function applyFilter() { state.area=areaSelect.value; state.query=searchInput.value.trim(); state.search=parseSearchQuery(state.query); renderResults(searchMatches(state.search)); renderer.redraw(); }
-      function searchMatches(search) {
-        if (!search.prefixes.length && !search.terms.some(t => t.length >= 1)) return [];
-        const output = [];
-        for (const p of state.points) { if (state.area && p.area !== state.area) continue; if (matchesSearch(p, search)) output.push(p); }
-        return output.sort((a,b) => { const rc = searchResultRank(a,search)-searchResultRank(b,search); return rc !== 0 ? rc : comparePointsByName(a,b); }).slice(0, 50);
+      // 搜尋篩選：更新區域/關鍵字條件，重繪結果列表與地圖。
+      function applyFilter() {
+        state.area = areaSelect.value;
+        state.query = searchInput.value.trim();
+        state.search = parseSearchQuery(state.query);
+        renderResults(searchMatches(state.search));
+        renderer.redraw();
       }
+
+      // 【已修正】搜尋放寬至單個字元 (例如可以只搜「尖」)
+      function searchMatches(search) {
+        if (!search.prefixes.length && !search.terms.some((t) => t.length >= 1))
+          return [];
+        const output = [];
+        for (const point of state.points) {
+          if (state.area && point.area !== state.area) continue;
+          if (matchesSearch(point, search)) output.push(point);
+        }
+        return output
+          .sort((a, b) => {
+            const rankCompare =
+              searchResultRank(a, search) - searchResultRank(b, search);
+            if (rankCompare !== 0) return rankCompare;
+            return comparePointsByName(a, b);
+          })
+          .slice(0, 50);
+      }
+
       function renderResults(items) {
         results.innerHTML = "";
-        if (!items.length) { results.innerHTML='<p class="popup-meta">請輸入設備關鍵字。</p>'; return; }
-        for (const p of items) {
+        if (!items.length) {
+          results.innerHTML = '<p class="popup-meta">請輸入設備關鍵字。</p>';
+          return;
+        }
+        for (const point of items) {
           const fragment = resultTemplate.content.cloneNode(true);
-          fragment.querySelector("strong").textContent = p.name || "未命名";
-          fragment.querySelector("span").textContent = `${p.area||""} / ${p.code||""}`;
-          fragment.querySelector("button").addEventListener("click", () => { map.flyTo([p.lat,p.lng],map.getMaxZoom(),{duration:0.45}); L.popup({autoPanPadding:[10,10]}).setLatLng([p.lat,p.lng]).setContent(popupHtml(p)).openOn(map); document.getElementById("mapSearchPanel").classList.remove("is-open"); searchInput.value=""; applyFilter(); });
+          fragment.querySelector("strong").textContent = point.name || "未命名";
+          fragment.querySelector("span").textContent =
+            `${point.area || ""} / ${point.code || ""}`;
+          fragment.querySelector("button").addEventListener("click", () => {
+            map.flyTo([point.lat, point.lng], map.getMaxZoom(), {
+              duration: 0.45,
+            });
+            L.popup({ autoPanPadding: [10, 10] })
+              .setLatLng([point.lat, point.lng])
+              .setContent(popupHtml(point))
+              .openOn(map);
+            document
+              .getElementById("mapSearchPanel")
+              .classList.remove("is-open");
+            searchInput.value = "";
+            applyFilter();
+          });
           results.append(fragment);
         }
       }
 
+      // 地圖互動：點群組標籤時放大，點設備點位時開啟 popup。
       map.on("click", (e) => {
         if (state.displayMode === "prefix") {
-          const prefix = state.drawnItems.find(item => { const b=item.hitBox; return b&&e.containerPoint.x>=b.x&&e.containerPoint.x<=b.x+b.width&&e.containerPoint.y>=b.y&&e.containerPoint.y<=b.y+b.height; });
-          if (prefix) map.flyTo([prefix.lat,prefix.lng], Math.max(map.getZoom()+2, SHOW_POINTS_ZOOM), {duration:0.45});
+          const prefix = state.drawnItems.find((item) => {
+            const b = item.hitBox;
+            return (
+              b &&
+              e.containerPoint.x >= b.x &&
+              e.containerPoint.x <= b.x + b.width &&
+              e.containerPoint.y >= b.y &&
+              e.containerPoint.y <= b.y + b.height
+            );
+          });
+          if (prefix)
+            map.flyTo(
+              [prefix.lat, prefix.lng],
+              Math.max(map.getZoom() + 2, SHOW_POINTS_ZOOM),
+              { duration: 0.45 },
+            );
         } else {
           if (state.labelsHidden) return;
-          let best=null, bestDist=16;
-          for (const p of state.visiblePoints.slice(0,6000)) { const dist=map.latLngToContainerPoint([p.lat,p.lng]).distanceTo(e.containerPoint); if (dist<bestDist) { best=p; bestDist=dist; } }
-          if (best) L.popup({autoPanPadding:[10,10]}).setLatLng([best.lat,best.lng]).setContent(popupHtml(best)).openOn(map);
+          let best = null,
+            bestDist = 16;
+          for (const point of state.visiblePoints.slice(0, 6000)) {
+            const dist = map
+              .latLngToContainerPoint([point.lat, point.lng])
+              .distanceTo(e.containerPoint);
+            if (dist < bestDist) {
+              best = point;
+              bestDist = dist;
+            }
+          }
+          if (best)
+            L.popup({ autoPanPadding: [10, 10] })
+              .setLatLng([best.lat, best.lng])
+              .setContent(popupHtml(best))
+              .openOn(map);
         }
       });
       map.on("contextmenu", (e) => {
-        const {lat,lng} = e.latlng;
+        const { lat, lng } = e.latlng;
         const code = latLngToTpcCode(lat, lng);
-        L.popup({autoPanPadding:[10,10]}).setLatLng([lat,lng]).setContent(popupHtml({lat,lng,name:"手動新增設備",code,area:"自訂"})).openOn(map);
+        const point = {
+          lat,
+          lng,
+          name: "手動新增設備",
+          code: code,
+          area: "自訂",
+        };
+        L.popup({ autoPanPadding: [10, 10] })
+          .setLatLng([lat, lng])
+          .setContent(popupHtml(point))
+          .openOn(map);
       });
 
-      let locationMarker=null, locationCircle=null, locationWatchId=null;
+      let locationMarker = null,
+        locationCircle = null,
+        locationWatchId = null;
+
+      // 定位功能：使用瀏覽器 Geolocation 顯示目前位置與精度範圍。
       document.getElementById("locateButton").addEventListener("click", (e) => {
         if (locationWatchId !== null) {
-          navigator.geolocation.clearWatch(locationWatchId); locationWatchId=null;
-          if (locationMarker) { map.removeLayer(locationMarker); locationMarker=null; }
-          if (locationCircle) { map.removeLayer(locationCircle); locationCircle=null; }
-          e.target.classList.remove("is-active"); e.target.textContent="定位"; return;
+          navigator.geolocation.clearWatch(locationWatchId);
+          locationWatchId = null;
+          if (locationMarker) {
+            map.removeLayer(locationMarker);
+            locationMarker = null;
+          }
+          if (locationCircle) {
+            map.removeLayer(locationCircle);
+            locationCircle = null;
+          }
+          e.target.classList.remove("is-active");
+          e.target.textContent = "定位";
+          return;
         }
-        if (!navigator.geolocation) { GlobalModal.alert("此瀏覽器不支援定位功能。"); return; }
-        e.target.textContent="定位中...";
+        if (!navigator.geolocation) {
+          GlobalModal.alert("此瀏覽器不支援定位功能。");
+          return;
+        }
+        e.target.textContent = "定位中...";
         locationWatchId = navigator.geolocation.watchPosition(
           (pos) => {
             const latlng = [pos.coords.latitude, pos.coords.longitude];
-            if (!locationMarker) { locationMarker=L.circleMarker(latlng,{radius:7,color:"#fff",weight:2,fillColor:"#2563eb",fillOpacity:0.95}).addTo(map); locationCircle=L.circle(latlng,{radius:pos.coords.accuracy||30,color:"#2563eb",weight:1,fillColor:"#2563eb",fillOpacity:0.12}).addTo(map); map.flyTo(latlng, map.getMaxZoom(), {duration:0.45}); }
-            else { locationMarker.setLatLng(latlng); locationCircle.setLatLng(latlng).setRadius(pos.coords.accuracy||30); }
-            e.target.classList.add("is-active"); e.target.textContent="關閉定位";
+            if (!locationMarker) {
+              locationMarker = L.circleMarker(latlng, {
+                radius: 7,
+                color: "#fff",
+                weight: 2,
+                fillColor: "#2563eb",
+                fillOpacity: 0.95,
+              }).addTo(map);
+              locationCircle = L.circle(latlng, {
+                radius: pos.coords.accuracy || 30,
+                color: "#2563eb",
+                weight: 1,
+                fillColor: "#2563eb",
+                fillOpacity: 0.12,
+              }).addTo(map);
+              map.flyTo(latlng, map.getMaxZoom(), { duration: 0.45 });
+            } else {
+              locationMarker.setLatLng(latlng);
+              locationCircle
+                .setLatLng(latlng)
+                .setRadius(pos.coords.accuracy || 30);
+            }
+            e.target.classList.add("is-active");
+            e.target.textContent = "關閉定位";
           },
-          (err) => { e.target.textContent="定位失敗"; console.error("定位錯誤:", err); },
-          { enableHighAccuracy: true }
+          (err) => {
+            e.target.textContent = "定位失敗";
+            console.error("定位錯誤:", err);
+          },
+          { enableHighAccuracy: true },
         );
       });
 
+      // 資料來源：優先讀本機 data 目錄，失敗時改讀 GitHub Pages 備援資料。
       const DATA_URLS = [
         { meta: "../data/meta.json", points: "../data/points.json" },
         { meta: "data/meta.json", points: "data/points.json" },
-        { meta: "https://aertyuloq8.github.io/taipower-equipment-map/data/meta.json", points: "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json" },
+        {
+          meta: "https://aertyuloq8.github.io/taipower-equipment-map/data/meta.json",
+          points:
+            "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json",
+        },
       ];
+
       async function tryFetchData() {
         for (const urls of DATA_URLS) {
-          try { const [mr, pr] = await Promise.all([fetch(urls.meta,{cache:"no-cache"}), fetch(urls.points,{cache:"no-cache"})]); if (mr.ok && pr.ok) return { meta: await mr.json(), points: await pr.json() }; }
-          catch (e) { console.warn("資料來源嘗試失敗：", urls.meta, e.message); }
+          try {
+            const [metaRes, pointsRes] = await Promise.all([
+              fetch(urls.meta, { cache: "no-cache" }),
+              fetch(urls.points, { cache: "no-cache" }),
+            ]);
+            if (metaRes.ok && pointsRes.ok) {
+              return {
+                meta: await metaRes.json(),
+                points: await pointsRes.json(),
+              };
+            }
+          } catch (e) {
+            console.warn("資料來源嘗試失敗，切換備用：", urls.meta, e.message);
+          }
         }
-        throw new Error("所有資料來源皆無法連線，請檢查網路或資料目錄是否存在。");
+        throw new Error(
+          "所有資料來源皆無法連線，請檢查網路或資料目錄是否存在。",
+        );
       }
 
+      // 啟動流程：讀取本機紀錄、載入設備資料、初始化地圖與統計資訊。
       async function init() {
         setStatus("載入設備資料...");
-        loadFromLocalStorage(); renderFolders(); updateRecordMarkers();
+        loadFromLocalStorage();
+        renderFolders();
+        updateRecordMarkers();
+
         try {
           const { meta, points } = await tryFetchData();
-          state.meta = meta; state.points = points;
-          fillAreas(); renderResults([]);
+          state.meta = meta;
+          state.points = points;
+
+          fillAreas();
+          renderResults([]);
           map.setView([23.7, 120.95], 8);
-          if (state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28,28] });
-          renderer.redraw(); setStatus("");
-        } catch (e) { console.error(e); setStatus("⚠️ 設備資料載入失敗：" + e.message); }
+          if (state.meta?.bounds)
+            map.fitBounds(state.meta.bounds, { padding: [28, 28] });
+          renderer.redraw();
+          setStatus("");
+        } catch (e) {
+          console.error(e);
+          setStatus("⚠️ 設備資料載入失敗：" + e.message);
+        }
       }
+
       init();
     </script>
   </body>
