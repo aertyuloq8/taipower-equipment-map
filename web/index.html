@@ -1603,13 +1603,29 @@
 
       // ==========================================
       // 【全域設定】不良項目快捷標籤清單（未來只要修改這裡即可）
+      // 分類只是用來整理快捷按鈕；實際儲存仍然只存輸入框的一段文字。
       // ==========================================
-      const DEFECT_OPTIONS = [
-        "樹木修剪",
-        "藤蔓清除",
-        "竹枝清除",
-        "椰樹修剪",
-        "桿上異物清除",
+      const DEFECT_GROUPS = [
+        {
+          label: "樹修",
+          open: true,
+          items: ["樹木修剪", "藤蔓清除", "竹枝清除", "椰樹修剪"],
+        },
+        {
+          label: "導線",
+          open: false,
+          items: ["防雷脫落", "低壓脫落"],
+        },
+		 {
+          label: "設備",
+          open: false,
+          items: ["不良", "游休TR", "橫擔腐蝕"],
+        },
+        {
+          label: "雜項",
+          open: false,
+          items: ["桿上異物"],
+        },
       ];
 
       // [修正] 依路徑字串（含斜線階層）找到或建立資料夾，傳回最底層資料夾 id
@@ -2612,21 +2628,37 @@
         const uD =
           existingRecord && existingRecord.urgency === "D" ? "selected" : "";
 
-        // 緊湊型「輸入框 + 快捷標籤」
-        let defectChipsHtml = `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:5px;">`;
-        DEFECT_OPTIONS.forEach((opt) => {
-          defectChipsHtml += `<span class="defect-chip-btn" data-val="${escapeHtml(opt)}" 
-            style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; padding:3px 6px; font-size:11px; color:#475569; cursor:pointer; user-select:none; white-space:nowrap;">
-            ${escapeHtml(opt)}
-          </span>`;
-        });
-        defectChipsHtml += `</div>`;
+        // 緊湊型「輸入框 + 分類收合快捷標籤」
+        // 點快捷標籤只會把文字帶入輸入框，不會改變實際儲存格式。
+        const defectGroupsHtml = DEFECT_GROUPS.map((group) => {
+          const chipsHtml = group.items
+            .map(
+              (
+                opt,
+              ) => `<span class="defect-chip-btn" data-val="${escapeHtml(opt)}"
+                style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; padding:3px 2px; font-size:12px; color:#475569; cursor:pointer; user-select:none; text-align:center; min-width:0; line-height:1.2;">
+                ${escapeHtml(opt)}
+              </span>`,
+            )
+            .join("");
+
+          return `
+            <details class="defect-group" ${group.open ? "open" : ""} style="border:1px solid #e2e8f0; border-radius:5px; background:#fff; padding:4px 6px; margin-top:5px;">
+              <summary style="cursor:pointer; color:#475569; font-size:11px; font-weight:bold; user-select:none;">
+                ${escapeHtml(group.label)} (${group.items.length})
+              </summary>
+              <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:4px; margin-top:5px;">
+                ${chipsHtml}
+              </div>
+            </details>
+          `;
+        }).join("");
 
         const defectFieldHtml = `
           <input type="text" id="popup-defect-input" 
             value="${escapeHtml(defectVal)}" placeholder="輸入或點選標籤" 
             style="width:100%; min-height:28px; padding:4px 8px; font-size:12px; border:1px solid #94a3b8; border-radius:4px; box-sizing:border-box;">
-          ${defectChipsHtml}
+          ${defectGroupsHtml}
         `;
 
         // ==========================================
@@ -2754,6 +2786,18 @@
           }
           return;
         }
+
+        const defectGroup = e.target.closest(".defect-group");
+        if (defectGroup && e.target.tagName === "SUMMARY") {
+          setTimeout(() => {
+            if (!defectGroup.open) return;
+            document.querySelectorAll(".defect-group").forEach((group) => {
+              if (group !== defectGroup) group.removeAttribute("open");
+            });
+          }, 0);
+          return;
+        }
+
         // ==========================================
         // 【修改區塊】按下儲存紀錄時，記憶資料夾 ID
         // ==========================================
