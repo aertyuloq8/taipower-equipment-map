@@ -628,16 +628,16 @@
       /* ========================================== */
       
       /* 1. 預設狀態 (手機直式)：
-         保護小螢幕，寬度會自動伸展但不超過螢幕的 85%，最小確保有 280px */
+         保護小螢幕，寬度會自動伸展但不超過螢幕的 70%，最小確保有 250px */
       .leaflet-popup-content {
-        min-width: 280px !important;
-        max-width: 85vw !important; 
+        min-width: 250px !important;
+        max-width: 70vw !important; 
         width: auto !important; /* 解除 JS 寫死的固定寬度 */
       }
 
       /* 2. 較大螢幕 (大尺寸手機直式、小平板)：
-         螢幕寬度大於 400px 時，給予按鈕更舒適的 340px 空間 */
-      @media (min-width: 400px) {
+         螢幕寬度大於 550px 時，給予按鈕更舒適的 340px 空間 */
+      @media (min-width: 550px) {
         .leaflet-popup-content {
           min-width: 340px !important;
         }
