@@ -905,7 +905,7 @@
       function drawPoints(ctx, items) { for (const item of items) { ctx.beginPath(); ctx.arc(item.x, item.y, 4.5, 0, Math.PI * 2); ctx.fillStyle = colorForEquipmentName(item.point.name); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255, 255, 255, 0.95)"; ctx.stroke(); } }
       function drawPrefixLabels(ctx, items) {
         for (const item of items) {
-          const label = `${item.prefix} 繚 ${formatNumber(item.count)}`, width = Math.max(74, Math.min(128, 28 + label.length * 7)), height = 30, x = item.x - width / 2, y = item.y - height / 2;
+          const label = `${item.prefix} - ${formatNumber(item.count)}`, width = Math.max(74, Math.min(128, 28 + label.length * 7)), height = 30, x = item.x - width / 2, y = item.y - height / 2;
           ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, width, height, 8); else ctx.rect(x,y,width,height);
           ctx.fillStyle = colorForPrefix(item.prefix); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
           ctx.fillStyle = "#fff"; ctx.font = "800 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, item.x, item.y + 0.5);
