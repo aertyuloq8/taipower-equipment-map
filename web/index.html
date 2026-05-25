@@ -3556,31 +3556,71 @@ function renderDefectStats() {
   }
   const max = sorted[0][1].length;
   const total = sorted.reduce((sum, [, recs]) => sum + recs.length, 0);
-const totalHtml = `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0 8px; margin-bottom:4px; border-bottom:2px solid var(--line); font-weight:bold; font-size:13px;">
-  <span style="color:var(--muted);">總計</span>
-  <span style="color:var(--accent-dark);">${total} 筆</span>
-</div>`;
-  el.innerHTML = totalHtml + sorted.map(([name, recs]) => {
-    const count = recs.length;
-    const recsHtml = recs.map(r => `
-      <div class="defect-stat-record" data-record-id="${r.id}" data-folder-id="${r.folderId}"
-        style="padding:5px 8px; cursor:pointer; border-radius:4px; font-size:12px; background:#f8fafc; margin-bottom:3px; border:1px solid var(--line);">
-        <div style="font-weight:bold; color:var(--accent-dark);">📍 ${escapeHtml(r.name || r.code)}</div>
-        <div style="color:var(--muted); font-size:11px; margin-top:1px;">📂 ${escapeHtml(getFullFolderPath(r.folderId))}</div>
-      </div>`).join('');
-    return `
-      <div style="border-bottom:1px solid #f1f5f9;">
-        <div class="defect-stat-header" style="display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; user-select:none;">
-          <span class="defect-stat-arrow" style="font-size:10px; color:var(--muted); transition:transform 0.2s;">▶</span>
-          <span style="flex:1; font-size:13px; color:var(--text);">${escapeHtml(name)}</span>
-          <div style="width:80px; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
-            <div style="width:${Math.round(count/max*100)}%; background:var(--accent); height:100%; border-radius:4px;"></div>
-          </div>
-          <span style="font-weight:bold; font-size:13px; color:var(--accent-dark); min-width:24px; text-align:right;">${count}</span>
+const totalHtml = `
+  <!-- ── 頂部總計列：顯示所有有不良紀錄的總筆數 ── -->
+  <div style="display:flex; justify-content:space-between; align-items:center; 
+              padding:4px 0 8px; margin-bottom:4px; 
+              border-bottom:2px solid var(--line); 
+              font-weight:bold; font-size:13px;">
+    <span style="color:var(--muted);">總計</span>
+    <span style="color:var(--accent-dark);">${total} 筆</span>
+  </div>`;
+
+el.innerHTML = totalHtml + sorted.map(([name, recs]) => {
+  const count = recs.length;
+
+  // ── 展開後的子列：每筆有此不良項目的紀錄 ──
+  const recsHtml = recs.map(r => `
+    <div class="defect-stat-record" 
+         data-record-id="${r.id}" 
+         data-folder-id="${r.folderId}"
+         style="padding:5px 8px; cursor:pointer; border-radius:4px; 
+                font-size:12px; background:#f8fafc; 
+                margin-bottom:3px; border:1px solid var(--line);">
+      <!-- 設備名稱，點擊後會跳轉並高亮該筆紀錄 -->
+      <div style="font-weight:bold; color:var(--accent-dark);">
+        📍 ${escapeHtml(r.name || r.code)}
+      </div>
+      <!-- 所屬資料夾完整路徑，例如「2026-05-25 / 子資料夾」 -->
+      <div style="color:var(--muted); font-size:11px; margin-top:1px;">
+        📂 ${escapeHtml(getFullFolderPath(r.folderId))}
+      </div>
+    </div>`).join('');
+
+  return `
+    <!-- ── 每個不良類型的外層容器 ── -->
+    <div style="border-bottom:1px solid #f1f5f9;">
+
+      <!-- 點擊這列可展開/收合子紀錄，accordion 邏輯在 click 事件委派處理 -->
+      <div class="defect-stat-header" 
+           style="display:flex; align-items:center; gap:8px; 
+                  padding:6px 0; cursor:pointer; user-select:none;">
+
+        <!-- 展開箭頭：展開時旋轉 90° -->
+        <span class="defect-stat-arrow" 
+              style="font-size:10px; color:var(--muted); transition:transform 0.2s;">▶</span>
+
+        <!-- 不良類型名稱，例如「樹木修剪」 -->
+        <span style="flex:1; font-size:15px; color:var(--text);">${escapeHtml(name)}</span>
+
+        <!-- 橫條圖：寬度比例 = 此類型筆數 / 最多那類的筆數 -->
+        <div style="width:80px; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
+          <div style="width:${Math.round(count/max*100)}%; 
+                      background:var(--accent); height:100%; border-radius:4px;"></div>
         </div>
-        <div class="defect-stat-records" style="display:none; padding:0 0 6px 12px;">${recsHtml}</div>
-      </div>`;
-  }).join('');
+
+        <!-- 右側筆數數字 -->
+        <span style="font-weight:bold; font-size:13px; color:var(--accent-dark); 
+                     min-width:24px; text-align:right;">${count}</span>
+      </div>
+
+      <!-- 子紀錄列表，預設隱藏，點標題列後展開 -->
+      <div class="defect-stat-records" style="display:none; padding:0 0 6px 12px;">
+        ${recsHtml}
+      </div>
+
+    </div>`;
+}).join('');
 }
 
 // 捲動按鈕
