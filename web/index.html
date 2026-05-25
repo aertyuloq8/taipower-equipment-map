@@ -948,12 +948,21 @@
           </button>
         </header>
 
-        <nav class="tab-nav" style="display: none"></nav>
+        <nav class="tab-nav">
+  <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
+  <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
+</nav>
         <!-- tab-nav hidden, kept for JS compat -->
 
         <div id="tabSearch" class="tab-content" style="display: none"></div>
         <!-- hidden search tab placeholder -->
-
+<div id="tabStats" class="tab-content" style="flex-direction:column; min-height:0;">
+  <div id="defectStatsContent" style="flex:1; overflow-y:auto; padding:14px 18px;"></div>
+  <div style="flex-shrink:0; display:flex; justify-content:flex-end; gap:6px; padding:8px 12px; border-top:1px solid var(--line); background:#fff;">
+    <button id="statsScrollTopBtn" style="min-height:32px; padding:0 14px; font-size:13px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▲ 頂部</button>
+    <button id="statsScrollBotBtn" style="min-height:32px; padding:0 14px; font-size:13px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▼ 底部</button>
+  </div>
+</div>
         <div id="tabRecords" class="tab-content is-active">
           <section class="folders-section" aria-label="巡視紀錄">
             <div class="folder-header">
@@ -1118,12 +1127,6 @@
                 </button>
               </div>
             </div>
-           <details id="defectStatsBox" style="border:1px solid var(--line); border-radius:8px; background:#fff; padding:8px 12px; margin-bottom:10px;">
-  <summary style="cursor:pointer; font-weight:bold; font-size:13px; color:var(--accent-dark); user-select:none;">
-    📊 不良項目統計
-  </summary>
-  <div id="defectStatsContent" style="margin-top:8px;"></div>
-</details>
             <div id="folderList" class="folder-list"></div>
 
           </section>
@@ -1270,12 +1273,23 @@
       const tabSearch = document.getElementById("tabSearch");
       const tabRecords = document.getElementById("tabRecords");
 
-      function switchTab(tabId) {
-        // 搜尋已移到地圖浮層，切換到 records 僅確保面板可見
-        if (tabId === "records") {
-          tabRecords.classList.add("is-active");
-        }
-      }
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('is-active'));
+  if (tabId === 'records') {
+    document.getElementById('tabRecordsBtn').classList.add('is-active');
+    document.getElementById('tabRecords').classList.add('is-active');
+  } else if (tabId === 'stats') {
+    document.getElementById('tabStatsBtn').classList.add('is-active');
+    document.getElementById('tabStats').classList.add('is-active');
+    renderDefectStats();
+  }
+}
+
+document.getElementById('tabRecordsBtn').addEventListener('click', () => switchTab('records'));
+document.getElementById('tabStatsBtn').addEventListener('click', () => {
+  switchTab('stats');
+});
 
       // 地圖浮動搜尋面板開關
       const mapSearchPanel = document.getElementById("mapSearchPanel");
@@ -1778,7 +1792,7 @@ function jumpToRecord(folderId, recordId) {
           console.error("儲存失敗:", e);
         }
         renderFolders();
-		renderDefectStats();
+		
         updateRecordMarkers();
       }
 
@@ -3541,7 +3555,12 @@ function renderDefectStats() {
     return;
   }
   const max = sorted[0][1].length;
-  el.innerHTML = sorted.map(([name, recs]) => {
+  const total = sorted.reduce((sum, [, recs]) => sum + recs.length, 0);
+const totalHtml = `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0 8px; margin-bottom:4px; border-bottom:2px solid var(--line); font-weight:bold; font-size:13px;">
+  <span style="color:var(--muted);">總計</span>
+  <span style="color:var(--accent-dark);">${total} 筆</span>
+</div>`;
+  el.innerHTML = totalHtml + sorted.map(([name, recs]) => {
     const count = recs.length;
     const recsHtml = recs.map(r => `
       <div class="defect-stat-record" data-record-id="${r.id}" data-folder-id="${r.folderId}"
@@ -3573,6 +3592,13 @@ document.getElementById('scrollBotBtn').addEventListener('click', () => {
   el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
 });
 
+document.getElementById('statsScrollTopBtn').addEventListener('click', () => {
+  document.getElementById('defectStatsContent').scrollTo({ top: 0, behavior: 'smooth' });
+});
+document.getElementById('statsScrollBotBtn').addEventListener('click', () => {
+  const el = document.getElementById('defectStatsContent');
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+});
 
       function renderResults(items) {
         results.innerHTML = "";
