@@ -4,7 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>土木設備分布地圖</title>
-
+    <!-- 引入 PWA 身分證 -->
+    <link rel="manifest" href="manifest.json" />
+    <!-- 為了讓 iOS 系統也能有完美的 APP 圖示體驗，加入這行 -->
+    <link rel="apple-touch-icon" href="icon-192.png">
     <!-- Leaflet 地圖 CSS：提供地圖底圖、圖層與 Popup 的基本樣式 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -2968,6 +2971,20 @@
       }
 
       init(); // 啟動
+	  // ==========================================
+      // 註冊 Service Worker (PWA 核心)
+      // ==========================================
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./service-worker.js')
+            .then(registration => {
+              console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
+            })
+            .catch(error => {
+              console.log('❌ PWA 註冊失敗:', error);
+            });
+        });
+      }
     </script>
   </body>
 </html>
