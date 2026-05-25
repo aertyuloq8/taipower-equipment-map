@@ -1,0 +1,21 @@
+{
+  "name": "土木設備分布地圖",
+  "short_name": "巡檢地圖",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#eef2f5",
+  "theme_color": "#087f8c",
+  "description": "台電土木設備巡視與不良統計系統",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
