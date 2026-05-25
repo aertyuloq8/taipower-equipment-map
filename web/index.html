@@ -1118,9 +1118,19 @@
                 </button>
               </div>
             </div>
-
+           <details id="defectStatsBox" style="border:1px solid var(--line); border-radius:8px; background:#fff; padding:8px 12px; margin-bottom:10px;">
+  <summary style="cursor:pointer; font-weight:bold; font-size:13px; color:var(--accent-dark); user-select:none;">
+    📊 不良項目統計
+  </summary>
+  <div id="defectStatsContent" style="margin-top:8px;"></div>
+</details>
             <div id="folderList" class="folder-list"></div>
+
           </section>
+		  <div style="flex-shrink:0; display:flex; justify-content:flex-end; gap:6px; padding:8px 12px; border-top:1px solid var(--line); background:#fff;">
+  <button id="scrollTopBtn" style="min-height:32px; padding:0 14px; font-size:13px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▲ 頂部</button>
+  <button id="scrollBotBtn" style="min-height:32px; padding:0 14px; font-size:13px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▼ 底部</button>
+</div>
         </div>
       </aside>
 
@@ -1137,6 +1147,7 @@
         </button>
         <div id="status" class="status">載入資料中...</div>
       </section>
+
     </main>
 
     <!-- 搜尋結果項目的模板，JS 會複製後填入設備名稱與圖號。 -->
@@ -1728,7 +1739,25 @@
           .getElementById("panelToggle")
           .setAttribute("aria-expanded", String(!collapsed));
       });
-
+function jumpToRecord(folderId, recordId) {
+  let curr = state.folders.find(f => f.id === folderId);
+  while (curr) {
+    state.expandedFolders.add(curr.id);
+    curr = state.folders.find(f => f.id === curr.parentId);
+  }
+  map.closePopup();
+  setPanelCollapsed(false);
+  switchTab('records');
+  renderFolders();
+  setTimeout(() => {
+    const row = document.getElementById(`record-row-${recordId}`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.style.backgroundColor = '#fef08a';
+      setTimeout(() => { row.style.backgroundColor = 'transparent'; }, 5000);
+    }
+  }, 80);
+}
       // ==========================================
       // LocalStorage 資料存取與遷移
       // ==========================================
@@ -1749,6 +1778,7 @@
           console.error("儲存失敗:", e);
         }
         renderFolders();
+		renderDefectStats();
         updateRecordMarkers();
       }
 
@@ -1892,7 +1922,12 @@
             const directRecords = state.records.filter(
               (r) => r.folderId === folder.id,
             );
-            directRecords.sort((a, b) => comparePointsByName(a, b));
+            directRecords.sort((a, b) => {
+  const nameA = a.name || "", nameB = b.name || "";
+  const cmp = compareNatural(nameA, nameB);
+  if (cmp !== 0) return cmp;
+  return compareNatural(a.code || "", b.code || "");
+});
             // [修正] 總數含子層，顯示在括號內
             const totalCount = getAllRecordsInFolder(folder.id).length;
             const directCount = directRecords.length;
@@ -2171,14 +2206,27 @@
       folderList.addEventListener("click", (e) => {
         const target = e.target;
 
-        const folderToggle = target.closest("[data-toggle]");
-        if (folderToggle) {
-          const fId = folderToggle.dataset.toggle;
-          if (state.expandedFolders.has(fId)) state.expandedFolders.delete(fId);
-          else state.expandedFolders.add(fId);
-          renderFolders();
-          return;
-        }
+ const folderToggle = target.closest("[data-toggle]");
+if (folderToggle) {
+  const fId = folderToggle.dataset.toggle;
+  const folder = state.folders.find(f => f.id === fId);
+  const isExpanding = !state.expandedFolders.has(fId);
+
+  if (isExpanding) {
+    // 收合同層的其他資料夾（只收同一父層）
+    const siblings = state.folders.filter(
+      f => f.parentId === (folder ? folder.parentId : null)
+    );
+    siblings.forEach(sib => {
+      if (sib.id !== fId) state.expandedFolders.delete(sib.id);
+    });
+    state.expandedFolders.add(fId);
+  } else {
+    state.expandedFolders.delete(fId);
+  }
+  renderFolders();
+  return;
+}
 
         // ==========================================
         // 點擊資料夾的勾選框：自動向下全選 / 取消
@@ -2797,49 +2845,39 @@ const defectGroupsHtml = DEFECT_GROUPS.map((group) => {
 
       // 全頁 click 事件：處理 popup 內的跳轉、快捷缺失標籤與儲存紀錄。
       document.addEventListener("click", (e) => {
+	  // 統計列展開/收合
+const statHeader = e.target.closest('.defect-stat-header');
+if (statHeader) {
+  const recordsDiv = statHeader.nextElementSibling;
+  const arrow = statHeader.querySelector('.defect-stat-arrow');
+  const isOpen = recordsDiv.style.display !== 'none';
+
+  // 先收合所有其他列
+  document.querySelectorAll('.defect-stat-header').forEach(h => {
+    if (h !== statHeader) {
+      h.nextElementSibling.style.display = 'none';
+      const a = h.querySelector('.defect-stat-arrow');
+      if (a) a.style.transform = '';
+    }
+  });
+
+  recordsDiv.style.display = isOpen ? 'none' : 'block';
+  arrow.style.transform = isOpen ? '' : 'rotate(90deg)';
+  return;
+}
+
+// 統計紀錄跳轉
+const statRecord = e.target.closest('.defect-stat-record');
+if (statRecord) {
+  jumpToRecord(statRecord.dataset.folderId, statRecord.dataset.recordId);
+  return;
+}
         // [新增] 點擊「已記錄於」的資料夾連結 → 切換到巡視紀錄分頁並展開該資料夾
-        const gotoLink = e.target.closest(".goto-folder-link");
-        if (gotoLink) {
-          const fId = gotoLink.dataset.folderId;
-          const rId = gotoLink.dataset.recordId; // 取得綁定的紀錄 ID
-          if (!fId) return;
-
-          // 展開該資料夾及其所有祖先
-          let curr = state.folders.find((f) => f.id === fId);
-          while (curr) {
-            state.expandedFolders.add(curr.id);
-            curr = state.folders.find((f) => f.id === curr.parentId);
-          }
-
-          map.closePopup();
-          setPanelCollapsed(false); // 確保在手機版時會強制打開左側面板
-          switchTab("records");
-          renderFolders();
-
-          // 捲動到目標並高亮
-          setTimeout(() => {
-            const recordRow = document.getElementById(`record-row-${rId}`);
-            if (recordRow) {
-              // 捲動到畫面中間
-              recordRow.scrollIntoView({ behavior: "smooth", block: "center" });
-              // 背景瞬間變為黃色高亮
-              recordRow.style.backgroundColor = "#fef08a";
-              // 1.5秒後利用 CSS transition 慢慢淡出回原本的透明色
-              setTimeout(() => {
-                recordRow.style.backgroundColor = "transparent";
-              }, 5000);
-            } else {
-              // 如果找不到單筆紀錄(異常)，退回尋找資料夾
-              const el = folderList.querySelector(`[data-toggle="${fId}"]`);
-              if (el)
-                el.closest(".folder-item")?.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-            }
-          }, 80);
-          return;
-        }
+       const gotoLink = e.target.closest(".goto-folder-link");
+if (gotoLink) {
+  jumpToRecord(gotoLink.dataset.folderId, gotoLink.dataset.recordId);
+  return;
+}
         // ==========================================
         // 【新增區塊】監聽不良項目快捷按鈕的點擊
         // ==========================================
@@ -3469,7 +3507,7 @@ const defectGroupsHtml = DEFECT_GROUPS.map((group) => {
 
       // 【已修正】搜尋放寬至單個字元 (例如可以只搜「尖」)
       function searchMatches(search) {
-        if (!search.prefixes.length && !search.terms.some((t) => t.length >= 1))
+        if (!search.prefixes.length && !search.terms.some((t) => t.length >= 2))
           return [];
         const output = [];
         for (const point of state.points) {
@@ -3485,6 +3523,56 @@ const defectGroupsHtml = DEFECT_GROUPS.map((group) => {
           })
           .slice(0, 50);
       }
+     
+	 // 不良統計
+function renderDefectStats() {
+  const el = document.getElementById('defectStatsContent');
+  if (!el) return;
+  const grouped = new Map();
+  for (const r of state.records) {
+    const d = (r.defect || '').trim();
+    if (!d || d === '無') continue;
+    if (!grouped.has(d)) grouped.set(d, []);
+    grouped.get(d).push(r);
+  }
+  const sorted = [...grouped.entries()].sort((a, b) => b[1].length - a[1].length);
+  if (!sorted.length) {
+    el.innerHTML = '<p style="color:#999;font-size:12px;margin:4px 0;">尚無不良紀錄</p>';
+    return;
+  }
+  const max = sorted[0][1].length;
+  el.innerHTML = sorted.map(([name, recs]) => {
+    const count = recs.length;
+    const recsHtml = recs.map(r => `
+      <div class="defect-stat-record" data-record-id="${r.id}" data-folder-id="${r.folderId}"
+        style="padding:5px 8px; cursor:pointer; border-radius:4px; font-size:12px; background:#f8fafc; margin-bottom:3px; border:1px solid var(--line);">
+        <div style="font-weight:bold; color:var(--accent-dark);">📍 ${escapeHtml(r.name || r.code)}</div>
+        <div style="color:var(--muted); font-size:11px; margin-top:1px;">📂 ${escapeHtml(getFullFolderPath(r.folderId))}</div>
+      </div>`).join('');
+    return `
+      <div style="border-bottom:1px solid #f1f5f9;">
+        <div class="defect-stat-header" style="display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; user-select:none;">
+          <span class="defect-stat-arrow" style="font-size:10px; color:var(--muted); transition:transform 0.2s;">▶</span>
+          <span style="flex:1; font-size:13px; color:var(--text);">${escapeHtml(name)}</span>
+          <div style="width:80px; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
+            <div style="width:${Math.round(count/max*100)}%; background:var(--accent); height:100%; border-radius:4px;"></div>
+          </div>
+          <span style="font-weight:bold; font-size:13px; color:var(--accent-dark); min-width:24px; text-align:right;">${count}</span>
+        </div>
+        <div class="defect-stat-records" style="display:none; padding:0 0 6px 12px;">${recsHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+// 捲動按鈕
+document.getElementById('scrollTopBtn').addEventListener('click', () => {
+  document.querySelector('.folders-section').scrollTo({ top: 0, behavior: 'smooth' });
+});
+document.getElementById('scrollBotBtn').addEventListener('click', () => {
+  const el = document.querySelector('.folders-section');
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+});
+
 
       function renderResults(items) {
         results.innerHTML = "";
@@ -3670,6 +3758,7 @@ const defectGroupsHtml = DEFECT_GROUPS.map((group) => {
         setStatus("載入設備資料...");
         loadFromLocalStorage();
         renderFolders();
+		renderDefectStats();
         updateRecordMarkers();
 
         try {
