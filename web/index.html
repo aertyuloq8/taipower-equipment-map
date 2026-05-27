@@ -726,18 +726,18 @@
               
               <div style="display:flex; align-items:center; justify-content:space-between; margin-top:3px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <span style="font-size:13px; color:var(--text); font-weight:bold;">實際顯示：</span>
-                  <div id="sidebar-icon-current-display" class="preview-badge" style="background-color:#64748b; font-size:15px; min-width:32px; height:32px; border-radius:16px; box-shadow:0 2px 5px rgba(0,0,0,0.2); display:flex; justify-content:center; align-items:center; color:#fff; font-weight:900; transition: background 0.3s;">⭐</div>
+                  <span id="icon-status-text" style="font-size:13px; color:var(--text); font-weight:bold;">自動判斷：</span>
+                  <div id="sidebar-icon-current-display" class="preview-badge" style="background-color:#0f766e; font-size:15px; min-width:32px; height:32px; border-radius:16px; box-shadow:0 2px 5px rgba(0,0,0,0.2); display:flex; justify-content:center; align-items:center; color:#fff; font-weight:900; transition: background 0.3s;">📍</div>
                 </div>
-                <button type="button" id="sidebar-icon-auto-btn" style="border:1px solid #cbd5e1; background:#fff; color:var(--muted); font-size:12px; font-weight:bold; padding:4px 8px; border-radius:4px; cursor:pointer; min-height:28px;">↺ 恢復自動</button>
+                <div style="display:flex; gap:6px;">
+                  <button type="button" id="sidebar-icon-auto-btn" style="display:none; border:1px solid #cbd5e1; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:bold; padding:4px 8px; border-radius:4px; cursor:pointer; min-height:28px;">↺ 恢復自動</button>
+                  <button type="button" id="toggle-manual-icon-btn" style="border:1px dashed var(--accent); background:transparent; color:var(--accent); font-size:12px; font-weight:bold; padding:4px 8px; border-radius:4px; cursor:pointer; min-height:28px; transition:all 0.2s;">✎ 手動修改</button>
+                </div>
               </div>
               <input type="hidden" id="sidebar-icon-input" value="">
 
-              <div id="sidebar-icon-groups" style="border:1px solid var(--line); border-radius:6px; padding:8px; background:#fff; margin-top:6px; display:flex; flex-direction:column; gap:6px;">
+              <div id="sidebar-icon-groups" style="display:none; border:1px solid var(--line); border-radius:6px; padding:8px; background:#fff; margin-top:6px; flex-direction:column; gap:6px;">
               </div>
-                 </div>
-            </div>
-          </div>
 
           <div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-top:1px solid var(--line); background:#fff; gap:8px;">
             <div style="display:flex; gap:6px;">
@@ -1095,25 +1095,25 @@ document.getElementById("editLat").value = point.lat;
       // ==========================================
 
       const ICON_GROUPS = [
-       { label: "外力",   icons: ["🌳", "🎋竹", "🌿藤","🌴", "🐦巢"] },
+       { label: "外力",   icons: ["🌳樹", "🎋竹", "🌿藤","🌴椰", "🐦巢"] },
 	   { label: "狀態",   icons: ["⚠️","💤游休",  "📐設計", "✅已設計"] },
-	   { label: "設施",   icons: ["TR️", "DS", "GS", "AGS", "PAD"] },
+	   { label: "設備",   icons: ["TR️", "DS", "GS", "AGS", "PAD"] },
 	   { label: "土木",   icons: [ "🚧", "⛏️", "🔩", "🔧", "🚨"] },
 	   { label: "其他",   icons: ["⭐", "🧤", "⚡", "💥", "💡"] }
       ];
 
       const DEFECT_ICON_RULES = [
-        { pattern: /椰/,                   icon: "🌴" },
+        { pattern: /椰/,                   icon: "🌴椰" },
 		{ pattern: /竹/,  icon: "🎋竹" },
 		{ pattern: /藤/,  icon: "🌿藤" },
-        { pattern: /樹木修剪|樹/,  icon: "🌳" },
+        { pattern: /樹木修剪|樹/,  icon: "🌳樹" },
         { pattern: /鳥/,                   icon: "🐦巢" },
         { pattern: /脫落/,     icon: "脫落" }, // 替換為短文字
         { pattern: /游休/,                      icon: "💤游休" }, // 替換為短文字
         { pattern: /設計|圖面|測量/,             icon: "📐設計" }, // 替換為短文字
 		{ pattern: /裸露/,             icon: "🧤裸露" }, // 替換為短文字
       ];
-      // ==========================================
+// ==========================================
       // ★ 更新側邊欄圖示預覽與按鈕狀態
       // ==========================================
       function updateSidebarIconPreview() {
@@ -1122,8 +1122,8 @@ document.getElementById("editLat").value = point.lat;
         const autoIcon = autoDetectIcon(defectVal);
         const displayEl = document.getElementById("sidebar-icon-current-display");
         const autoBtn = document.getElementById("sidebar-icon-auto-btn");
+        const statusText = document.getElementById("icon-status-text"); // 抓取狀態文字
 
-        // 決定最終顯示的圖示：手動選擇優先，若無手動則使用自動判斷
         const finalIcon = manualIcon || autoIcon;
 
         if (displayEl) {
@@ -1131,19 +1131,13 @@ document.getElementById("editLat").value = point.lat;
           displayEl.style.backgroundColor = getBadgeBgColor(finalIcon);
         }
 
-        // 更新按鈕狀態：如果目前是手動選擇，讓按鈕看起來可以點擊；如果是自動，按鈕變為反灰狀態
-        if (autoBtn) {
-          if (manualIcon) {
-            autoBtn.style.background = "#fff";
-            autoBtn.style.color = "var(--accent-dark)";
-            autoBtn.style.borderColor = "var(--accent-dark)";
-            autoBtn.textContent = "↺ 恢復自動";
-          } else {
-            autoBtn.style.background = "#e2e8f0";
-            autoBtn.style.color = "var(--muted)";
-            autoBtn.style.borderColor = "var(--line)";
-            autoBtn.textContent = "⚙️ 自動模式中";
-          }
+        // 更新文字與「恢復自動」按鈕的顯示狀態
+        if (manualIcon) {
+          if (statusText) statusText.textContent = "手動指定：";
+          if (autoBtn) autoBtn.style.display = "block"; // 只有在手動模式下才顯示「恢復自動」
+        } else {
+          if (statusText) statusText.textContent = "自動判斷：";
+          if (autoBtn) autoBtn.style.display = "none"; // 自動模式下隱藏，節省空間
         }
       }
  // ── 1. 自動判斷圖示邏輯 (加入預設圖示) ──
@@ -1171,7 +1165,7 @@ document.getElementById("editLat").value = point.lat;
         if (["⚠️", "🐦巢", "🧤裸露"].includes(icon)) return "#d97706"; // 橘黃 (警告/修繕)
         if (["TR️", "DS", "GS", "AGS", "PAD"].includes(icon)) return "#F700FF"; // 紫色
         if (["✅"].includes(icon)) return "#16a34a"; // 綠色 (正常)
-        if (["🌳", "🎋竹", "🌿藤", "🌴"].includes(icon)) return "#4d7c0f"; // 橄欖綠 (外力/環境)
+        if (["🌳樹", "🎋竹", "🌿藤", "🌴椰"].includes(icon)) return "#4d7c0f"; // 橄欖綠 (外力/環境)
         if (["脫落", "⚡", "電桿", "箱體", "💤游休", "📐設計"].includes(icon)) return "#2563eb"; // 藍色 (設施/工程)
         
         // ★ 為預設的圖釘 ⭐ 加上質感的深青色背景
@@ -1795,7 +1789,6 @@ document.getElementById("editLat").value = point.lat;
         const gotoLink = e.target.closest(".goto-folder-link");
         if (gotoLink) { jumpToRecord(gotoLink.dataset.folderId, gotoLink.dataset.recordId); return; }
 
-    // (找到 document.addEventListener("click", ...) 區塊，修改這兩個判斷式)
 
 // ── 不良項目快捷晶片 (更新：連動新版預覽，並支援點擊內部文字) ──
       const defectChipBtn = e.target.closest(".defect-chip-btn");
@@ -1842,7 +1835,22 @@ document.getElementById("editLat").value = point.lat;
         updateSidebarIconPreview(); // ★ 重新計算並更新預覽
         return;
       }
-
+// ── 展開/收合手動圖示選擇區塊 ──
+      if (e.target.id === "toggle-manual-icon-btn") {
+        const iconGroups = document.getElementById("sidebar-icon-groups");
+        
+        // 判斷目前是隱藏還是顯示，進行切換
+        if (iconGroups.style.display === "none") {
+          iconGroups.style.display = "flex";
+          e.target.textContent = "▲ 隱藏面板";
+          e.target.style.background = "#eef8f9"; // 給予點擊後的底色回饋
+        } else {
+          iconGroups.style.display = "none";
+          e.target.textContent = "✎ 手動修改";
+          e.target.style.background = "transparent";
+        }
+        return;
+      }
       // ── ★ 全新的側邊欄儲存按鈕邏輯 ──
       if (e.target.id === "sidebarSaveBtn") {
         const lat = parseFloat(document.getElementById("editLat").value);
