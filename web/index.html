@@ -689,9 +689,10 @@
                 <div id="editPanelMeta" style="font-size:11px; color:var(--muted);">在地圖點擊進行編輯</div>
               </div>
               
-              <div id="editPanelActions" style="display:none; flex-direction:column; gap:4px; flex-shrink:0;">
-                <a id="sidebarNavBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🗺️ 導航</a>
-                <a id="sidebarStreetBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🏙️ 街景</a>
+<!-- 修改點 1：將 flex-direction 改為 row，並微調 padding 與字體大小 -->
+              <div id="editPanelActions" style="display:none; flex-direction:row; gap:6px; flex-shrink:0; align-items:center;">
+                <a id="sidebarNavBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🗺️ 導航</a>
+                <a id="sidebarStreetBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🏙️ 街景</a>
               </div>
             </div>
             
@@ -715,7 +716,7 @@
                   <span style="font-size:12px; color:#b91c1c; font-weight:bold;">⚠️ 現場圖號座標不符</span>
                 </label>
                 <div id="sidebar-correct-code-container" style="display:none; margin-top:6px; gap:4px;">
-                  <input type="text" id="sidebar-correct-code-input" placeholder="請填寫現場正確的圖號或座標..." style="width:100%; min-height:28px; padding:4px 8px; font-size:12px; border:1px solid #fca5a5; border-radius:4px; box-sizing:border-box;">
+                  <input type="text" id="sidebar-correct-code-input" placeholder="請填寫正確的圖號座標..." style="width:100%; min-height:28px; padding:4px 8px; font-size:12px; border:1px solid #fca5a5; border-radius:4px; box-sizing:border-box;">
                   <button type="button" id="btn-fill-gps-code" style="white-space:nowrap; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:4px; font-size:12px; padding:0 8px; cursor:pointer; font-weight:bold; transition:all 0.2s;">📍 定位帶入</button>
                 </div>
               </div>
@@ -849,6 +850,7 @@
       function switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('is-active'));
+        
         if (tabId === 'records') {
           document.getElementById('tabRecordsBtn').classList.add('is-active');
           document.getElementById('tabRecords').classList.add('is-active');
@@ -859,7 +861,17 @@
         } else if (tabId === 'edit') {
           document.getElementById('tabEditBtn').classList.add('is-active');
           document.getElementById('tabEdit').classList.add('is-active');
-		  renderDefectStats();
+          renderDefectStats();
+
+          // ★ 新增：切換到「編輯紀錄」的瞬間，強制重新整理資料夾下拉選單
+          const folderSelect = document.getElementById("sidebar-folder");
+          if (folderSelect) {
+            const currentVal = folderSelect.value;
+            const folderExists = state.folders.some(f => f.id === currentVal);
+            // 如果原本選的資料夾還在就保持，不在了就退回系統最後使用的資料夾
+            const valueToSelect = folderExists ? currentVal : state.lastFolderId;
+            folderSelect.innerHTML = getFolderOptionsHtml(valueToSelect);
+          }
         }
       }
       document.getElementById('tabRecordsBtn').addEventListener('click', () => switchTab('records'));
@@ -1291,7 +1303,7 @@ document.getElementById("editLat").value = point.lat;
         }, 80);
       }
 
-      // ==========================================
+// ==========================================
       // LocalStorage
       // ==========================================
       function saveToLocalStorage() {
@@ -1300,8 +1312,20 @@ document.getElementById("editLat").value = point.lat;
             folders: state.folders, records: state.records, lastFolderId: state.lastFolderId,
           }));
         } catch (e) { console.error("儲存失敗:", e); }
+        
         renderFolders();
         updateRecordMarkers();
+
+        // ★ 新增：連動更新編輯面板的「存入資料夾」下拉選單
+        const folderSelect = document.getElementById("sidebar-folder");
+        if (folderSelect) {
+          const currentVal = folderSelect.value;
+          // 檢查原本選中的資料夾是不是剛剛被刪除了
+          const folderExists = state.folders.some(f => f.id === currentVal);
+          // 如果還在就保持原狀，如果被刪了就退回上一次使用的資料夾
+          const valueToSelect = folderExists ? currentVal : state.lastFolderId;
+          folderSelect.innerHTML = getFolderOptionsHtml(valueToSelect);
+        }
       }
 
       function loadFromLocalStorage() {
@@ -1729,7 +1753,7 @@ document.getElementById("editLat").value = point.lat;
       }
 
       document.querySelector("#addFolderBtn").addEventListener("click", () => {
-        GlobalModal.prompt("請輸入新的最上層資料夾名稱：", "", (newName) => {
+        GlobalModal.prompt("請輸入資料夾名稱：", "", (newName) => {
           if (newName && newName.trim()) {
             const newId = Date.now().toString();
             state.folders.push({ id: newId, name: newName.trim(), parentId: null });
@@ -1994,20 +2018,69 @@ document.getElementById("editLat").value = point.lat;
         const needCorrection = document.getElementById("sidebar-correction-flag").checked;
         const correctCode = needCorrection ? document.getElementById("sidebar-correct-code-input").value.trim() : "";
         
-        // ★ 新增：抓取正在編輯的精確紀錄 ID
+        // 抓取正在編輯的精確紀錄 ID
         const editRecordId = document.getElementById("editRecordId").value; 
 
         if (isNaN(lat) || isNaN(lng)) return;
-        if (!folderId) { GlobalModal.alert("請先建立並選擇存放資料夾！"); return; }
+        
+        // ★ 修改點：沒有選擇資料夾時，彈出「選擇」或「建立」的互動視窗
+        if (!folderId) { 
+          if (state.folders.length > 0) {
+            // 利用現有的 getFolderOptionsHtml，並在最上方插入「建立新資料夾」的選項
+            const optionsHtml = `<option value="CREATE_NEW">➕ 建立新資料夾...</option>` + getFolderOptionsHtml().replace('<option value="">(請選擇資料夾)</option>', '');
+            
+            GlobalModal.select("📂 選擇或建立資料夾", "尚未選擇儲存位置，請選擇現有資料夾或建立新的：", optionsHtml, (selectedValue) => {
+              if (selectedValue === "CREATE_NEW") {
+                // 如果選擇建立新資料夾，稍微延遲一下再彈出輸入框 (避免視窗切換閃爍)
+                setTimeout(() => {
+                  GlobalModal.prompt("請輸入新資料夾名稱來建立：", "", (newName) => {
+                    if (newName && newName.trim()) {
+                      const newId = Date.now().toString();
+                      state.folders.push({ id: newId, name: newName.trim(), parentId: null });
+                      state.expandedFolders.add(newId);
+                      saveToLocalStorage();
+                      
+                      const folderSelect = document.getElementById("sidebar-folder");
+                      folderSelect.innerHTML = getFolderOptionsHtml(newId);
+                      folderSelect.value = newId;
+                      document.getElementById("sidebarSaveBtn").click();
+                    }
+                  });
+                }, 150);
+              } else if (selectedValue) {
+                // 如果選擇了現有資料夾，自動套用並儲存
+                const folderSelect = document.getElementById("sidebar-folder");
+                folderSelect.value = selectedValue;
+                document.getElementById("sidebarSaveBtn").click();
+              }
+            });
+          } else {
+            // 完全沒有資料夾時，直接要求建立
+            GlobalModal.prompt("目前尚未建立任何資料夾，請先建立資料夾：", "", (newName) => {
+              if (newName && newName.trim()) {
+                const newId = Date.now().toString();
+                state.folders.push({ id: newId, name: newName.trim(), parentId: null });
+                state.expandedFolders.add(newId);
+                saveToLocalStorage();
+                
+                const folderSelect = document.getElementById("sidebar-folder");
+                folderSelect.innerHTML = getFolderOptionsHtml(newId);
+                folderSelect.value = newId;
+                document.getElementById("sidebarSaveBtn").click();
+              }
+            });
+          }
+          return; // 終止目前的執行，等待使用者操作互動視窗
+        }
 
         state.lastFolderId = folderId;
         
-        // ★ 核心修正 1：如果是編輯舊紀錄，先把「原本那筆」從資料庫拔除 (達成移動或覆蓋)
+        // 如果是編輯舊紀錄，先把「原本那筆」從資料庫拔除 (達成移動或覆蓋)
         if (editRecordId) {
           state.records = state.records.filter(r => r.id !== editRecordId);
         }
         
-        // ★ 核心修正 2：確保「目標資料夾」內不會有重複座標的紀錄打架
+        // 確保「目標資料夾」內不會有重複座標的紀錄打架
         state.records = state.records.filter(r => r.folderId !== folderId || r.lat !== lat || r.lng !== lng);
         
         state.records.push({
@@ -2020,7 +2093,6 @@ document.getElementById("editLat").value = point.lat;
         
         saveToLocalStorage();
         map.closePopup();
-        switchTab("records");
         
         const btn = document.getElementById("sidebarSaveBtn");
         btn.textContent = "✅ 已儲存";
