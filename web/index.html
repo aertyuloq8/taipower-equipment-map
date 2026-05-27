@@ -683,23 +683,42 @@
 
         <div id="tabEdit" class="tab-content" style="flex-direction:column; min-height:0;">
           <div style="padding:12px 18px; border-bottom:1px solid var(--line); background:#f8fafc; flex-shrink:0;">
-            <h2 id="editPanelTitle" style="font-size:16px; color:var(--accent-dark); margin-bottom:4px;">請選擇設備</h2>
-            <div id="editPanelMeta" style="font-size:12px; color:var(--muted);">在地圖上點擊設備以進行編輯</div>
-<div id="editPanelWarning" style="margin-top:6px;"></div>
-            <div id="editPanelActions" style="display:none; gap:8px; margin-top:8px;">
-              <a id="sidebarNavBtn" href="#" target="_blank" rel="noopener" style="flex:1; text-align:center; background:var(--accent); color:#fff; border-radius:4px; padding:6px; font-size:12px; font-weight:bold; text-decoration:none;">🧭 導航</a>
-              <a id="sidebarStreetBtn" href="#" target="_blank" rel="noopener" style="flex:1; text-align:center; background:var(--accent); color:#fff; border-radius:4px; padding:6px; font-size:12px; font-weight:bold; text-decoration:none;">🏙️ 街景</a>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+              <div style="min-width:0; flex-grow:1;">
+                <h2 id="editPanelTitle" style="font-size:16px; color:var(--accent-dark); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">請選擇設備</h2>
+                <div id="editPanelMeta" style="font-size:11px; color:var(--muted);">在地圖點擊進行編輯</div>
+              </div>
+              
+              <div id="editPanelActions" style="display:none; flex-direction:column; gap:4px; flex-shrink:0;">
+                <a id="sidebarNavBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🗺️ 導航</a>
+                <a id="sidebarStreetBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:11px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🏙️ 街景</a>
+              </div>
             </div>
+            
+            <div id="editPanelWarning" style="margin-top:6px;"></div>
             <input type="hidden" id="editLat">
             <input type="hidden" id="editLng">
             <input type="hidden" id="editCode">
+			<input type="hidden" id="editRecordId">
           </div>
 
           <div id="editFormScrollArea" style="flex:1; overflow-y:auto; padding:14px 18px;">
             <div id="editFormContainer" style="display:none; flex-direction:column; gap:8px;">
+              
               <label style="font-size:12px; font-weight:bold;">🏷️ 設備名稱
                 <input id="sidebar-name-input" type="text" style="width:100%; min-height:32px; padding:4px 8px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
               </label>
+
+              <div style="margin-top:4px; padding:6px; background:#fef2f2; border:1px dashed #fca5a5; border-radius:4px;">
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                  <input type="checkbox" id="sidebar-correction-flag" style="width:16px; height:16px; cursor:pointer;">
+                  <span style="font-size:12px; color:#b91c1c; font-weight:bold;">⚠️ 現場圖號座標不符</span>
+                </label>
+                <div id="sidebar-correct-code-container" style="display:none; margin-top:6px; gap:4px;">
+                  <input type="text" id="sidebar-correct-code-input" placeholder="請填寫現場正確的圖號或座標..." style="width:100%; min-height:28px; padding:4px 8px; font-size:12px; border:1px solid #fca5a5; border-radius:4px; box-sizing:border-box;">
+                  <button type="button" id="btn-fill-gps-code" style="white-space:nowrap; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:4px; font-size:12px; padding:0 8px; cursor:pointer; font-weight:bold; transition:all 0.2s;">📍 定位帶入</button>
+                </div>
+              </div>
 
               <div style="display:flex; gap:8px;">
                 <label style="font-size:12px; font-weight:bold; flex:2;">📁 存入資料夾
@@ -739,15 +758,15 @@
               <div id="sidebar-icon-groups" style="display:none; border:1px solid var(--line); border-radius:6px; padding:8px; background:#fff; margin-top:6px; flex-direction:column; gap:6px;">
               </div>
 
-          <div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-top:1px solid var(--line); background:#fff; gap:8px;">
+            </div> </div> <div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-top:1px solid var(--line); background:#fff; gap:8px; z-index:10; box-shadow:0 -2px 10px rgba(0,0,0,0.05);">
             <div style="display:flex; gap:6px;">
               <button id="editScrollTopBtn" style="min-height:32px; padding:0 12px; font-size:12px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▲</button>
               <button id="editScrollBotBtn" style="min-height:32px; padding:0 12px; font-size:12px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▼</button>
             </div>
             <button id="sidebarSaveBtn" class="btn-save-record" style="margin-top:0; width:auto; flex-grow:1;" disabled>💾 儲存紀錄</button>
           </div>
-        </div>
-      </aside>
+
+        </div> </aside>
 
       <section class="map-shell">
         <div id="map"></div>
@@ -897,7 +916,17 @@
         document.getElementById("editFormContainer").style.display = "flex";
         document.getElementById("sidebarSaveBtn").disabled = false;
 
-        const existingRecord = state.records.find(r => r.lat === point.lat && r.lng === point.lng);
+        // ★ 修正：優先使用唯一 ID 尋找紀錄，避免同座標多筆紀錄互相干擾
+        let existingRecord = null;
+        if (point.id) {
+          existingRecord = state.records.find(r => r.id === point.id);
+        } else {
+          // 如果沒有 ID (例如直接從搜尋或地圖空白處點擊)，才退回使用座標尋找
+          existingRecord = state.records.find(r => r.lat === point.lat && r.lng === point.lng);
+        }
+        
+        // 紀錄目前正在編輯的 ID
+        document.getElementById("editRecordId").value = existingRecord ? existingRecord.id : "";
         const allRecordsForPoint = state.records.filter(r => r.lat === point.lat && r.lng === point.lng);
 
         // 標題與隱藏座標
@@ -924,7 +953,11 @@ document.getElementById("editLat").value = point.lat;
         document.getElementById("sidebar-name-input").value = existingRecord ? (existingRecord.name || point.name || "手動新增設備") : (point.name || "手動新增設備");
         document.getElementById("sidebar-defect-input").value = existingRecord ? (existingRecord.defect || "") : "";
         document.getElementById("sidebar-urgency").value = existingRecord ? (existingRecord.urgency || "C") : "C";
-
+        // ★ 載入修正提醒與正確圖號
+        const isCorrectionNeeded = existingRecord ? !!existingRecord.needCorrection : false;
+        document.getElementById("sidebar-correction-flag").checked = isCorrectionNeeded;
+        document.getElementById("sidebar-correct-code-container").style.display = isCorrectionNeeded ? "flex" : "none";
+        document.getElementById("sidebar-correct-code-input").value = existingRecord && existingRecord.correctCode ? existingRecord.correctCode : "";
         const defaultFolderId = existingRecord ? existingRecord.folderId : (state.lastFolderId || null);
         document.getElementById("sidebar-folder").innerHTML = getFolderOptionsHtml(defaultFolderId);
 
@@ -1155,9 +1188,6 @@ document.getElementById("editLat").value = point.lat;
         return "⭐"; 
       }
 
-      function getRecordIcon(record) {
-        return record.icon || autoDetectIcon(record.defect);
-      }
 
 // ── 2. 動態給予膠囊徽章背景色 (加入預設圖示的專屬顏色) ──
       function getBadgeBgColor(icon) {
@@ -1379,13 +1409,17 @@ document.getElementById("editLat").value = point.lat;
               recordsHTML += directRecords.map(r => {
                 const rChecked = state.selectedRecords.has(r.id) ? "checked" : "";
                 // ★ 使用 getRecordIcon(r) 取代固定 📍
-                const recordIcon = getRecordIcon(r);
+               const recordIcon = getRecordIcon(r);
+                
+                // ★ 新增：如果有勾選修正，產生紅色小標籤
+                const correctionTag = r.needCorrection ? `<span style="background-color:#b91c1c; color:#fff; font-size:10px; font-weight:bold; padding:2px 4px; border-radius:4px; margin-left:4px;">🔧圖號不符</span>` : "";
+
                 return `
                   <div id="record-row-${r.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding:4px; border-radius:4px; transition:background-color 1.5s ease;">
                     <input type="checkbox" class="cb-record" data-id="${r.id}" ${rChecked} style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
                     <button class="record-item" data-fly-lat="${r.lat}" data-fly-lng="${r.lng}" title="飛轉至此設備">
                       <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span class="record-item-title"><span style="display:inline-block; padding:1px 5px; border-radius:8px; font-size:10px; color:#fff; background-color:${getBadgeBgColor(recordIcon)}; vertical-align:middle; margin-right:2px;">${recordIcon}</span> ${escapeHtml(r.name || r.code)}</span>
+                        <span class="record-item-title"><span style="display:inline-block; padding:1px 5px; border-radius:8px; font-size:10px; color:#fff; background-color:${getBadgeBgColor(recordIcon)}; vertical-align:middle; margin-right:2px;">${recordIcon}</span> ${escapeHtml(r.name || r.code)}${correctionTag}</span>
                         <span class="btn-small text-danger" data-delete-record="${r.id}" title="刪除此紀錄" style="border:none; padding:2px 4px; min-height:0; margin-left:4px;">✖</span>
                       </div>
                       <span class="record-item-meta">不良: ${escapeHtml(r.defect || "無")} | 緩急: ${escapeHtml(r.urgency || "C")}</span>
@@ -1447,7 +1481,20 @@ document.getElementById("editLat").value = point.lat;
         const exportData = [];
         uniqueRecordIds.forEach(rId => {
           const r = state.records.find(x => x.id === rId);
-          if (r) exportData.push({ "巡視日期(目錄)": getFullFolderPath(r.folderId), 土木設備: r.name || "", 圖號座標: r.code || "", 不良項目: r.defect || "", 緩急程度: r.urgency || "", 設計單號: "", 設計日期: "", 施工單位: "", 施工單號: "", 施工日期: "" });
+          if (r) exportData.push({ 
+  "巡視日期(目錄)": getFullFolderPath(r.folderId), 
+  "土木設備": r.name || "", 
+  "圖號座標": r.code || "", 
+  "不良項目": r.defect || "", 
+  "緩急程度": r.urgency || "", 
+  "設計單號": "", 
+  "設計日期": "", 
+  "施工單位": "", 
+  "施工單號": "", 
+  "施工日期": "",
+  "圖資修正": r.needCorrection ? "是" : "",  // ★ 移到最後面
+  "正確圖號": r.correctCode || ""            // ★ 移到最後面
+});
         });
         if (exportData.length === 0) { GlobalModal.alert("勾選範圍內沒有紀錄可匯出。"); return; }
         const ws = XLSX.utils.json_to_sheet(exportData);
@@ -1578,13 +1625,24 @@ document.getElementById("editLat").value = point.lat;
           }
           renderFolders(); return;
         }
+        // ── 點擊側邊欄的紀錄飛轉 ──
         const recordBtn = target.closest(".record-item");
         if (recordBtn && !target.dataset.deleteRecord) {
-          const lat = parseFloat(recordBtn.dataset.flyLat), lng = parseFloat(recordBtn.dataset.flyLng);
-          const point = state.points.find(p => p.lat === lat && p.lng === lng) || state.records.find(r => r.lat === lat && r.lng === lng);
+          // ★ 修正：從父層容器精準抓取該筆紀錄的 ID
+          const row = recordBtn.closest("[id^='record-row-']");
+          const rId = row ? row.id.replace("record-row-", "") : null;
+          let point = state.records.find(r => r.id === rId);
+          
+          // 防呆：如果找不到 (例如剛匯入的舊資料)，才退回座標尋找
+          if (!point) {
+            const lat = parseFloat(recordBtn.dataset.flyLat), lng = parseFloat(recordBtn.dataset.flyLng);
+            point = state.points.find(p => p.lat === lat && p.lng === lng) || state.records.find(r => r.lat === lat && r.lng === lng);
+          }
+
           if (point) {
-            map.flyTo([lat, lng], map.getMaxZoom(), { duration: 0.45 });
-            L.popup().setLatLng([lat, lng]).setContent(popupHtml(point)).openOn(map);
+            map.flyTo([point.lat, point.lng], map.getMaxZoom(), { duration: 0.45 });
+            L.popup({ autoPanPadding: [10, 10] }).setLatLng([point.lat, point.lng]).setContent(miniPopupHtml(point)).openOn(map);
+            openEditPanel(point); // 傳入精確的 point (包含 id)
             if (window.innerWidth <= 820) setPanelCollapsed(true);
           }
           return;
@@ -1633,8 +1691,21 @@ document.getElementById("editLat").value = point.lat;
           const fId = target.dataset.export, folder = state.folders.find(f => f.id === fId);
           if (!folder) return;
           const targetRecords = getAllRecordsInFolder(fId), pathName = getFullFolderPath(fId);
-          const exportData = targetRecords.map(r => ({ "巡視日期(目錄)": getFullFolderPath(r.folderId), 土木設備: r.name || "", 圖號座標: r.code || "", 不良項目: r.defect || "", 緩急程度: r.urgency || "", 設計單號: "", 設計日期: "", 施工單位: "", 施工單號: "", 施工日期: "" }));
-          if (exportData.length === 0) exportData.push({ "巡視日期(目錄)": pathName, 土木設備: "", 圖號座標: "", 不良項目: "", 緩急程度: "", 設計單號: "", 設計日期: "", 施工單位: "", 施工單號: "", 施工日期: "" });
+          const exportData = targetRecords.map(r => ({ 
+  "巡視日期(目錄)": getFullFolderPath(r.folderId), 
+  "土木設備": r.name || "", 
+  "圖號座標": r.code || "", 
+  "不良項目": r.defect || "", 
+  "緩急程度": r.urgency || "", 
+  "設計單號": "", 
+  "設計日期": "", 
+  "施工單位": "", 
+  "施工單號": "", 
+  "施工日期": "",
+  "圖資修正": r.needCorrection ? "是" : "",  // ★ 移到最後面
+  "正確圖號": r.correctCode || ""            // ★ 移到最後面
+}));
+         if (exportData.length === 0) exportData.push({ "巡視日期(目錄)": pathName, "土木設備": "", "圖號座標": "", "不良項目": "", "緩急程度": "", "設計單號": "", "設計日期": "", "施工單位": "", "施工單號": "", "施工日期": "", "圖資修正": "", "正確圖號": "" });
           const ws = XLSX.utils.json_to_sheet(exportData); const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
           XLSX.writeFile(wb, `巡視紀錄_${folder.name}.xlsx`);
@@ -1683,7 +1754,12 @@ document.getElementById("editLat").value = point.lat;
             for (const row of rows) {
               if (skipHeader) { skipHeader = false; continue; }
               if (!row || row.length < 3) continue;
-              const folderPath = String(row[0] || "").trim(), name = String(row[1] || "").trim(), code = String(row[2] || "").trim(), defect = String(row[3] || "").trim(), urgency = String(row[4] || "C").trim();
+ const folderPath = String(row[0] || "").trim(), name = String(row[1] || "").trim(), code = String(row[2] || "").trim(), defect = String(row[3] || "").trim(), urgency = String(row[4] || "C").trim();
+              
+              // ★ 新增：讀取最後兩欄 (索引 10 是圖資修正，11 是正確圖號)
+              const needCorrection = String(row[10] || "").trim() === "是";
+              const correctCode = String(row[11] || "").trim();
+
               if (!folderPath || !name) continue;
               let resolvedLat = null, resolvedLng = null, resolvedName = name, resolvedCode = code;
               let point = code ? state.points.find(p => (p.code || "") === code) : null;
@@ -1705,8 +1781,9 @@ document.getElementById("editLat").value = point.lat;
               const recordData = {
                 id: existingIndex >= 0 ? state.records[existingIndex].id : "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
                 lat: resolvedLat, lng: resolvedLng, name: resolvedName, code: resolvedCode, folderId, defect, urgency,
-                // icon 欄位：匯入時不覆蓋已存在的自訂圖示
                 icon: existingIndex >= 0 ? state.records[existingIndex].icon : undefined,
+                needCorrection, // ★ 匯入時一併寫入打勾狀態
+                correctCode     // ★ 匯入時一併寫入正確圖號
               };
               if (existingIndex >= 0) state.records[existingIndex] = recordData;
               else state.records.push(recordData);
@@ -1788,7 +1865,59 @@ document.getElementById("editLat").value = point.lat;
         // Popup「已記錄於」跳轉
         const gotoLink = e.target.closest(".goto-folder-link");
         if (gotoLink) { jumpToRecord(gotoLink.dataset.folderId, gotoLink.dataset.recordId); return; }
+// ── 展開/收合正確圖號輸入框 ──
+      if (e.target.id === "sidebar-correction-flag") {
+        const container = document.getElementById("sidebar-correct-code-container");
+        const input = document.getElementById("sidebar-correct-code-input");
+        if (e.target.checked) {
+          container.style.display = "flex";
+          input.focus(); 
+        } else {
+          container.style.display = "none";
+          input.value = ""; 
+        }
+      }
 
+      // ── 點擊「📍 定位帶入」按鈕 ──
+      if (e.target.id === "btn-fill-gps-code") {
+        const btn = e.target;
+        const input = document.getElementById("sidebar-correct-code-input");
+        if (!navigator.geolocation) { GlobalModal.alert("您的裝置不支援 GPS 定位功能。"); return; }
+        
+        const originalText = btn.textContent;
+        btn.textContent = "⏳ 定位中...";
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const tpcCode = latLngToTpcCode(lat, lng); // 轉換為台電圖號
+            
+            if (tpcCode && tpcCode !== "座標超出範圍") {
+               input.value = tpcCode;
+            } else {
+               input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            }
+            
+            btn.textContent = "✅ 已帶入";
+            btn.style.background = "#dcfce7"; btn.style.color = "#16a34a"; btn.style.borderColor = "#86efac"; btn.style.opacity = "1";
+            setTimeout(() => {
+              btn.textContent = originalText; btn.disabled = false;
+              btn.style.background = "#fee2e2"; btn.style.color = "#b91c1c"; btn.style.borderColor = "#fca5a5";
+            }, 2000);
+          },
+          (err) => {
+            console.error("GPS 定位失敗:", err);
+            btn.textContent = "❌ 定位失敗"; btn.style.opacity = "1";
+            setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
+            GlobalModal.alert("無法取得位置，請確認手機的 GPS 定位權限是否開啟！");
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        );
+        return;
+      }
 
 // ── 不良項目快捷晶片 (更新：連動新版預覽，並支援點擊內部文字) ──
       const defectChipBtn = e.target.closest(".defect-chip-btn");
@@ -1851,7 +1980,7 @@ document.getElementById("editLat").value = point.lat;
         }
         return;
       }
-      // ── ★ 全新的側邊欄儲存按鈕邏輯 ──
+// ── ★ 全新的側邊欄儲存按鈕邏輯 ──
       if (e.target.id === "sidebarSaveBtn") {
         const lat = parseFloat(document.getElementById("editLat").value);
         const lng = parseFloat(document.getElementById("editLng").value);
@@ -1862,23 +1991,37 @@ document.getElementById("editLat").value = point.lat;
         const urgency = document.getElementById("sidebar-urgency").value;
         const customIcon = document.getElementById("sidebar-icon-input").value.trim();
 
+        const needCorrection = document.getElementById("sidebar-correction-flag").checked;
+        const correctCode = needCorrection ? document.getElementById("sidebar-correct-code-input").value.trim() : "";
+        
+        // ★ 新增：抓取正在編輯的精確紀錄 ID
+        const editRecordId = document.getElementById("editRecordId").value; 
+
         if (isNaN(lat) || isNaN(lng)) return;
         if (!folderId) { GlobalModal.alert("請先建立並選擇存放資料夾！"); return; }
 
         state.lastFolderId = folderId;
+        
+        // ★ 核心修正 1：如果是編輯舊紀錄，先把「原本那筆」從資料庫拔除 (達成移動或覆蓋)
+        if (editRecordId) {
+          state.records = state.records.filter(r => r.id !== editRecordId);
+        }
+        
+        // ★ 核心修正 2：確保「目標資料夾」內不會有重複座標的紀錄打架
         state.records = state.records.filter(r => r.folderId !== folderId || r.lat !== lat || r.lng !== lng);
         
         state.records.push({
-          id: "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
+          id: editRecordId || ("rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 6)), // 沿用舊 ID 或產生新 ID
           lat, lng, name: customName, code, folderId, defect, urgency,
           icon: customIcon || undefined,
+          needCorrection, 
+          correctCode     
         });
-
+        
         saveToLocalStorage();
         map.closePopup();
-        switchTab("records"); // 儲存完跳回紀錄清單
+        switchTab("records");
         
-// 給予視覺回饋
         const btn = document.getElementById("sidebarSaveBtn");
         btn.textContent = "✅ 已儲存";
         setTimeout(() => { btn.textContent = "💾 儲存紀錄"; }, 2000);
@@ -1902,7 +2045,9 @@ document.getElementById("editLat").value = point.lat;
         const visibleRecords = state.records.filter(r => !state.hiddenRecordFolders.has(r.folderId));
         for (const record of visibleRecords) {
           const icon = getRecordIcon(record);
-          const bgColor = getBadgeBgColor(icon);
+          
+          // ★ 如果有勾選圖資修正，強制把地圖底色變成醒目的桃紅色 (#be185d)；否則維持原本顏色
+          const bgColor = record.needCorrection ? "#be185d" : getBadgeBgColor(icon);
 
           let htmlContent, iconAnchor;
           if (state.labelsHidden) {
@@ -2185,38 +2330,74 @@ L.marker([point.lat, point.lng], {
         return output.sort((a, b) => { const r = searchResultRank(a, search) - searchResultRank(b, search); return r !== 0 ? r : comparePointsByName(a, b); }).slice(0, 50);
       }
 
-      function renderDefectStats() {
+function renderDefectStats() {
         const el = document.getElementById('defectStatsContent'); if (!el) return;
+        
+        // ★ 1. 獨立抓出所有勾選「需修正」的紀錄
+        const correctionRecords = state.records.filter(r => r.needCorrection);
+
+        // 2. 原本的不良項目分組邏輯
         const grouped = new Map();
         for (const r of state.records) {
           const d = (r.defect || '').trim(); if (!d || d === '無') continue;
           if (!grouped.has(d)) grouped.set(d, []); grouped.get(d).push(r);
         }
         const sorted = [...grouped.entries()].sort((a, b) => b[1].length - a[1].length);
-        if (!sorted.length) { el.innerHTML = '<p style="color:#999;font-size:12px;margin:4px 0;">尚無不良紀錄</p>'; return; }
-        const max = sorted[0][1].length, total = sorted.reduce((sum, [, recs]) => sum + recs.length, 0);
-        el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0 8px; margin-bottom:4px; border-bottom:2px solid var(--line); font-weight:bold; font-size:13px;"><span style="color:var(--muted);">總計</span><span style="color:var(--accent-dark);">${total} 筆</span></div>`
-          + sorted.map(([name, recs]) => {
-            const count = recs.length;
-            const recsHtml = recs.map(r => `
-              <div class="defect-stat-record" data-record-id="${r.id}" data-folder-id="${r.folderId}"
-                style="padding:5px 8px; cursor:pointer; border-radius:4px; font-size:12px; background:#f8fafc; margin-bottom:3px; border:1px solid var(--line);">
-                <div style="font-weight:bold; color:var(--accent-dark);"><span style="display:inline-block; padding:1px 5px; border-radius:8px; font-size:10px; color:#fff; background-color:${getBadgeBgColor(getRecordIcon(r))}; vertical-align:middle; margin-right:2px;">${getRecordIcon(r)}</span> ${escapeHtml(r.name || r.code)}</div>
-                <div style="color:var(--muted); font-size:11px; margin-top:1px;">📂 ${escapeHtml(getFullFolderPath(r.folderId))}</div>
-              </div>`).join('');
-            return `
-              <div style="border-bottom:1px solid #f1f5f9;">
-                <div class="defect-stat-header" style="display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; user-select:none;">
-                  <span class="defect-stat-arrow" style="font-size:10px; color:var(--muted); transition:transform 0.2s;">▶</span>
-                  <span style="flex:1; font-size:15px; color:var(--text);">${escapeHtml(name)}</span>
-                  <div style="width:80px; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
-                    <div style="width:${Math.round(count / max * 100)}%; background:var(--accent); height:100%; border-radius:4px;"></div>
-                  </div>
-                  <span style="font-weight:bold; font-size:13px; color:var(--accent-dark); min-width:24px; text-align:right;">${count}</span>
+
+        // 若無任何不良與修正，顯示空狀態
+        if (!sorted.length && !correctionRecords.length) { 
+          el.innerHTML = '<p style="color:#999;font-size:12px;margin:4px 0;">尚無不良或需修正紀錄</p>'; 
+          return; 
+        }
+
+        const max = sorted.length > 0 ? sorted[0][1].length : 1;
+        const total = sorted.reduce((sum, [, recs]) => sum + recs.length, 0);
+        
+        let html = `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0 8px; margin-bottom:8px; border-bottom:2px solid var(--line); font-weight:bold; font-size:13px;"><span style="color:var(--muted);">總計不良數</span><span style="color:var(--accent-dark);">${total} 筆</span></div>`;
+
+        // 幫助產生內部紀錄列表的短函數
+        const buildRecordsHtml = (recs) => recs.map(r => `
+          <div class="defect-stat-record" data-record-id="${r.id}" data-folder-id="${r.folderId}"
+            style="padding:5px 8px; cursor:pointer; border-radius:4px; font-size:12px; background:#f8fafc; margin-bottom:3px; border:1px solid var(--line);">
+            <div style="font-weight:bold; color:var(--accent-dark);">
+              <span style="display:inline-block; padding:1px 5px; border-radius:8px; font-size:10px; color:#fff; background-color:${getBadgeBgColor(getRecordIcon(r))}; vertical-align:middle; margin-right:2px;">${getRecordIcon(r)}</span> 
+              ${escapeHtml(r.name || r.code)}
+              ${r.needCorrection ? '<span style="background-color:#b91c1c; color:#fff; font-size:10px; font-weight:bold; padding:2px 4px; border-radius:4px; margin-left:4px;">🔧圖號不符</span>' : ''}
+            </div>
+            <div style="color:var(--muted); font-size:11px; margin-top:1px;">📂 ${escapeHtml(getFullFolderPath(r.folderId))}</div>
+          </div>`).join('');
+
+        // ★ 3. 渲染特別獨立出來的「圖資需修正」專屬區塊 (置頂、醒目紅色)
+        if (correctionRecords.length > 0) {
+          html += `
+            <div style="border:1px dashed #fca5a5; background:#fef2f2; border-radius:6px; margin-bottom:12px;">
+              <div class="defect-stat-header" style="display:flex; align-items:center; gap:8px; padding:8px; cursor:pointer; user-select:none;">
+                <span class="defect-stat-arrow" style="font-size:10px; color:#b91c1c; transition:transform 0.2s;">▶</span>
+                <span style="flex:1; font-size:15px; color:#b91c1c; font-weight:bold;">⚠️ 圖號座標需修正</span>
+                <span style="font-weight:bold; font-size:13px; color:#fff; background:#b91c1c; padding:2px 8px; border-radius:12px;">${correctionRecords.length}</span>
+              </div>
+              <div class="defect-stat-records" style="display:none; padding:0 8px 8px 12px;">${buildRecordsHtml(correctionRecords)}</div>
+            </div>`;
+        }
+
+        // 4. 渲染原本的不良項目統計
+        html += sorted.map(([name, recs]) => {
+          const count = recs.length;
+          return `
+            <div style="border-bottom:1px solid #f1f5f9;">
+              <div class="defect-stat-header" style="display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; user-select:none;">
+                <span class="defect-stat-arrow" style="font-size:10px; color:var(--muted); transition:transform 0.2s;">▶</span>
+                <span style="flex:1; font-size:15px; color:var(--text);">${escapeHtml(name)}</span>
+                <div style="width:80px; background:#e2e8f0; border-radius:4px; height:8px; overflow:hidden;">
+                  <div style="width:${Math.round(count / max * 100)}%; background:var(--accent); height:100%; border-radius:4px;"></div>
                 </div>
-                <div class="defect-stat-records" style="display:none; padding:0 0 6px 12px;">${recsHtml}</div>
-              </div>`;
-          }).join('');
+                <span style="font-weight:bold; font-size:13px; color:var(--accent-dark); min-width:24px; text-align:right;">${count}</span>
+              </div>
+              <div class="defect-stat-records" style="display:none; padding:0 0 6px 12px;">${buildRecordsHtml(recs)}</div>
+            </div>`;
+        }).join('');
+        
+        el.innerHTML = html;
       }
 
       document.getElementById('scrollTopBtn').addEventListener('click', () => { document.querySelector('.folders-section').scrollTo({ top: 0, behavior: 'smooth' }); });
