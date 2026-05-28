@@ -1263,7 +1263,7 @@ document.getElementById("editLat").value = point.lat;
         for (const part of parts) {
           currentFolder = state.folders.find(f => f.name === part && f.parentId === parentId);
           if (!currentFolder) {
-            const newId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+            const newId = generateId();
             currentFolder = { id: newId, name: part, parentId };
             state.folders.push(currentFolder);
             state.expandedFolders.add(newId);
@@ -1306,23 +1306,24 @@ document.getElementById("editLat").value = point.lat;
 // ==========================================
       // LocalStorage
       // ==========================================
-      function saveToLocalStorage() {
+ function saveToLocalStorage() {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify({
             folders: state.folders, records: state.records, lastFolderId: state.lastFolderId,
           }));
-        } catch (e) { console.error("儲存失敗:", e); }
+        } catch (e) { 
+          console.error("儲存失敗:", e); 
+          // [新增] 彈出警告，避免使用者以為有存到
+          GlobalModal.alert("⚠️ 儲存失敗！<br><br>可能是瀏覽器儲存空間已達上限 (約 5MB)。請立即點擊「資料備份」下載您的紀錄，並清理不需要的資料夾。");
+        }
         
         renderFolders();
         updateRecordMarkers();
 
-        // ★ 新增：連動更新編輯面板的「存入資料夾」下拉選單
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) {
           const currentVal = folderSelect.value;
-          // 檢查原本選中的資料夾是不是剛剛被刪除了
           const folderExists = state.folders.some(f => f.id === currentVal);
-          // 如果還在就保持原狀，如果被刪了就退回上一次使用的資料夾
           const valueToSelect = folderExists ? currentVal : state.lastFolderId;
           folderSelect.innerHTML = getFolderOptionsHtml(valueToSelect);
         }
@@ -1539,6 +1540,11 @@ document.getElementById("editLat").value = point.lat;
               state.records = state.records.filter(r => r.folderId !== fId);
               state.folders = state.folders.filter(f => f.id !== fId);
               state.hiddenRecordFolders.delete(fId); state.expandedFolders.delete(fId);
+              
+              // [新增] 避免 lastFolderId 變成幽靈參照
+              if (state.lastFolderId === fId) {
+                state.lastFolderId = state.folders.length > 0 ? state.folders[state.folders.length - 1].id : null;
+              }
             }
             state.selectedFolders.forEach(fId => deleteFolderRecursive(fId));
             state.selectedRecords.forEach(rId => { state.records = state.records.filter(r => r.id !== rId); });
@@ -1553,21 +1559,45 @@ document.getElementById("editLat").value = point.lat;
           getFolderOptionsHtml(null, null, true),
           (targetId) => {
             const safeTarget = targetId === "" ? null : targetId;
+            
+            // [新增] 預先檢查：找出那些「獨立被勾選」且「即將被移動到最上層」的設備紀錄
+            const recordsInMovingFolders = new Set();
+            state.selectedFolders.forEach(fId => getAllRecordIdsInFolder(fId).forEach(id => recordsInMovingFolders.add(id)));
+            
+            let hasStandaloneRecord = false;
+            for (const rId of state.selectedRecords) {
+              if (!recordsInMovingFolders.has(rId)) {
+                hasStandaloneRecord = true;
+                break;
+              }
+            }
+
+            // [新增] 如果目標是最上層，且包含獨立紀錄，直接擋下整筆操作
+            if (safeTarget === null && hasStandaloneRecord) { 
+              GlobalModal.alert("❌ 設備紀錄必須放置在資料夾內，不可移至(最上層)！\n請重新選擇目標資料夾。"); 
+              return; // 提早結束，避免資料發生「一半被移動」的慘況
+            }
+
+            // 1. 移動資料夾
             for (const fId of state.selectedFolders) {
+              // 防呆：不能移動到自己，也不能移動到自己的子資料夾裡面
               if (fId === safeTarget || (safeTarget && isDescendant(safeTarget, fId))) continue;
               const folder = state.folders.find(f => f.id === fId);
               if (folder) folder.parentId = safeTarget;
             }
-            const recordsInMovingFolders = new Set();
-            state.selectedFolders.forEach(fId => getAllRecordIdsInFolder(fId).forEach(id => recordsInMovingFolders.add(id)));
+
+            // 2. 移動獨立的設備紀錄
             for (const rId of state.selectedRecords) {
               if (recordsInMovingFolders.has(rId)) continue;
-              if (safeTarget === null) { GlobalModal.alert("❌ 設備紀錄必須放置在資料夾內！"); break; }
               const record = state.records.find(r => r.id === rId);
               if (record) record.folderId = safeTarget;
             }
-            state.selectedFolders.clear(); state.selectedRecords.clear();
+            
+            // 3. 清空選取狀態並儲存更新
+            state.selectedFolders.clear(); 
+            state.selectedRecords.clear();
             saveToLocalStorage();
+            renderFolders(); // 更新左側列表畫面
           }
         );
       });
@@ -1682,7 +1712,7 @@ document.getElementById("editLat").value = point.lat;
         if (target.dataset.addSub) {
           GlobalModal.prompt("請輸入子資料夾名稱：", "", (newName) => {
             if (newName && newName.trim()) {
-              const pId = target.dataset.addSub, newId = Date.now().toString();
+              const pId = target.dataset.addSub, newId = generateId();
               state.folders.push({ id: newId, name: newName.trim(), parentId: pId });
               state.expandedFolders.add(pId); state.expandedFolders.add(newId); saveToLocalStorage();
             }
@@ -1733,14 +1763,31 @@ document.getElementById("editLat").value = point.lat;
           const ws = XLSX.utils.json_to_sheet(exportData); const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
           XLSX.writeFile(wb, `巡視紀錄_${folder.name}.xlsx`);
-        } else if (target.dataset.deleteFolder) {
+       } else if (target.dataset.deleteFolder) {
           const fId = target.dataset.deleteFolder, folder = state.folders.find(f => f.id === fId);
           if (!folder) return;
-          GlobalModal.confirm(`確定要刪除資料夾「${folder.name}」及其中所有紀錄嗎？`, () => {
-            state.records = state.records.filter(r => r.folderId !== fId);
-            state.folders = state.folders.filter(f => f.id !== fId);
-            state.hiddenRecordFolders.delete(fId); state.selectedFolders.delete(fId);
-            saveToLocalStorage(); renderer.redraw();
+          
+          // [修正] 加上 escapeHtml 防護
+          GlobalModal.confirm(`確定要刪除資料夾「${escapeHtml(folder.name)}」及其中所有子層與紀錄嗎？`, () => {
+            
+            function deleteFolderRecursive(currentFolderId) {
+              state.folders.filter(f => f.parentId === currentFolderId).forEach(child => deleteFolderRecursive(child.id));
+              state.records = state.records.filter(r => r.folderId !== currentFolderId);
+              state.folders = state.folders.filter(f => f.id !== currentFolderId);
+              
+              state.hiddenRecordFolders.delete(currentFolderId); 
+              state.selectedFolders.delete(currentFolderId);
+              state.expandedFolders.delete(currentFolderId);
+
+              if (state.lastFolderId === currentFolderId) {
+                state.lastFolderId = state.folders.length > 0 ? state.folders[state.folders.length - 1].id : null;
+              }
+            }
+
+            deleteFolderRecursive(fId);
+            saveToLocalStorage(); 
+            renderer.redraw();
+            renderFolders();
           });
         }
       });
@@ -1755,14 +1802,14 @@ document.getElementById("editLat").value = point.lat;
       document.querySelector("#addFolderBtn").addEventListener("click", () => {
         GlobalModal.prompt("請輸入資料夾名稱：", "", (newName) => {
           if (newName && newName.trim()) {
-            const newId = Date.now().toString();
+            const newId = generateId();
             state.folders.push({ id: newId, name: newName.trim(), parentId: null });
             state.expandedFolders.add(newId); saveToLocalStorage();
           }
         });
       });
 
-      // ==========================================
+     // ==========================================
       // 匯入 Excel
       // ==========================================
       document.querySelector("#importCsvBtn").addEventListener("click", () => document.querySelector("#importFileInput").click());
@@ -1774,13 +1821,15 @@ document.getElementById("editLat").value = point.lat;
             const data = new Uint8Array(event.target.result);
             const workbook = XLSX.read(data, { type: "array" });
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false });
-            let importedCount = 0, skippedCount = 0, manualCount = 0, skipHeader = true;
+            
+            // [修改] 新增 reverseResolvedCount 計數器
+            let importedCount = 0, skippedCount = 0, reverseResolvedCount = 0, manualCount = 0, skipHeader = true;
+            
             for (const row of rows) {
               if (skipHeader) { skipHeader = false; continue; }
               if (!row || row.length < 3) continue;
- const folderPath = String(row[0] || "").trim(), name = String(row[1] || "").trim(), code = String(row[2] || "").trim(), defect = String(row[3] || "").trim(), urgency = String(row[4] || "C").trim();
+              const folderPath = String(row[0] || "").trim(), name = String(row[1] || "").trim(), code = String(row[2] || "").trim(), defect = String(row[3] || "").trim(), urgency = String(row[4] || "C").trim();
               
-              // ★ 新增：讀取最後兩欄 (索引 10 是圖資修正，11 是正確圖號)
               const needCorrection = String(row[10] || "").trim() === "是";
               const correctCode = String(row[11] || "").trim();
 
@@ -1788,6 +1837,7 @@ document.getElementById("editLat").value = point.lat;
               let resolvedLat = null, resolvedLng = null, resolvedName = name, resolvedCode = code;
               let point = code ? state.points.find(p => (p.code || "") === code) : null;
               if (!point && name) point = state.points.find(p => (p.name || "") === name);
+              
               if (point) {
                 resolvedLat = point.lat; resolvedLng = point.lng; resolvedName = point.name || name; resolvedCode = point.code || code;
               } else {
@@ -1796,8 +1846,14 @@ document.getElementById("editLat").value = point.lat;
                   resolvedLat = parseFloat(gpsMatch[1]); resolvedLng = parseFloat(gpsMatch[2]); resolvedCode = code; resolvedName = name; manualCount++;
                 } else {
                   const reversed = tpcCodeToLatLng(code);
-                  if (reversed) { resolvedLat = reversed.lat; resolvedLng = reversed.lng; resolvedCode = code; resolvedName = name; skippedCount++; }
-                  else { skippedCount++; continue; }
+                  // [修改] 成功反推算入 reverseResolvedCount，失敗才算入 skippedCount
+                  if (reversed) { 
+                    resolvedLat = reversed.lat; resolvedLng = reversed.lng; resolvedCode = code; resolvedName = name; 
+                    reverseResolvedCount++; 
+                  } else { 
+                    skippedCount++; 
+                    continue; 
+                  }
                 }
               }
               const folderId = findOrCreateFolderByPath(folderPath); if (!folderId) continue;
@@ -1806,18 +1862,22 @@ document.getElementById("editLat").value = point.lat;
                 id: existingIndex >= 0 ? state.records[existingIndex].id : "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
                 lat: resolvedLat, lng: resolvedLng, name: resolvedName, code: resolvedCode, folderId, defect, urgency,
                 icon: existingIndex >= 0 ? state.records[existingIndex].icon : undefined,
-                needCorrection, // ★ 匯入時一併寫入打勾狀態
-                correctCode     // ★ 匯入時一併寫入正確圖號
+                needCorrection, 
+                correctCode     
               };
               if (existingIndex >= 0) state.records[existingIndex] = recordData;
               else state.records.push(recordData);
               importedCount++;
             }
             saveToLocalStorage();
+            
+            // [修改] 訊息顯示邏輯同步更新
             let msg = `✅ 匯入完成！成功匯入/更新 ${importedCount} 筆紀錄`;
             if (manualCount > 0) msg += `（含 ${manualCount} 筆 GPS 手動點位）`;
             msg += `。`;
-            if (skippedCount > 0) msg += `\n📐 有 ${skippedCount} 筆不在資料庫，已用圖號反推座標自動補全。`;
+            if (reverseResolvedCount > 0) msg += `\n📐 有 ${reverseResolvedCount} 筆不在資料庫，已用圖號反推座標自動補全。`;
+            if (skippedCount > 0) msg += `\n⚠️ 有 ${skippedCount} 筆圖號無法解析，已略過。`;
+            
             GlobalModal.alert(msg);
           } catch (err) { GlobalModal.alert("讀取檔案失敗！請確認格式是否正確。\n" + err.message); }
           e.target.value = "";
@@ -1844,11 +1904,20 @@ document.getElementById("editLat").value = point.lat;
           try {
             const parsed = JSON.parse(event.target.result);
             if (!parsed.folders || !parsed.records) throw new Error("格式錯誤");
-            GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋！", () => {
-              state.folders = parsed.folders; state.records = parsed.records;
-              state.hiddenRecordFolders.clear(); state.expandedFolders.clear();
-              state.selectedFolders.clear(); state.selectedRecords.clear();
-              saveToLocalStorage(); renderer.redraw(); GlobalModal.alert("還原成功！");
+GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋！", () => {
+              state.folders = parsed.folders; 
+              state.records = parsed.records;
+              
+              // [新增] 重置 lastFolderId，避免指向舊系統的幽靈資料夾
+              state.lastFolderId = state.records.length > 0 ? state.records[state.records.length - 1].folderId : null;
+
+              state.hiddenRecordFolders.clear(); 
+              state.expandedFolders.clear();
+              state.selectedFolders.clear(); 
+              state.selectedRecords.clear();
+              saveToLocalStorage(); 
+              renderer.redraw(); 
+              GlobalModal.alert("還原成功！");
             });
           } catch (err) { GlobalModal.alert("還原失敗：" + err.message); }
           e.target.value = "";
@@ -2035,7 +2104,7 @@ document.getElementById("editLat").value = point.lat;
                 setTimeout(() => {
                   GlobalModal.prompt("請輸入新資料夾名稱來建立：", "", (newName) => {
                     if (newName && newName.trim()) {
-                      const newId = Date.now().toString();
+                      const newId = generateId();
                       state.folders.push({ id: newId, name: newName.trim(), parentId: null });
                       state.expandedFolders.add(newId);
                       saveToLocalStorage();
@@ -2058,7 +2127,7 @@ document.getElementById("editLat").value = point.lat;
             // 完全沒有資料夾時，直接要求建立
             GlobalModal.prompt("目前尚未建立任何資料夾，請先建立資料夾：", "", (newName) => {
               if (newName && newName.trim()) {
-                const newId = Date.now().toString();
+                const newId = generateId();
                 state.folders.push({ id: newId, name: newName.trim(), parentId: null });
                 state.expandedFolders.add(newId);
                 saveToLocalStorage();
@@ -2075,28 +2144,60 @@ document.getElementById("editLat").value = point.lat;
 
         state.lastFolderId = folderId;
         
-        // 如果是編輯舊紀錄，先把「原本那筆」從資料庫拔除 (達成移動或覆蓋)
-        if (editRecordId) {
-          state.records = state.records.filter(r => r.id !== editRecordId);
+        // 1. 檢查目標資料夾內，是否已經有「同座標」的紀錄（且不是自己目前正在編輯的這筆）
+        const collisionRecord = state.records.find(
+          r => r.folderId === folderId && 
+               r.lat === lat && 
+               r.lng === lng && 
+               r.id !== editRecordId
+        );
+
+        // 獨立出實際寫入與 UI 更新的函式，方便後續呼叫
+        const performSave = () => {
+          // 拔除原本正在編輯的舊紀錄（達成更新或移動）
+          if (editRecordId) {
+            state.records = state.records.filter(r => r.id !== editRecordId);
+          }
+          
+          // 如果剛剛確認要覆蓋碰撞的紀錄，將其拔除
+          if (collisionRecord) {
+            state.records = state.records.filter(r => r.id !== collisionRecord.id);
+          }
+
+          // 寫入新紀錄 (請記得配合前一次的修正，使用 generateId() 產生新 ID)
+          state.records.push({
+            id: editRecordId || generateId(), 
+            lat, lng, name: customName, code, folderId, defect, urgency,
+            icon: customIcon || undefined,
+            needCorrection, 
+            correctCode     
+          });
+          
+          saveToLocalStorage();
+          map.closePopup();
+          
+          const btn = document.getElementById("sidebarSaveBtn");
+          btn.textContent = "✅ 已儲存";
+          btn.style.background = "#16a34a"; // 成功綠色回饋
+          setTimeout(() => { 
+            btn.textContent = "💾 儲存紀錄"; 
+            btn.style.background = ""; // 恢復原本顏色
+          }, 2000);
+        };
+
+        // 2. 判斷碰撞結果
+        if (collisionRecord) {
+          // 發生碰撞，攔截儲存並警告使用者
+          GlobalModal.confirm(
+            `⚠️ 目標資料夾內已存在相同座標的設備：\n「${escapeHtml(collisionRecord.name || collisionRecord.code)}」\n\n按下「確定」將覆蓋該筆紀錄，按下「取消」請重新選擇資料夾。`, 
+            () => {
+              performSave(); // 使用者確認覆蓋，執行儲存
+            }
+          );
+        } else {
+          // 無碰撞，直接安全儲存
+          performSave();
         }
-        
-        // 確保「目標資料夾」內不會有重複座標的紀錄打架
-        state.records = state.records.filter(r => r.folderId !== folderId || r.lat !== lat || r.lng !== lng);
-        
-        state.records.push({
-          id: editRecordId || ("rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 6)), // 沿用舊 ID 或產生新 ID
-          lat, lng, name: customName, code, folderId, defect, urgency,
-          icon: customIcon || undefined,
-          needCorrection, 
-          correctCode     
-        });
-        
-        saveToLocalStorage();
-        map.closePopup();
-        
-        const btn = document.getElementById("sidebarSaveBtn");
-        btn.textContent = "✅ 已儲存";
-        setTimeout(() => { btn.textContent = "💾 儲存紀錄"; }, 2000);
       }
       }); 
 
@@ -2151,8 +2252,20 @@ document.getElementById("editLat").value = point.lat;
       // 工具函式
       // ==========================================
       function setStatus(text) { statusBox.textContent = text; }
-      function escapeHtml(value) {
-        return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+ function escapeHtml(value) {
+        // 利用字串相加，強迫避開編輯器的自動轉碼渲染
+        const map = {
+          '&': '&' + 'amp;',
+          '<': '&' + 'lt;',
+          '>': '&' + 'gt;',
+          '"': '&' + 'quot;',
+          "'": '&' + '#39;'
+        };
+        return String(value ?? "").replace(/[&<>"']/g, m => map[m]);
+      }
+	  
+	  function generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
       }
       function formatNumber(value) { return new Intl.NumberFormat("zh-TW").format(value); }
       function debounce(fn, wait = 180) {
@@ -2397,9 +2510,36 @@ L.marker([point.lat, point.lng], {
 
       function searchMatches(search) {
         if (!search.prefixes.length && !search.terms.some(t => t.length >= 2)) return [];
-        const output = [];
-        for (const point of state.points) { if (state.area && point.area !== state.area) continue; if (matchesSearch(point, search)) output.push(point); }
-        return output.sort((a, b) => { const r = searchResultRank(a, search) - searchResultRank(b, search); return r !== 0 ? r : comparePointsByName(a, b); }).slice(0, 50);
+        
+        // [修改] 使用 Map 依據座標去重複，確保同位置的紀錄能覆蓋原始圖資
+        const outputMap = new Map();
+
+        // 1. 搜尋基礎圖資
+        for (const point of state.points) { 
+          if (state.area && point.area !== state.area) continue; 
+          if (matchesSearch(point, search)) {
+            outputMap.set(`${point.lat},${point.lng}`, point);
+          }
+        }
+
+        // 2. [新增] 搜尋使用者建立/編輯的巡視紀錄
+        for (const record of state.records) {
+          if (matchesSearch(record, search)) {
+            // 將紀錄加入結果，並加上特別的 area 標籤讓畫面顯示
+            outputMap.set(`${record.lat},${record.lng}`, {
+              ...record,
+              area: "📂 巡視紀錄" 
+            });
+          }
+        }
+
+        // 3. 轉回陣列、排序並取前 50 筆
+        return Array.from(outputMap.values())
+          .sort((a, b) => { 
+            const r = searchResultRank(a, search) - searchResultRank(b, search); 
+            return r !== 0 ? r : comparePointsByName(a, b); 
+          })
+          .slice(0, 50);
       }
 
 function renderDefectStats() {
