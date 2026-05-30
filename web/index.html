@@ -1,8 +1,11 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>土木設備分布地圖</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -130,6 +133,7 @@
       .tab-content {
         display: none;
         flex-direction: column;
+        height: 100%;
         min-height: 0;
         overflow: hidden;
       }
@@ -317,20 +321,31 @@
       .text-button:hover { text-decoration: underline; color: var(--accent); background: transparent; }
       .map-shell { min-width: 0; position: relative; }
       .map-locate-button {
+        align-items: center;
         background: rgba(255, 255, 255, 0.96);
         border: 1px solid var(--line);
         border-radius: 8px;
         box-shadow: var(--shadow);
         color: var(--accent-dark);
-        min-height: 40px;
-        padding: 0 14px;
+        display: inline-flex;
+        font-size: 22px;
+        font-weight: 900;
+        justify-content: center;
+        line-height: 1;
+        bottom: 18px;
+        height: 48px;
+        min-height: 48px;
+        min-width: 48px;
+        padding: 0;
         position: absolute;
         right: 14px;
-        top: 14px;
+        top: auto;
+        width: 48px;
         z-index: var(--control-z);
       }
       .map-locate-button:hover { background: #eef8f9; }
       .map-locate-button.is-active { background: var(--blue); border-color: var(--blue); color: #fff; }
+      .leaflet-control-zoom { display: none !important; }
       #map { background: #edf3f5; height: 100%; width: 100%; }
       .status {
         background: rgba(255, 255, 255, 0.94);
@@ -400,18 +415,14 @@
       }
       .btn-save-record:hover { background: #c27a1e; }
 
-/* ==========================================
-       * 混合型徽章：可容納 Emoji 或 1~3字中文
-       * 自動延展寬度的膠囊形狀 (Pill shape)
-       * ========================================== */
       .saved-badge-marker {
         display: inline-flex;
         justify-content: center;
         align-items: center;
-        min-width: 26px; /* 確保單個Emoji時是正圓形 */
+        min-width: 26px;
         height: 26px;
-        padding: 0 6px;  /* 讓文字左右有呼吸空間 */
-        border-radius: 13px; /* 膠囊圓角 */
+        padding: 0 6px;
+        border-radius: 13px;
         font-size: 13px;
         font-weight: 900;
         color: #fff;
@@ -419,12 +430,11 @@
         box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         cursor: pointer;
         transition: transform 0.15s;
-        white-space: nowrap; /* 確保文字不換行 */
+        white-space: nowrap;
         line-height: 1;
       }
       .saved-badge-marker:hover { transform: scale(1.15); }
 
-      /* 預覽列的徽章同步樣式 */
       .icon-auto-preview .preview-badge {
         display: inline-flex;
         justify-content: center;
@@ -533,9 +543,6 @@
       .map-search-stats { display: flex; gap: 8px; font-size: 11px; color: var(--muted); padding: 6px 12px; }
       .map-search-results { overflow-y: auto; flex: 1; min-height: 0; padding: 0 10px 10px; }
       .map-search-results .result-item { margin-bottom: 6px; }
-	  /* ==========================================
-       * 🎨 地圖圖示與按鈕優化樣式
-       * ========================================== */
       .icon-chip-btn {
         background: #fff;
         border: 1px solid var(--line);
@@ -562,6 +569,566 @@
       }
       #sidebar-icon-auto-btn {
         transition: all 0.2s;
+      }
+
+      @media (max-width: 768px) {
+        html, body, .app {
+          height: 100dvh;
+          overflow: hidden;
+        }
+
+        body {
+          background: #edf3f5;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .app,
+        .app.is-panel-collapsed {
+          display: block;
+          min-height: 100dvh;
+        }
+
+        .map-shell {
+          height: 100dvh;
+          width: 100vw;
+        }
+
+        #map {
+          height: 100dvh;
+          width: 100vw;
+        }
+
+        .top-controls {
+          align-items: flex-end;
+          display: grid;
+          grid-template-columns: auto 44px;
+          gap: 8px;
+          left: auto;
+          right: calc(10px + env(safe-area-inset-right, 0px));
+          top: calc(10px + env(safe-area-inset-top, 0px));
+          width: auto;
+        }
+
+        #panelToggle {
+          display: inline-flex !important;
+          grid-column: 2;
+          grid-row: 1;
+          position: relative;
+          z-index: 2;
+        }
+
+        #toggleLabelsBtn.mobile-map-label-toggle {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        #mapSearchToggle {
+          grid-column: 1 / span 2;
+          grid-row: 2;
+          justify-self: end;
+        }
+
+        body.is-panel-open .top-controls {
+          opacity: 0.95;
+        }
+
+        .icon-button,
+        .map-search-btn,
+        .map-locate-button {
+          min-height: 44px;
+          box-shadow: 0 8px 22px rgba(22, 36, 52, 0.2);
+        }
+
+        .icon-button {
+          height: 44px;
+          width: 44px;
+        }
+
+        .map-search-btn {
+          border-radius: 8px;
+          min-width: 88px;
+        }
+
+        .map-locate-button {
+          bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+          border-radius: 10px;
+          height: 48px;
+          min-height: 48px;
+          min-width: 48px;
+          padding: 0;
+          right: calc(12px + env(safe-area-inset-right, 0px));
+          top: auto;
+          width: 48px;
+        }
+
+        .panel {
+          border: 1px solid var(--line);
+          border-bottom: 0;
+          border-radius: 18px 18px 0 0;
+          bottom: 0;
+          box-shadow: 0 -14px 36px rgba(22, 36, 52, 0.22);
+          height: calc(100dvh - 72px - env(safe-area-inset-top, 0px));
+          left: 0;
+          max-height: calc(100dvh - 74px - env(safe-area-inset-top, 0px));
+          position: fixed;
+          right: 0;
+          grid-template-rows: auto minmax(0, 1fr);
+          transform: translateY(0);
+          transition: transform 220ms ease;
+          width: 100vw;
+          z-index: calc(var(--control-z) + 40);
+        }
+
+        .panel::before {
+          background: #cbd5e1;
+          border-radius: 999px;
+          content: "";
+          height: 4px;
+          left: 50%;
+          position: absolute;
+          top: 8px;
+          transform: translateX(-50%);
+          width: 44px;
+          z-index: 2;
+        }
+
+        .panel.is-collapsed {
+          background: transparent;
+          border: 0;
+          box-shadow: none;
+          pointer-events: none;
+          transform: translateY(100%);
+        }
+
+        .panel.is-collapsed > * {
+          display: none;
+        }
+
+        .panel-head {
+          display: none;
+        }
+
+        .panel-title {
+          display: none;
+        }
+
+        h1 {
+          font-size: 21px;
+        }
+
+        .btn-global-toggle {
+          min-height: 44px;
+        }
+
+        .tab-nav {
+          overflow-x: auto;
+          overscroll-behavior-x: contain;
+          scrollbar-width: none;
+        }
+
+        .tab-nav {
+          border-radius: 18px 18px 0 0;
+        }
+
+        .tab-nav::-webkit-scrollbar {
+          display: none;
+        }
+
+        .tab-btn {
+          flex: 1 0 33.33%;
+          min-height: 48px;
+          white-space: nowrap;
+        }
+
+        #tabRecords,
+        #tabStats,
+        #tabEdit {
+          height: 100%;
+          min-height: 0;
+        }
+
+        .folders-section,
+        #editFormScrollArea,
+        #defectStatsContent,
+        .results,
+        .map-search-results,
+        .popup-right {
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+        }
+
+        .folders-section {
+          padding: 12px 16px 18px;
+        }
+
+        .folder-header > div,
+        .folder-btn-group,
+        .folder-actions {
+          gap: 8px;
+        }
+
+        .btn-action,
+        .btn-small,
+        .record-item,
+        .result-item,
+        select,
+        input[type="search"],
+        input[type="text"],
+        button {
+          min-height: 44px;
+        }
+
+        .btn-small {
+          align-items: center;
+          display: inline-flex;
+          justify-content: center;
+          padding: 6px 10px;
+        }
+
+        .folder-item {
+          border-radius: 10px;
+          padding: 10px;
+        }
+
+        .folder-name-toggle {
+          font-size: 15px;
+          min-height: 32px;
+        }
+
+        .record-item {
+          padding: 10px;
+        }
+
+        .record-item-title {
+          white-space: normal;
+        }
+
+        #editFormScrollArea {
+          padding: 10px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+        }
+
+        #tabEdit > div:first-child {
+          padding: 10px 16px;
+        }
+
+        #editPanelTitle {
+          font-size: 17px !important;
+          line-height: 1.25;
+          white-space: normal !important;
+        }
+
+        #editPanelMeta {
+          line-height: 1.35;
+        }
+
+        #editPanelActions {
+          align-self: stretch;
+          margin-left: auto;
+        }
+
+        #editPanelActions a {
+          align-items: center !important;
+          border-radius: 8px !important;
+          justify-content: center !important;
+          min-height: 40px;
+          min-width: 56px;
+          padding: 0 8px !important;
+          white-space: nowrap;
+        }
+
+        #editFormContainer {
+          gap: 10px !important;
+        }
+
+        #editFormContainer label {
+          font-size: 13px !important;
+        }
+
+        #sidebar-name-input,
+        #sidebar-defect-input,
+        #sidebar-correct-code-input,
+        #sidebar-folder,
+        #sidebar-urgency {
+          border-radius: 8px !important;
+          font-size: 16px !important;
+          min-height: 44px !important;
+          padding-left: 10px !important;
+          padding-right: 10px !important;
+        }
+
+        #sidebar-correction-flag {
+          height: 20px !important;
+          width: 20px !important;
+        }
+
+        #sidebar-correction-flag + span {
+          font-size: 13px !important;
+        }
+
+        #sidebar-defect-groups {
+          display: grid;
+          gap: 8px;
+        }
+
+        #sidebar-defect-groups .defect-group {
+          border-radius: 10px !important;
+          margin-top: 0 !important;
+          padding: 8px !important;
+        }
+
+        #sidebar-defect-groups .defect-group summary {
+          min-height: 34px;
+          display: flex;
+          align-items: center;
+        }
+
+        .defect-chip-btn {
+          border-radius: 9px !important;
+          flex: 1 1 calc(50% - 6px) !important;
+          min-height: 48px !important;
+        }
+
+        #sidebar-icon-current-display {
+          min-width: 38px !important;
+          height: 38px !important;
+          border-radius: 19px !important;
+        }
+
+        #tabEdit > div:last-child {
+          gap: 10px !important;
+          padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+        }
+
+        #tabEdit > div:last-child > div:first-child {
+          display: flex !important;
+        }
+
+        #tabEdit > div:last-child,
+        #tabRecords > div:last-child,
+        #tabStats > div:last-child {
+          padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        }
+
+        #sidebarSaveBtn {
+          border-radius: 12px;
+          flex-grow: 1;
+          font-size: 16px;
+          min-height: 52px;
+        }
+
+        .mobile-map-label-toggle {
+          border-radius: 8px;
+          box-shadow: 0 8px 22px rgba(22, 36, 52, 0.2);
+          min-height: 44px;
+          min-width: 108px;
+          padding: 0 12px;
+          white-space: nowrap;
+        }
+
+        .map-search-panel {
+          border-radius: 14px;
+          left: auto;
+          max-height: calc(100dvh - 74px - env(safe-area-inset-top, 0px));
+          right: calc(10px + env(safe-area-inset-right, 0px));
+          top: calc(64px + env(safe-area-inset-top, 0px));
+          width: min(370px, calc(100vw - 20px));
+        }
+
+        .map-search-inner {
+          padding: 12px;
+        }
+
+        .map-search-inner select,
+        .map-search-inner input {
+          font-size: 16px;
+          min-height: 44px;
+        }
+
+        .map-search-stats {
+          flex-wrap: wrap;
+          row-gap: 4px;
+        }
+
+        .map-search-results {
+          padding: 0 10px 12px;
+        }
+
+        .map-search-results .result-item {
+          border-radius: 10px;
+          padding: 12px;
+        }
+
+        .leaflet-control-zoom {
+          display: none !important;
+        }
+
+        .leaflet-popup-content {
+          max-width: calc(100vw - 58px) !important;
+          min-width: min(260px, calc(100vw - 70px)) !important;
+        }
+
+        .custom-modal-overlay {
+          align-items: flex-end;
+          padding: 12px;
+        }
+
+        .custom-modal-box {
+          border-radius: 16px;
+          margin-bottom: env(safe-area-inset-bottom, 0px);
+          max-width: none;
+          width: 100%;
+        }
+      }
+
+      @media (max-height: 520px) and (orientation: landscape) and (pointer: coarse),
+             (max-width: 980px) and (max-height: 520px) and (orientation: landscape) {
+        .app,
+        .app.is-panel-collapsed {
+          display: block;
+          min-height: 100dvh;
+        }
+
+        .map-shell {
+          height: 100dvh;
+          width: 100vw;
+        }
+
+        #map {
+          height: 100dvh;
+          width: 100vw;
+        }
+
+        .top-controls {
+          align-items: flex-end;
+          display: grid;
+          grid-template-columns: auto 44px;
+          gap: 8px;
+          left: auto;
+          right: calc(10px + env(safe-area-inset-right, 0px));
+          top: calc(10px + env(safe-area-inset-top, 0px));
+        }
+
+        #panelToggle {
+          display: inline-flex !important;
+          grid-column: 2;
+          grid-row: 1;
+          position: relative;
+          z-index: 2;
+        }
+
+        #toggleLabelsBtn.mobile-map-label-toggle {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        #mapSearchToggle {
+          grid-column: 1 / span 2;
+          grid-row: 2;
+          justify-self: end;
+        }
+
+        body.is-panel-open .top-controls {
+          right: calc(min(430px, 52vw) + 10px + env(safe-area-inset-right, 0px));
+        }
+
+        .icon-button,
+        .map-search-btn,
+        .mobile-map-label-toggle {
+          min-height: 44px;
+          box-shadow: 0 8px 22px rgba(22, 36, 52, 0.2);
+        }
+
+        .icon-button {
+          height: 44px;
+          width: 44px;
+        }
+
+        .map-search-btn {
+          border-radius: 8px;
+          min-width: 88px;
+        }
+
+        .mobile-map-label-toggle {
+          border-radius: 8px;
+          min-height: 44px;
+          min-width: 108px;
+          padding: 0 12px;
+          white-space: nowrap;
+        }
+
+        .map-search-panel {
+          bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+          left: auto;
+          max-height: none;
+          top: calc(62px + env(safe-area-inset-top, 0px));
+          right: calc(10px + env(safe-area-inset-right, 0px));
+          width: min(360px, calc(100vw - 20px));
+        }
+
+        .panel {
+          border: 1px solid var(--line);
+          border-right: 0;
+          border-radius: 18px 0 0 18px;
+          bottom: 0;
+          height: 100dvh;
+          left: calc(100vw - min(430px, 52vw));
+          max-height: none;
+          right: auto;
+          top: 0;
+          transform: translateX(0);
+          width: min(430px, 52vw);
+        }
+
+        .panel::before {
+          height: 44px;
+          left: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+        }
+
+        .panel.is-collapsed {
+          transform: translateX(100%);
+        }
+
+        .tab-nav {
+          border-radius: 18px 0 0 0;
+          padding-left: 10px;
+        }
+
+        .tab-btn {
+          min-height: 44px;
+        }
+
+        #tabEdit > div:first-child {
+          padding: 8px 14px;
+        }
+
+        #editFormScrollArea,
+        .folders-section,
+        #defectStatsContent {
+          padding-left: 14px !important;
+          padding-right: 14px !important;
+        }
+
+        .map-locate-button {
+          bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+          height: 48px;
+          min-height: 48px;
+          min-width: 48px;
+          right: calc(14px + env(safe-area-inset-right, 0px));
+          top: auto;
+          width: 48px;
+        }
+
+        .leaflet-control-zoom {
+          display: none !important;
+        }
+
+        .status {
+          bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+          max-width: min(64vw, 520px);
+        }
       }
     </style>
   </head>
@@ -627,7 +1194,7 @@
           <div class="panel-title"><h1>土木設備分布地圖</h1></div>
           <button id="toggleLabelsBtn" class="btn-global-toggle">隱藏所有主圖標籤</button>
         </header>
- <nav class="tab-nav">
+        <nav class="tab-nav">
           <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
           <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
           <button class="tab-btn" id="tabEditBtn">📝 編輯紀錄</button>
@@ -688,28 +1255,23 @@
                 <h2 id="editPanelTitle" style="font-size:16px; color:var(--accent-dark); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">請選擇設備</h2>
                 <div id="editPanelMeta" style="font-size:11px; color:var(--muted);">在地圖點擊進行編輯</div>
               </div>
-              
-<!-- 修改點 1：將 flex-direction 改為 row，並微調 padding 與字體大小 -->
               <div id="editPanelActions" style="display:none; flex-direction:row; gap:6px; flex-shrink:0; align-items:center;">
                 <a id="sidebarNavBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🗺️ 導航</a>
                 <a id="sidebarStreetBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🏙️ 街景</a>
               </div>
             </div>
-            
             <div id="editPanelWarning" style="margin-top:6px;"></div>
             <input type="hidden" id="editLat">
             <input type="hidden" id="editLng">
             <input type="hidden" id="editCode">
-			<input type="hidden" id="editRecordId">
+            <input type="hidden" id="editRecordId">
           </div>
 
           <div id="editFormScrollArea" style="flex:1; overflow-y:auto; padding:14px 18px;">
             <div id="editFormContainer" style="display:none; flex-direction:column; gap:8px;">
-              
               <label style="font-size:12px; font-weight:bold;">🏷️ 設備名稱
                 <input id="sidebar-name-input" type="text" style="width:100%; min-height:32px; padding:4px 8px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
               </label>
-
               <div style="margin-top:4px; padding:6px; background:#fef2f2; border:1px dashed #fca5a5; border-radius:4px;">
                 <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                   <input type="checkbox" id="sidebar-correction-flag" style="width:16px; height:16px; cursor:pointer;">
@@ -720,7 +1282,6 @@
                   <button type="button" id="btn-fill-gps-code" style="white-space:nowrap; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:4px; font-size:12px; padding:0 8px; cursor:pointer; font-weight:bold; transition:all 0.2s;">📍 定位帶入</button>
                 </div>
               </div>
-
               <div style="display:flex; gap:8px;">
                 <label style="font-size:12px; font-weight:bold; flex:2;">📁 存入資料夾
                   <select id="sidebar-folder" style="width:100%; min-height:32px; padding:4px 6px; font-size:13px; margin-top:3px; border:1px solid #ccc; border-radius:4px;"></select>
@@ -734,16 +1295,11 @@
                   </select>
                 </label>
               </div>
-
-              
-
               <label style="font-size:12px; font-weight:bold; margin-top:8px;">🔧 不良項目
                 <input type="text" id="sidebar-defect-input" placeholder="輸入或點選標籤" style="width:100%; min-height:28px; padding:4px 8px; font-size:12px; border:1px solid #94a3b8; border-radius:4px; box-sizing:border-box; margin-top:3px;">
               </label>
-              <div id="sidebar-defect-groups">
-                 </div>
-<label style="font-size:12px; font-weight:bold; margin-top:8px;">🎨 地圖圖示</label>
-              
+              <div id="sidebar-defect-groups"></div>
+              <label style="font-size:12px; font-weight:bold; margin-top:8px;">🎨 地圖圖示</label>
               <div style="display:flex; align-items:center; justify-content:space-between; margin-top:3px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span id="icon-status-text" style="font-size:13px; color:var(--text); font-weight:bold;">自動判斷：</span>
@@ -755,23 +1311,23 @@
                 </div>
               </div>
               <input type="hidden" id="sidebar-icon-input" value="">
-
               <div id="sidebar-icon-groups" style="display:none; border:1px solid var(--line); border-radius:6px; padding:8px; background:#fff; margin-top:6px; flex-direction:column; gap:6px;">
               </div>
-
-            </div> </div> <div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-top:1px solid var(--line); background:#fff; gap:8px; z-index:10; box-shadow:0 -2px 10px rgba(0,0,0,0.05);">
+            </div>
+          </div>
+          <div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-top:1px solid var(--line); background:#fff; gap:8px; z-index:10; box-shadow:0 -2px 10px rgba(0,0,0,0.05);">
             <div style="display:flex; gap:6px;">
               <button id="editScrollTopBtn" style="min-height:32px; padding:0 12px; font-size:12px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▲</button>
               <button id="editScrollBotBtn" style="min-height:32px; padding:0 12px; font-size:12px; background:#f1f5f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:20px; font-weight:bold;">▼</button>
             </div>
             <button id="sidebarSaveBtn" class="btn-save-record" style="margin-top:0; width:auto; flex-grow:1;" disabled>💾 儲存紀錄</button>
           </div>
-
-        </div> </aside>
+        </div>
+      </aside>
 
       <section class="map-shell">
         <div id="map"></div>
-        <button id="locateButton" class="map-locate-button" type="button" aria-pressed="false" title="定位目前位置">定位</button>
+        <button id="locateButton" class="map-locate-button" type="button" aria-label="定位目前位置" aria-pressed="false" title="定位目前位置">⌖</button>
         <div id="status" class="status">載入資料中...</div>
       </section>
     </main>
@@ -839,15 +1395,11 @@
         });
       }
 
-      const tabSearchBtn  = document.getElementById("tabSearchBtn");
-      const tabRecordsBtn = document.getElementById("tabRecordsBtn");
-      const tabSearch  = document.getElementById("tabSearch");
-      const tabRecords = document.getElementById("tabRecords");
-
-// ==========================================
+      // ==========================================
       // 分頁切換 (新增了 'edit' 分頁支援)
       // ==========================================
       function switchTab(tabId) {
+        document.getElementById("panel").dataset.activeTab = tabId;
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('is-active'));
         
@@ -861,42 +1413,69 @@
         } else if (tabId === 'edit') {
           document.getElementById('tabEditBtn').classList.add('is-active');
           document.getElementById('tabEdit').classList.add('is-active');
-          renderDefectStats();
 
-          // ★ 新增：切換到「編輯紀錄」的瞬間，強制重新整理資料夾下拉選單
           const folderSelect = document.getElementById("sidebar-folder");
           if (folderSelect) {
             const currentVal = folderSelect.value;
             const folderExists = state.folders.some(f => f.id === currentVal);
-            // 如果原本選的資料夾還在就保持，不在了就退回系統最後使用的資料夾
             const valueToSelect = folderExists ? currentVal : state.lastFolderId;
             folderSelect.innerHTML = getFolderOptionsHtml(valueToSelect);
           }
         }
+
+        window.setTimeout(() => map.invalidateSize(), 120);
       }
       document.getElementById('tabRecordsBtn').addEventListener('click', () => switchTab('records'));
       document.getElementById('tabStatsBtn').addEventListener('click',   () => switchTab('stats'));
       document.getElementById('tabEditBtn').addEventListener('click',    () => switchTab('edit'));
-	  
+      
       const mapSearchPanel = document.getElementById("mapSearchPanel");
+      const isMobileLayout = () => window.matchMedia("(max-width: 768px), (max-height: 520px) and (orientation: landscape) and (pointer: coarse), (max-width: 980px) and (max-height: 520px) and (orientation: landscape)").matches;
+      function syncMobileMapControls() {
+        const labelsBtn = document.getElementById("toggleLabelsBtn");
+        const topControls = document.querySelector(".top-controls");
+        const panelHead = document.querySelector(".panel-head");
+        if (!labelsBtn || !topControls || !panelHead) return;
+
+        if (isMobileLayout()) {
+          if (labelsBtn.parentElement !== topControls) topControls.append(labelsBtn);
+          labelsBtn.classList.add("mobile-map-label-toggle");
+          labelsBtn.textContent = state.labelsHidden ? "顯示標籤" : "隱藏標籤";
+        } else {
+          if (labelsBtn.parentElement !== panelHead) panelHead.append(labelsBtn);
+          labelsBtn.classList.remove("mobile-map-label-toggle");
+          labelsBtn.textContent = state.labelsHidden ? "顯示所有主圖標籤" : "隱藏所有主圖標籤";
+        }
+      }
+      function collapsePanelControl() {
+        setPanelCollapsed(true);
+        const panelToggle = document.getElementById("panelToggle");
+        panelToggle.setAttribute("aria-expanded", "false");
+        panelToggle.title = "展開面板";
+      }
+      function collapseFloatingControls() {
+        mapSearchPanel.classList.remove("is-open");
+        collapsePanelControl();
+      }
       document.getElementById("mapSearchToggle").addEventListener("click", () => {
-        mapSearchPanel.classList.toggle("is-open");
+        const willOpen = !mapSearchPanel.classList.contains("is-open");
+        if (willOpen) collapsePanelControl();
+        mapSearchPanel.classList.toggle("is-open", willOpen);
       });
       document.getElementById("mapSearchClose").addEventListener("click", () => {
         mapSearchPanel.classList.remove("is-open");
       });
-    // ==========================================
+
+      // ==========================================
       // 初始化側邊欄的靜態表單選項
       // ==========================================
       function initSidebarForm() {
-        // 渲染圖示群組
         const groupsHtml = ICON_GROUPS.map(group => {
           const chipsHtml = group.icons.map(ico => `<button type="button" class="icon-chip-btn" data-icon="${escapeHtml(ico)}" title="${escapeHtml(ico)}">${ico}</button>`).join("");
           return `<div style="display:flex; align-items:center; gap:3px; flex-wrap:wrap; margin-bottom:2px;"><span style="font-size:10px; color:var(--muted); width:28px; flex-shrink:0; text-align:right; padding-right:4px;">${escapeHtml(group.label)}</span>${chipsHtml}</div>`;
         }).join("");
         document.getElementById("sidebar-icon-groups").innerHTML = groupsHtml;
 
-        // 渲染不良項目快捷群組 (放在固定的側邊欄，徹底解決收合 Bug)
         const defectGroupsHtml = DEFECT_GROUPS.map(group => {
           const chipsHtml = group.items.map(opt => {
              const len = opt.length;
@@ -916,7 +1495,6 @@
         }).join("");
         document.getElementById("sidebar-defect-groups").innerHTML = defectGroupsHtml;
 
-        // 綁定編輯分頁的頂部/底部滾動按鈕
         document.getElementById('editScrollTopBtn').addEventListener('click', () => { document.getElementById('editFormScrollArea').scrollTo({ top: 0, behavior: 'smooth' }); });
         document.getElementById('editScrollBotBtn').addEventListener('click', () => { const el = document.getElementById('editFormScrollArea'); el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); });
       }
@@ -928,20 +1506,12 @@
         document.getElementById("editFormContainer").style.display = "flex";
         document.getElementById("sidebarSaveBtn").disabled = false;
 
-        // ★ 修正：優先使用唯一 ID 尋找紀錄，避免同座標多筆紀錄互相干擾
-        let existingRecord = null;
-        if (point.id) {
-          existingRecord = state.records.find(r => r.id === point.id);
-        } else {
-          // 如果沒有 ID (例如直接從搜尋或地圖空白處點擊)，才退回使用座標尋找
-          existingRecord = state.records.find(r => r.lat === point.lat && r.lng === point.lng);
-        }
+        const existingRecord = state.records.find(r => r.id === point.id)
+          || state.records.find(r => isSameMapPoint(r, point));
         
-        // 紀錄目前正在編輯的 ID
         document.getElementById("editRecordId").value = existingRecord ? existingRecord.id : "";
-        const allRecordsForPoint = state.records.filter(r => r.lat === point.lat && r.lng === point.lng);
+        const allRecordsForPoint = state.records.filter(r => isSameMapPoint(r, point));
 
-        // 標題與隱藏座標
         document.getElementById("editPanelTitle").textContent = point.name || "未命名設備";
         document.getElementById("editPanelMeta").textContent = `圖號：${point.code || ""} | 座標：${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
         
@@ -952,20 +1522,17 @@
         }
         document.getElementById("editPanelWarning").innerHTML = warningHtml;
 
-document.getElementById("editLat").value = point.lat;
+        document.getElementById("editLat").value = point.lat;
         document.getElementById("editLng").value = point.lng;
         document.getElementById("editCode").value = point.code || "";
 
-        // ★ 新增這三行：動態更新導航與街景的網址
         document.getElementById("editPanelActions").style.display = "flex";
         document.getElementById("sidebarNavBtn").href = googleNavUrl(point);
         document.getElementById("sidebarStreetBtn").href = streetViewUrl(point);
 
-        // 填入表單值
         document.getElementById("sidebar-name-input").value = existingRecord ? (existingRecord.name || point.name || "手動新增設備") : (point.name || "手動新增設備");
         document.getElementById("sidebar-defect-input").value = existingRecord ? (existingRecord.defect || "") : "";
         document.getElementById("sidebar-urgency").value = existingRecord ? (existingRecord.urgency || "C") : "C";
-        // ★ 載入修正提醒與正確圖號
         const isCorrectionNeeded = existingRecord ? !!existingRecord.needCorrection : false;
         document.getElementById("sidebar-correction-flag").checked = isCorrectionNeeded;
         document.getElementById("sidebar-correct-code-container").style.display = isCorrectionNeeded ? "flex" : "none";
@@ -973,22 +1540,19 @@ document.getElementById("editLat").value = point.lat;
         const defaultFolderId = existingRecord ? existingRecord.folderId : (state.lastFolderId || null);
         document.getElementById("sidebar-folder").innerHTML = getFolderOptionsHtml(defaultFolderId);
 
-// 圖示處理
         const currentIcon = existingRecord ? (existingRecord.icon || "") : "";
         document.getElementById("sidebar-icon-input").value = currentIcon;
         document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => {
           btn.classList.toggle("is-selected", btn.dataset.icon === currentIcon);
         });
 
-        // ★ 預覽更新：直接呼叫我們剛剛寫好的新函數
         updateSidebarIconPreview();
 
-        // 切換面板並開啟
         switchTab('edit');
         setPanelCollapsed(false);
       }
 
-// ==========================================
+      // ==========================================
       // 地圖上的迷你導航小視窗 (精簡版)
       // ==========================================
       function miniPopupHtml(point) {
@@ -998,6 +1562,7 @@ document.getElementById("editLat").value = point.lat;
             <div class="popup-meta" style="margin-bottom:2px;">圖號：${escapeHtml(point.code || "")}</div>
           </div>`;
       }
+
       // ==========================================
       // 座標轉換：WGS84 → TWD67 TM2
       // ==========================================
@@ -1122,7 +1687,6 @@ document.getElementById("editLat").value = point.lat;
       const statusBox         = document.querySelector("#status");
       const folderList        = document.querySelector("#folderList");
       const selectedCountText = document.getElementById("selectedCount");
-      const batchActionBar    = document.getElementById("batchActionBar");
       const areaSelect        = document.getElementById("areaSelect");
       const searchInput       = document.getElementById("searchInput");
       const results           = document.getElementById("results");
@@ -1130,44 +1694,41 @@ document.getElementById("editLat").value = point.lat;
       const totalCount        = document.getElementById("totalCount");
       const visibleCount      = document.getElementById("visibleCount");
       const drawCount         = document.getElementById("drawCount");
+      window.addEventListener("resize", debounce(syncMobileMapControls, 120));
 
       let labelsLayer  = L.layerGroup().addTo(map);
       let recordsLayer = L.featureGroup().addTo(map);
 
-
-       // ==========================================
+      // ==========================================
       // ★ 混合圖示系統（Emoji + 1~3字短文字）
       // ==========================================
-
       const ICON_GROUPS = [
        { label: "外力",   icons: ["🌳樹", "🎋竹", "🌿藤","🌴椰", "🐦巢"] },
-	   { label: "狀態",   icons: ["⚠️","💤游休",  "📐設計", "✅已設計"] },
-	   { label: "設備",   icons: ["TR️", "DS", "GS", "AGS", "PAD"] },
-	   { label: "土木",   icons: [ "🚧", "⛏️", "🔩", "🔧", "🚨"] },
-	   { label: "其他",   icons: ["⭐", "🧤", "⚡", "💥", "💡"] }
+       { label: "狀態",   icons: ["⚠️","💤游休",  "📐設計", "✅已設計"] },
+       { label: "設備",   icons: ["TR️", "DS", "GS", "AGS", "PAD"] },
+       { label: "土木",   icons: [ "🚧", "⛏️", "🔩", "🔧", "🚨"] },
+       { label: "其他",   icons: ["⭐", "🧤", "⚡", "💥", "💡"] }
       ];
 
       const DEFECT_ICON_RULES = [
         { pattern: /椰/,                   icon: "🌴椰" },
-		{ pattern: /竹/,  icon: "🎋竹" },
-		{ pattern: /藤/,  icon: "🌿藤" },
+        { pattern: /竹/,  icon: "🎋竹" },
+        { pattern: /藤/,  icon: "🌿藤" },
         { pattern: /樹木修剪|樹/,  icon: "🌳樹" },
         { pattern: /鳥/,                   icon: "🐦巢" },
-        { pattern: /脫落/,     icon: "脫落" }, // 替換為短文字
-        { pattern: /游休/,                      icon: "💤游休" }, // 替換為短文字
-        { pattern: /設計|圖面|測量/,             icon: "📐設計" }, // 替換為短文字
-		{ pattern: /裸露/,             icon: "🧤裸露" }, // 替換為短文字
+        { pattern: /脫落/,      icon: "脫落" },
+        { pattern: /游休/,                       icon: "💤游休" },
+        { pattern: /設計|圖面|測量/,              icon: "📐設計" },
+        { pattern: /裸露/,              icon: "🧤裸露" },
       ];
-// ==========================================
-      // ★ 更新側邊欄圖示預覽與按鈕狀態
-      // ==========================================
+
       function updateSidebarIconPreview() {
         const defectVal = document.getElementById("sidebar-defect-input").value;
         const manualIcon = document.getElementById("sidebar-icon-input").value;
         const autoIcon = autoDetectIcon(defectVal);
         const displayEl = document.getElementById("sidebar-icon-current-display");
         const autoBtn = document.getElementById("sidebar-icon-auto-btn");
-        const statusText = document.getElementById("icon-status-text"); // 抓取狀態文字
+        const statusText = document.getElementById("icon-status-text");
 
         const finalIcon = manualIcon || autoIcon;
 
@@ -1176,50 +1737,35 @@ document.getElementById("editLat").value = point.lat;
           displayEl.style.backgroundColor = getBadgeBgColor(finalIcon);
         }
 
-        // 更新文字與「恢復自動」按鈕的顯示狀態
         if (manualIcon) {
           if (statusText) statusText.textContent = "手動指定：";
-          if (autoBtn) autoBtn.style.display = "block"; // 只有在手動模式下才顯示「恢復自動」
+          if (autoBtn) autoBtn.style.display = "block";
         } else {
           if (statusText) statusText.textContent = "自動判斷：";
-          if (autoBtn) autoBtn.style.display = "none"; // 自動模式下隱藏，節省空間
+          if (autoBtn) autoBtn.style.display = "none";
         }
       }
- // ── 1. 自動判斷圖示邏輯 (加入預設圖示) ──
+
       function autoDetectIcon(defect) {
         const d = (defect || "").trim();
-        
-        // ★ 當沒有輸入不良項目時，給予預設圖示 ⭐，避免出現灰底空圓圈
-        if (!d || d === "無") return "⭐"; 
-        
+        if (!d || d === "無") return "⭐";
         for (const { pattern, icon } of DEFECT_ICON_RULES) {
           if (pattern.test(d)) return icon;
         }
-        
-        // ★ 有不良項目，但在 DEFECT_ICON_RULES 找不到對應關鍵字時，預設給「⭐」
-        return "⭐"; 
+        return "⭐";
       }
 
-
-// ── 2. 動態給予膠囊徽章背景色 (加入預設圖示的專屬顏色) ──
       function getBadgeBgColor(icon) {
-        if (["🚨", "火", "停用"].includes(icon)) return "#dc2626"; // 紅色 (危險)
-        if (["⚠️", "🐦巢", "🧤裸露"].includes(icon)) return "#d97706"; // 橘黃 (警告/修繕)
-        if (["TR️", "DS", "GS", "AGS", "PAD"].includes(icon)) return "#F700FF"; // 紫色
-        if (["✅"].includes(icon)) return "#16a34a"; // 綠色 (正常)
-        if (["🌳樹", "🎋竹", "🌿藤", "🌴椰"].includes(icon)) return "#4d7c0f"; // 橄欖綠 (外力/環境)
-        if (["脫落", "⚡", "電桿", "箱體", "💤游休", "📐設計"].includes(icon)) return "#2563eb"; // 藍色 (設施/工程)
-        
-        // ★ 為預設的圖釘 ⭐ 加上質感的深青色背景
-        if (["⭐"].includes(icon)) return "#0f766e"; 
-        
-        return "#64748b"; // 其他未設定的預設灰底 (例如 ⭐)
+        if (["🚨", "火", "停用"].includes(icon)) return "#dc2626";
+        if (["⚠️", "🐦巢", "🧤裸露"].includes(icon)) return "#d97706";
+        if (["TR️", "DS", "GS", "AGS", "PAD"].includes(icon)) return "#F700FF";
+        if (["✅"].includes(icon)) return "#16a34a";
+        if (["🌳樹", "🎋竹", "🌿藤", "🌴椰"].includes(icon)) return "#4d7c0f";
+        if (["脫落", "⚡", "電桿", "箱體", "💤游休", "📐設計"].includes(icon)) return "#2563eb";
+        if (["⭐"].includes(icon)) return "#0f766e";
+        return "#64748b";
       }
-      /**
-       * getRecordIcon(record)
-       * 取得紀錄最終顯示圖示
-       * 優先順序：自訂圖示 > 不良類型自動判斷
-       */
+
       function getRecordIcon(record) {
         return record.icon || autoDetectIcon(record.defect);
       }
@@ -1250,7 +1796,7 @@ document.getElementById("editLat").value = point.lat;
 
       const DEFECT_GROUPS = [
         { label: "常用", open: true,  items: ["樹木修剪", "藤蔓清除", "竹枝清除", "椰樹修剪", "鳥巢"] },
-		{ label: "裸露", open: false,  items: ["接線環裸露", "拉線夾板裸露", "FC裸露", "TR一次裸露", "電纜接頭裸露", "GS裸露"] },
+        { label: "裸露", open: false,  items: ["接線環裸露", "拉線夾板裸露", "FC裸露", "TR一次裸露", "電纜接頭裸露", "GS裸露"] },
         { label: "導線", open: false, items: ["防雷脫落", "低壓脫落"] },
         { label: "設計", open: false, items: ["不良設計", "游休TR設計", "橫擔腐蝕設計"] },
         { label: "雜項", open: false, items: ["桿上異物"] },
@@ -1276,6 +1822,8 @@ document.getElementById("editLat").value = point.lat;
       function setPanelCollapsed(collapsed) {
         document.querySelector("#panel").classList.toggle("is-collapsed", collapsed);
         document.querySelector(".app").classList.toggle("is-panel-collapsed", collapsed);
+        document.body.classList.toggle("is-panel-open", !collapsed);
+        if (!collapsed) mapSearchPanel.classList.remove("is-open");
         window.setTimeout(() => map.invalidateSize(), 220);
       }
 
@@ -1284,15 +1832,29 @@ document.getElementById("editLat").value = point.lat;
         const collapsed = !panel.classList.contains("is-collapsed");
         setPanelCollapsed(collapsed);
         document.getElementById("panelToggle").setAttribute("aria-expanded", String(!collapsed));
+        document.getElementById("panelToggle").title = collapsed ? "展開面板" : "收合面板";
       });
 
+      // ==========================================
+      // ★ jumpToRecord：支援孤兒記錄與正常記錄的完美跳轉
+      // ==========================================
       function jumpToRecord(folderId, recordId) {
+        const record = state.records.find(r => r.id === recordId);
+        if (!record) return;
+
+        // 尋找父資料夾並展開（如果是孤兒記錄，curr 為 undefined，會自動跳過此迴圈）
         let curr = state.folders.find(f => f.id === folderId);
-        while (curr) { state.expandedFolders.add(curr.id); curr = state.folders.find(f => f.id === curr.parentId); }
+        while (curr) { 
+          state.expandedFolders.add(curr.id); 
+          curr = state.folders.find(f => f.id === curr.parentId); 
+        }
+        
         map.closePopup();
         setPanelCollapsed(false);
         switchTab('records');
-        renderFolders();
+        renderFolders(); // 確保 DOM 已經重新渲染
+        
+        // 延遲捲動，讓孤兒紀錄也能順利被找到並高亮
         setTimeout(() => {
           const row = document.getElementById(`record-row-${recordId}`);
           if (row) {
@@ -1303,17 +1865,17 @@ document.getElementById("editLat").value = point.lat;
         }, 80);
       }
 
-// ==========================================
+      // ==========================================
       // LocalStorage
       // ==========================================
- function saveToLocalStorage() {
+      function saveToLocalStorage() {
         try {
+          normalizeInspectionState();
           localStorage.setItem(STORAGE_KEY, JSON.stringify({
             folders: state.folders, records: state.records, lastFolderId: state.lastFolderId,
           }));
         } catch (e) { 
           console.error("儲存失敗:", e); 
-          // [新增] 彈出警告，避免使用者以為有存到
           GlobalModal.alert("⚠️ 儲存失敗！<br><br>可能是瀏覽器儲存空間已達上限 (約 5MB)。請立即點擊「資料備份」下載您的紀錄，並清理不需要的資料夾。");
         }
         
@@ -1343,10 +1905,60 @@ document.getElementById("editLat").value = point.lat;
             state.records.forEach(r => {
               if (!r.id) r.id = "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
             });
+            const beforeNormalize = JSON.stringify({ folders: state.folders, records: state.records, lastFolderId: state.lastFolderId });
+            normalizeInspectionState();
+            const afterNormalize = JSON.stringify({ folders: state.folders, records: state.records, lastFolderId: state.lastFolderId });
             if (!state.lastFolderId && state.records.length > 0) state.lastFolderId = state.records[state.records.length - 1].folderId;
+            if (beforeNormalize !== afterNormalize) saveToLocalStorage();
             if (!localStorage.getItem(STORAGE_KEY)) saveToLocalStorage();
           }
         } catch (e) { console.error("讀取 localStorage 失敗:", e); }
+      }
+
+      function normalizeInspectionState() {
+        const usedFolderIds = new Set();
+        for (const folder of state.folders) {
+          if (!folder.id || usedFolderIds.has(folder.id)) folder.id = generateId();
+          usedFolderIds.add(folder.id);
+          folder.name = String(folder.name || "未命名資料夾").trim() || "未命名資料夾";
+          if (typeof folder.parentId === "undefined") folder.parentId = null;
+        }
+
+        const validFolderIds = new Set(state.folders.map(f => f.id));
+        for (const folder of state.folders) {
+          if (folder.parentId === folder.id || !validFolderIds.has(folder.parentId)) folder.parentId = null;
+        }
+
+        for (const folder of state.folders) {
+          const seen = new Set([folder.id]);
+          let curr = state.folders.find(f => f.id === folder.parentId);
+          while (curr) {
+            if (seen.has(curr.id)) {
+              folder.parentId = null;
+              break;
+            }
+            seen.add(curr.id);
+            curr = state.folders.find(f => f.id === curr.parentId);
+          }
+        }
+
+        const usedRecordIds = new Set();
+        for (const record of state.records) {
+          if (!record.id || usedRecordIds.has(record.id)) record.id = "rec_" + generateId();
+          usedRecordIds.add(record.id);
+          if (!record.folderId || !validFolderIds.has(record.folderId)) record.folderId = null;
+        }
+
+        if (!state.lastFolderId || !validFolderIds.has(state.lastFolderId)) {
+          const lastRecordFolderId = [...state.records].reverse().find(r => r.folderId && validFolderIds.has(r.folderId))?.folderId;
+          state.lastFolderId = lastRecordFolderId || state.folders[state.folders.length - 1]?.id || null;
+        }
+
+        for (const id of [...state.hiddenRecordFolders]) if (!validFolderIds.has(id)) state.hiddenRecordFolders.delete(id);
+        for (const id of [...state.expandedFolders]) if (!validFolderIds.has(id)) state.expandedFolders.delete(id);
+        for (const id of [...state.selectedFolders]) if (!validFolderIds.has(id)) state.selectedFolders.delete(id);
+        const validRecordIds = new Set(state.records.map(r => r.id));
+        for (const id of [...state.selectedRecords]) if (!validRecordIds.has(id)) state.selectedRecords.delete(id);
       }
 
       function getFullFolderPath(folderId) {
@@ -1377,8 +1989,7 @@ document.getElementById("editLat").value = point.lat;
       }
 
       // ==========================================
-      // renderFolders()
-      // ★ 修改：紀錄列表現在顯示 getRecordIcon(r) 取代固定 📍
+      // renderFolders() 加入孤兒記錄區塊
       // ==========================================
       function renderFolders() {
         for (const id of state.selectedFolders) { if (!state.folders.some(f => f.id === id)) state.selectedFolders.delete(id); }
@@ -1433,12 +2044,8 @@ document.getElementById("editLat").value = point.lat;
                 </div>`;
               recordsHTML += directRecords.map(r => {
                 const rChecked = state.selectedRecords.has(r.id) ? "checked" : "";
-                // ★ 使用 getRecordIcon(r) 取代固定 📍
-               const recordIcon = getRecordIcon(r);
-                
-                // ★ 新增：如果有勾選修正，產生紅色小標籤
+                const recordIcon = getRecordIcon(r);
                 const correctionTag = r.needCorrection ? `<span style="background-color:#b91c1c; color:#fff; font-size:10px; font-weight:bold; padding:2px 4px; border-radius:4px; margin-left:4px;">🔧圖號不符</span>` : "";
-
                 return `
                   <div id="record-row-${r.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding:4px; border-radius:4px; transition:background-color 1.5s ease;">
                     <input type="checkbox" class="cb-record" data-id="${r.id}" ${rChecked} style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
@@ -1492,11 +2099,41 @@ document.getElementById("editLat").value = point.lat;
           });
           return html;
         }
-        folderList.innerHTML = buildFoldersHtml(null, 0);
+
+        // ★ 收集孤兒記錄
+        const validFolderIds = new Set(state.folders.map(f => f.id));
+        const orphanRecords = state.records.filter(r => !r.folderId || !validFolderIds.has(r.folderId));
+        let orphanHtml = "";
+        if (orphanRecords.length > 0) {
+          orphanHtml += `
+            <div style="margin-top:16px; border-top:2px dashed #f87171; padding-top:10px;">
+              <div style="font-weight:bold; color:#b91c1c; margin-bottom:8px;">⚠️ 未歸類紀錄 (${orphanRecords.length})</div>
+          `;
+          orphanRecords.sort((a, b) => compareNatural(a.name || "", b.name || ""));
+          for (const r of orphanRecords) {
+            const icon = getRecordIcon(r);
+            orphanHtml += `
+              <div id="record-row-${r.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding:4px; border-radius:4px; background:#fef2f2;">
+                <button class="record-item" data-fly-lat="${r.lat}" data-fly-lng="${r.lng}" title="飛轉至此設備" style="flex-grow:1;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="record-item-title">
+                      <span style="display:inline-block; padding:1px 5px; border-radius:8px; font-size:10px; color:#fff; background-color:${getBadgeBgColor(icon)}; vertical-align:middle; margin-right:2px;">${icon}</span>
+                      ${escapeHtml(r.name || r.code)}
+                    </span>
+                    <span class="btn-small text-danger" data-delete-record="${r.id}" title="刪除此紀錄" style="border:none; padding:2px 4px; min-height:0; margin-left:4px;">✖</span>
+                  </div>
+                  <span class="record-item-meta">不良: ${escapeHtml(r.defect || "無")} | 緩急: ${escapeHtml(r.urgency || "C")}</span>
+                </button>
+              </div>`;
+          }
+          orphanHtml += `</div>`;
+        }
+
+        folderList.innerHTML = buildFoldersHtml(null, 0) + orphanHtml;
       }
 
       // ==========================================
-      // 批次操作
+      // 批次操作 (batchMoveBtn 已修改為部分執行)
       // ==========================================
       document.getElementById("batchExportBtn").addEventListener("click", () => {
         if (state.selectedFolders.size === 0 && state.selectedRecords.size === 0) { GlobalModal.alert("請先勾選要匯出的資料夾或紀錄。"); return; }
@@ -1507,19 +2144,19 @@ document.getElementById("editLat").value = point.lat;
         uniqueRecordIds.forEach(rId => {
           const r = state.records.find(x => x.id === rId);
           if (r) exportData.push({ 
-  "巡視日期(目錄)": getFullFolderPath(r.folderId), 
-  "土木設備": r.name || "", 
-  "圖號座標": r.code || "", 
-  "不良項目": r.defect || "", 
-  "緩急程度": r.urgency || "", 
-  "設計單號": "", 
-  "設計日期": "", 
-  "施工單位": "", 
-  "施工單號": "", 
-  "施工日期": "",
-  "圖資修正": r.needCorrection ? "是" : "",  // ★ 移到最後面
-  "正確圖號": r.correctCode || ""            // ★ 移到最後面
-});
+            "巡視日期(目錄)": getFullFolderPath(r.folderId), 
+            "土木設備": r.name || "", 
+            "圖號座標": r.code || "", 
+            "不良項目": r.defect || "", 
+            "緩急程度": r.urgency || "", 
+            "設計單號": "", 
+            "設計日期": "", 
+            "施工單位": "", 
+            "施工單號": "", 
+            "施工日期": "",
+            "圖資修正": r.needCorrection ? "是" : "",
+            "正確圖號": r.correctCode || ""
+          });
         });
         if (exportData.length === 0) { GlobalModal.alert("勾選範圍內沒有紀錄可匯出。"); return; }
         const ws = XLSX.utils.json_to_sheet(exportData);
@@ -1540,8 +2177,6 @@ document.getElementById("editLat").value = point.lat;
               state.records = state.records.filter(r => r.folderId !== fId);
               state.folders = state.folders.filter(f => f.id !== fId);
               state.hiddenRecordFolders.delete(fId); state.expandedFolders.delete(fId);
-              
-              // [新增] 避免 lastFolderId 變成幽靈參照
               if (state.lastFolderId === fId) {
                 state.lastFolderId = state.folders.length > 0 ? state.folders[state.folders.length - 1].id : null;
               }
@@ -1560,44 +2195,42 @@ document.getElementById("editLat").value = point.lat;
           (targetId) => {
             const safeTarget = targetId === "" ? null : targetId;
             
-            // [新增] 預先檢查：找出那些「獨立被勾選」且「即將被移動到最上層」的設備紀錄
             const recordsInMovingFolders = new Set();
             state.selectedFolders.forEach(fId => getAllRecordIdsInFolder(fId).forEach(id => recordsInMovingFolders.add(id)));
+
+            const standaloneRecords = [...state.selectedRecords].filter(rId => !recordsInMovingFolders.has(rId));
             
-            let hasStandaloneRecord = false;
-            for (const rId of state.selectedRecords) {
-              if (!recordsInMovingFolders.has(rId)) {
-                hasStandaloneRecord = true;
-                break;
-              }
+            const blockedRecords = [];
+            if (safeTarget === null && standaloneRecords.length > 0) {
+              standaloneRecords.forEach(rId => {
+                const rec = state.records.find(r => r.id === rId);
+                if (rec) blockedRecords.push(rec.name || rec.code);
+              });
             }
 
-            // [新增] 如果目標是最上層，且包含獨立紀錄，直接擋下整筆操作
-            if (safeTarget === null && hasStandaloneRecord) { 
-              GlobalModal.alert("❌ 設備紀錄必須放置在資料夾內，不可移至(最上層)！\n請重新選擇目標資料夾。"); 
-              return; // 提早結束，避免資料發生「一半被移動」的慘況
-            }
-
-            // 1. 移動資料夾
+            // 移動資料夾
             for (const fId of state.selectedFolders) {
-              // 防呆：不能移動到自己，也不能移動到自己的子資料夾裡面
               if (fId === safeTarget || (safeTarget && isDescendant(safeTarget, fId))) continue;
               const folder = state.folders.find(f => f.id === fId);
               if (folder) folder.parentId = safeTarget;
             }
 
-            // 2. 移動獨立的設備紀錄
-            for (const rId of state.selectedRecords) {
-              if (recordsInMovingFolders.has(rId)) continue;
-              const record = state.records.find(r => r.id === rId);
-              if (record) record.folderId = safeTarget;
+            // 移動獨立紀錄（僅在目標非最上層時）
+            for (const rId of standaloneRecords) {
+              if (safeTarget !== null) {
+                const record = state.records.find(r => r.id === rId);
+                if (record) record.folderId = safeTarget;
+              }
             }
-            
-            // 3. 清空選取狀態並儲存更新
+
             state.selectedFolders.clear(); 
             state.selectedRecords.clear();
             saveToLocalStorage();
-            renderFolders(); // 更新左側列表畫面
+            renderFolders();
+
+            if (blockedRecords.length > 0) {
+              GlobalModal.alert(`⚠️ 以下設備紀錄無法移至最上層（必須放在資料夾內），已略過：\n${blockedRecords.join("、")}`);
+            }
           }
         );
       });
@@ -1682,12 +2315,10 @@ document.getElementById("editLat").value = point.lat;
         // ── 點擊側邊欄的紀錄飛轉 ──
         const recordBtn = target.closest(".record-item");
         if (recordBtn && !target.dataset.deleteRecord) {
-          // ★ 修正：從父層容器精準抓取該筆紀錄的 ID
           const row = recordBtn.closest("[id^='record-row-']");
           const rId = row ? row.id.replace("record-row-", "") : null;
           let point = state.records.find(r => r.id === rId);
           
-          // 防呆：如果找不到 (例如剛匯入的舊資料)，才退回座標尋找
           if (!point) {
             const lat = parseFloat(recordBtn.dataset.flyLat), lng = parseFloat(recordBtn.dataset.flyLng);
             point = state.points.find(p => p.lat === lat && p.lng === lng) || state.records.find(r => r.lat === lat && r.lng === lng);
@@ -1696,7 +2327,7 @@ document.getElementById("editLat").value = point.lat;
           if (point) {
             map.flyTo([point.lat, point.lng], map.getMaxZoom(), { duration: 0.45 });
             L.popup({ autoPanPadding: [10, 10] }).setLatLng([point.lat, point.lng]).setContent(miniPopupHtml(point)).openOn(map);
-            openEditPanel(point); // 傳入精確的 point (包含 id)
+            openEditPanel(point);
             if (window.innerWidth <= 820) setPanelCollapsed(true);
           }
           return;
@@ -1746,24 +2377,24 @@ document.getElementById("editLat").value = point.lat;
           if (!folder) return;
           const targetRecords = getAllRecordsInFolder(fId), pathName = getFullFolderPath(fId);
           const exportData = targetRecords.map(r => ({ 
-  "巡視日期(目錄)": getFullFolderPath(r.folderId), 
-  "土木設備": r.name || "", 
-  "圖號座標": r.code || "", 
-  "不良項目": r.defect || "", 
-  "緩急程度": r.urgency || "", 
-  "設計單號": "", 
-  "設計日期": "", 
-  "施工單位": "", 
-  "施工單號": "", 
-  "施工日期": "",
-  "圖資修正": r.needCorrection ? "是" : "",  // ★ 移到最後面
-  "正確圖號": r.correctCode || ""            // ★ 移到最後面
-}));
-         if (exportData.length === 0) exportData.push({ "巡視日期(目錄)": pathName, "土木設備": "", "圖號座標": "", "不良項目": "", "緩急程度": "", "設計單號": "", "設計日期": "", "施工單位": "", "施工單號": "", "施工日期": "", "圖資修正": "", "正確圖號": "" });
+            "巡視日期(目錄)": getFullFolderPath(r.folderId), 
+            "土木設備": r.name || "", 
+            "圖號座標": r.code || "", 
+            "不良項目": r.defect || "", 
+            "緩急程度": r.urgency || "", 
+            "設計單號": "", 
+            "設計日期": "", 
+            "施工單位": "", 
+            "施工單號": "", 
+            "施工日期": "",
+            "圖資修正": r.needCorrection ? "是" : "",
+            "正確圖號": r.correctCode || ""
+          }));
+          if (exportData.length === 0) exportData.push({ "巡視日期(目錄)": pathName, "土木設備": "", "圖號座標": "", "不良項目": "", "緩急程度": "", "設計單號": "", "設計日期": "", "施工單位": "", "施工單號": "", "施工日期": "", "圖資修正": "", "正確圖號": "" });
           const ws = XLSX.utils.json_to_sheet(exportData); const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
           XLSX.writeFile(wb, `巡視紀錄_${folder.name}.xlsx`);
-       } else if (target.dataset.deleteFolder) {
+        } else if (target.dataset.deleteFolder) {
           const fId = target.dataset.deleteFolder, folder = state.folders.find(f => f.id === fId);
           if (!folder) return;
           
@@ -1857,9 +2488,12 @@ document.getElementById("editLat").value = point.lat;
                 }
               }
               const folderId = findOrCreateFolderByPath(folderPath); if (!folderId) continue;
-              const existingIndex = state.records.findIndex(r => r.folderId === folderId && r.lat === resolvedLat && r.lng === resolvedLng);
+              const existingIndex = state.records.findIndex(r =>
+                r.folderId === folderId && isSameMapPoint(r, { lat: resolvedLat, lng: resolvedLng, code: resolvedCode })
+              );
               const recordData = {
-                id: existingIndex >= 0 ? state.records[existingIndex].id : "rec_" + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+                // 修改這裡的寫法
+                id: existingIndex >= 0 ? state.records[existingIndex].id : "rec_" + generateId(),
                 lat: resolvedLat, lng: resolvedLng, name: resolvedName, code: resolvedCode, folderId, defect, urgency,
                 icon: existingIndex >= 0 ? state.records[existingIndex].icon : undefined,
                 needCorrection, 
@@ -1886,7 +2520,7 @@ document.getElementById("editLat").value = point.lat;
       });
 
       // ==========================================
-      // 資料備份與還原
+      // 資料備份與還原 (還原後強制更新下拉選單)
       // ==========================================
       document.getElementById("exportSystemBtn").addEventListener("click", () => {
         const data = JSON.stringify({ folders: state.folders, records: state.records }, null, 2);
@@ -1904,19 +2538,21 @@ document.getElementById("editLat").value = point.lat;
           try {
             const parsed = JSON.parse(event.target.result);
             if (!parsed.folders || !parsed.records) throw new Error("格式錯誤");
-GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋！", () => {
+            GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋！", () => {
               state.folders = parsed.folders; 
               state.records = parsed.records;
-              
-              // [新增] 重置 lastFolderId，避免指向舊系統的幽靈資料夾
               state.lastFolderId = state.records.length > 0 ? state.records[state.records.length - 1].folderId : null;
-
+              normalizeInspectionState();
               state.hiddenRecordFolders.clear(); 
               state.expandedFolders.clear();
               state.selectedFolders.clear(); 
               state.selectedRecords.clear();
               saveToLocalStorage(); 
               renderer.redraw(); 
+              const folderSelect = document.getElementById("sidebar-folder");
+              if (folderSelect) {
+                folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
+              }
               GlobalModal.alert("還原成功！");
             });
           } catch (err) { GlobalModal.alert("還原失敗：" + err.message); }
@@ -1937,8 +2573,6 @@ GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋�
       // 全頁 click / input 事件委派
       // ==========================================
       document.addEventListener("click", (e) => {
-
-        // 不良統計列展開/收合
         const statHeader = e.target.closest('.defect-stat-header');
         if (statHeader) {
           const recordsDiv = statHeader.nextElementSibling, arrow = statHeader.querySelector('.defect-stat-arrow');
@@ -1951,299 +2585,268 @@ GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋�
           return;
         }
 
-        // 不良統計子紀錄跳轉
         const statRecord = e.target.closest('.defect-stat-record');
         if (statRecord) { jumpToRecord(statRecord.dataset.folderId, statRecord.dataset.recordId); return; }
 
-        // Popup「已記錄於」跳轉
         const gotoLink = e.target.closest(".goto-folder-link");
         if (gotoLink) { jumpToRecord(gotoLink.dataset.folderId, gotoLink.dataset.recordId); return; }
-// ── 展開/收合正確圖號輸入框 ──
-      if (e.target.id === "sidebar-correction-flag") {
-        const container = document.getElementById("sidebar-correct-code-container");
-        const input = document.getElementById("sidebar-correct-code-input");
-        if (e.target.checked) {
-          container.style.display = "flex";
-          input.focus(); 
-        } else {
-          container.style.display = "none";
-          input.value = ""; 
-        }
-      }
 
-      // ── 點擊「📍 定位帶入」按鈕 ──
-      if (e.target.id === "btn-fill-gps-code") {
-        const btn = e.target;
-        const input = document.getElementById("sidebar-correct-code-input");
-        if (!navigator.geolocation) { GlobalModal.alert("您的裝置不支援 GPS 定位功能。"); return; }
-        
-        const originalText = btn.textContent;
-        btn.textContent = "⏳ 定位中...";
-        btn.disabled = true;
-        btn.style.opacity = "0.7";
-        
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            const tpcCode = latLngToTpcCode(lat, lng); // 轉換為台電圖號
-            
-            if (tpcCode && tpcCode !== "座標超出範圍") {
-               input.value = tpcCode;
-            } else {
-               input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-            }
-            
-            btn.textContent = "✅ 已帶入";
-            btn.style.background = "#dcfce7"; btn.style.color = "#16a34a"; btn.style.borderColor = "#86efac"; btn.style.opacity = "1";
-            setTimeout(() => {
-              btn.textContent = originalText; btn.disabled = false;
-              btn.style.background = "#fee2e2"; btn.style.color = "#b91c1c"; btn.style.borderColor = "#fca5a5";
-            }, 2000);
-          },
-          (err) => {
-            console.error("GPS 定位失敗:", err);
-            btn.textContent = "❌ 定位失敗"; btn.style.opacity = "1";
-            setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
-            GlobalModal.alert("無法取得位置，請確認手機的 GPS 定位權限是否開啟！");
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-        );
-        return;
-      }
-
-// ── 不良項目快捷晶片 (更新：連動新版預覽，並支援點擊內部文字) ──
-      const defectChipBtn = e.target.closest(".defect-chip-btn");
-      if (defectChipBtn) {
-        const inputEl = document.getElementById("sidebar-defect-input");
-        if (inputEl) {
-          // 1. 將點選的不良項目填入輸入框
-          inputEl.value = defectChipBtn.dataset.val;
-          
-          // 2. ★ 呼叫我們上一版寫好的函數，讓地圖圖示馬上自動判斷並更新！
-          updateSidebarIconPreview();
-          
-          // 3. 點擊時的按鈕閃爍視覺回饋
-          const originalBg = defectChipBtn.style.background;
-          defectChipBtn.style.background = "#bae6fd";
-          setTimeout(() => { defectChipBtn.style.background = originalBg; }, 150);
-        }
-        return;
-      }
-
-// ── 圖示晶片選擇事件 (修改版：加入預覽更新) ──
-      const iconChipBtn = e.target.closest(".icon-chip-btn");
-      if (iconChipBtn && e.target.id !== "sidebar-icon-auto-btn") {
-        const iconInput = document.getElementById("sidebar-icon-input");
-        if (!iconInput) return;
-        
-        const selectedIcon = iconChipBtn.dataset.icon; 
-        iconInput.value = selectedIcon;
-        
-        // 更新所有按鈕的外觀
-        document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => {
-          btn.classList.toggle("is-selected", btn.dataset.icon === selectedIcon);
-        });
-        
-        // ★ 呼叫新函數更新預覽畫面
-        updateSidebarIconPreview();
-        return;
-      }
-
-      // ── 處理「恢復自動」按鈕點擊 ──
-      if (e.target.id === "sidebar-icon-auto-btn") {
-        document.getElementById("sidebar-icon-input").value = ""; // 清除手動選擇
-        document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => btn.classList.remove("is-selected"));
-        updateSidebarIconPreview(); // ★ 重新計算並更新預覽
-        return;
-      }
-// ── 展開/收合手動圖示選擇區塊 ──
-      if (e.target.id === "toggle-manual-icon-btn") {
-        const iconGroups = document.getElementById("sidebar-icon-groups");
-        
-        // 判斷目前是隱藏還是顯示，進行切換
-        if (iconGroups.style.display === "none") {
-          iconGroups.style.display = "flex";
-          e.target.textContent = "▲ 隱藏面板";
-          e.target.style.background = "#eef8f9"; // 給予點擊後的底色回饋
-        } else {
-          iconGroups.style.display = "none";
-          e.target.textContent = "✎ 手動修改";
-          e.target.style.background = "transparent";
-        }
-        return;
-      }
-// ── ★ 全新的側邊欄儲存按鈕邏輯 ──
-      if (e.target.id === "sidebarSaveBtn") {
-        const lat = parseFloat(document.getElementById("editLat").value);
-        const lng = parseFloat(document.getElementById("editLng").value);
-        const code = document.getElementById("editCode").value;
-        const folderId = document.getElementById("sidebar-folder").value;
-        const customName = document.getElementById("sidebar-name-input").value.trim() || "手動新增設備";
-        const defect = document.getElementById("sidebar-defect-input").value.trim();
-        const urgency = document.getElementById("sidebar-urgency").value;
-        const customIcon = document.getElementById("sidebar-icon-input").value.trim();
-
-        const needCorrection = document.getElementById("sidebar-correction-flag").checked;
-        const correctCode = needCorrection ? document.getElementById("sidebar-correct-code-input").value.trim() : "";
-        
-        // 抓取正在編輯的精確紀錄 ID
-        const editRecordId = document.getElementById("editRecordId").value; 
-
-        if (isNaN(lat) || isNaN(lng)) return;
-        
-        // ★ 修改點：沒有選擇資料夾時，彈出「選擇」或「建立」的互動視窗
-        if (!folderId) { 
-          if (state.folders.length > 0) {
-            // 利用現有的 getFolderOptionsHtml，並在最上方插入「建立新資料夾」的選項
-            const optionsHtml = `<option value="CREATE_NEW">➕ 建立新資料夾...</option>` + getFolderOptionsHtml().replace('<option value="">(請選擇資料夾)</option>', '');
-            
-            GlobalModal.select("📂 選擇或建立資料夾", "尚未選擇儲存位置，請選擇現有資料夾或建立新的：", optionsHtml, (selectedValue) => {
-              if (selectedValue === "CREATE_NEW") {
-                // 如果選擇建立新資料夾，稍微延遲一下再彈出輸入框 (避免視窗切換閃爍)
-                setTimeout(() => {
-                  GlobalModal.prompt("請輸入新資料夾名稱來建立：", "", (newName) => {
-                    if (newName && newName.trim()) {
-                      const newId = generateId();
-                      state.folders.push({ id: newId, name: newName.trim(), parentId: null });
-                      state.expandedFolders.add(newId);
-                      saveToLocalStorage();
-                      
-                      const folderSelect = document.getElementById("sidebar-folder");
-                      folderSelect.innerHTML = getFolderOptionsHtml(newId);
-                      folderSelect.value = newId;
-                      document.getElementById("sidebarSaveBtn").click();
-                    }
-                  });
-                }, 150);
-              } else if (selectedValue) {
-                // 如果選擇了現有資料夾，自動套用並儲存
-                const folderSelect = document.getElementById("sidebar-folder");
-                folderSelect.value = selectedValue;
-                document.getElementById("sidebarSaveBtn").click();
-              }
-            });
+        if (e.target.id === "sidebar-correction-flag") {
+          const container = document.getElementById("sidebar-correct-code-container");
+          const input = document.getElementById("sidebar-correct-code-input");
+          if (e.target.checked) {
+            container.style.display = "flex";
+            input.focus(); 
           } else {
-            // 完全沒有資料夾時，直接要求建立
-            GlobalModal.prompt("目前尚未建立任何資料夾，請先建立資料夾：", "", (newName) => {
-              if (newName && newName.trim()) {
-                const newId = generateId();
-                state.folders.push({ id: newId, name: newName.trim(), parentId: null });
-                state.expandedFolders.add(newId);
-                saveToLocalStorage();
-                
-                const folderSelect = document.getElementById("sidebar-folder");
-                folderSelect.innerHTML = getFolderOptionsHtml(newId);
-                folderSelect.value = newId;
-                document.getElementById("sidebarSaveBtn").click();
-              }
-            });
+            container.style.display = "none";
+            input.value = ""; 
           }
-          return; // 終止目前的執行，等待使用者操作互動視窗
         }
 
-        state.lastFolderId = folderId;
-        
-        // 1. 檢查目標資料夾內，是否已經有「同座標」的紀錄（且不是自己目前正在編輯的這筆）
-        const collisionRecord = state.records.find(
-          r => r.folderId === folderId && 
-               r.lat === lat && 
-               r.lng === lng && 
-               r.id !== editRecordId
-        );
-
-        // 獨立出實際寫入與 UI 更新的函式，方便後續呼叫
-        const performSave = () => {
-          // 拔除原本正在編輯的舊紀錄（達成更新或移動）
-          if (editRecordId) {
-            state.records = state.records.filter(r => r.id !== editRecordId);
-          }
+        if (e.target.id === "btn-fill-gps-code") {
+          const btn = e.target;
+          const input = document.getElementById("sidebar-correct-code-input");
+          if (!navigator.geolocation) { GlobalModal.alert("您的裝置不支援 GPS 定位功能。"); return; }
           
-          // 如果剛剛確認要覆蓋碰撞的紀錄，將其拔除
-          if (collisionRecord) {
-            state.records = state.records.filter(r => r.id !== collisionRecord.id);
-          }
+          const originalText = btn.textContent;
+          btn.textContent = "⏳ 定位中...";
+          btn.disabled = true;
+          btn.style.opacity = "0.7";
+          
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              const tpcCode = latLngToTpcCode(lat, lng);
+              
+              if (tpcCode && tpcCode !== "座標超出範圍") {
+                 input.value = tpcCode;
+              } else {
+                 input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+              }
+              
+              btn.textContent = "✅ 已帶入";
+              btn.style.background = "#dcfce7"; btn.style.color = "#16a34a"; btn.style.borderColor = "#86efac"; btn.style.opacity = "1";
+              setTimeout(() => {
+                btn.textContent = originalText; btn.disabled = false;
+                btn.style.background = "#fee2e2"; btn.style.color = "#b91c1c"; btn.style.borderColor = "#fca5a5";
+              }, 2000);
+            },
+            (err) => {
+              console.error("GPS 定位失敗:", err);
+              btn.textContent = "❌ 定位失敗"; btn.style.opacity = "1";
+              setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
+              GlobalModal.alert("無法取得位置，請確認手機的 GPS 定位權限是否開啟！");
+            },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+          );
+          return;
+        }
 
-          // 寫入新紀錄 (請記得配合前一次的修正，使用 generateId() 產生新 ID)
-          state.records.push({
-            id: editRecordId || generateId(), 
-            lat, lng, name: customName, code, folderId, defect, urgency,
-            icon: customIcon || undefined,
-            needCorrection, 
-            correctCode     
+        const defectChipBtn = e.target.closest(".defect-chip-btn");
+        if (defectChipBtn) {
+          const inputEl = document.getElementById("sidebar-defect-input");
+          if (inputEl) {
+            inputEl.value = defectChipBtn.dataset.val;
+            updateSidebarIconPreview();
+            const originalBg = defectChipBtn.style.background;
+            defectChipBtn.style.background = "#bae6fd";
+            setTimeout(() => { defectChipBtn.style.background = originalBg; }, 150);
+          }
+          return;
+        }
+
+        const iconChipBtn = e.target.closest(".icon-chip-btn");
+        if (iconChipBtn && e.target.id !== "sidebar-icon-auto-btn") {
+          const iconInput = document.getElementById("sidebar-icon-input");
+          if (!iconInput) return;
+          
+          const selectedIcon = iconChipBtn.dataset.icon; 
+          iconInput.value = selectedIcon;
+          
+          document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => {
+            btn.classList.toggle("is-selected", btn.dataset.icon === selectedIcon);
           });
           
-          saveToLocalStorage();
-          map.closePopup();
-          
-          const btn = document.getElementById("sidebarSaveBtn");
-          btn.textContent = "✅ 已儲存";
-          btn.style.background = "#16a34a"; // 成功綠色回饋
-          setTimeout(() => { 
-            btn.textContent = "💾 儲存紀錄"; 
-            btn.style.background = ""; // 恢復原本顏色
-          }, 2000);
-        };
-
-        // 2. 判斷碰撞結果
-        if (collisionRecord) {
-          // 發生碰撞，攔截儲存並警告使用者
-          GlobalModal.confirm(
-            `⚠️ 目標資料夾內已存在相同座標的設備：\n「${escapeHtml(collisionRecord.name || collisionRecord.code)}」\n\n按下「確定」將覆蓋該筆紀錄，按下「取消」請重新選擇資料夾。`, 
-            () => {
-              performSave(); // 使用者確認覆蓋，執行儲存
-            }
-          );
-        } else {
-          // 無碰撞，直接安全儲存
-          performSave();
+          updateSidebarIconPreview();
+          return;
         }
-      }
+
+        if (e.target.id === "sidebar-icon-auto-btn") {
+          document.getElementById("sidebar-icon-input").value = "";
+          document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => btn.classList.remove("is-selected"));
+          updateSidebarIconPreview();
+          return;
+        }
+
+        if (e.target.id === "toggle-manual-icon-btn") {
+          const iconGroups = document.getElementById("sidebar-icon-groups");
+          
+          if (iconGroups.style.display === "none") {
+            iconGroups.style.display = "flex";
+            e.target.textContent = "▲ 隱藏面板";
+            e.target.style.background = "#eef8f9";
+          } else {
+            iconGroups.style.display = "none";
+            e.target.textContent = "✎ 手動修改";
+            e.target.style.background = "transparent";
+          }
+          return;
+        }
+
+        if (e.target.id === "sidebarSaveBtn") {
+          const lat = parseFloat(document.getElementById("editLat").value);
+          const lng = parseFloat(document.getElementById("editLng").value);
+          const code = document.getElementById("editCode").value;
+          const folderId = document.getElementById("sidebar-folder").value;
+          const customName = document.getElementById("sidebar-name-input").value.trim() || "手動新增設備";
+          const defect = document.getElementById("sidebar-defect-input").value.trim();
+          const urgency = document.getElementById("sidebar-urgency").value;
+          const customIcon = document.getElementById("sidebar-icon-input").value.trim();
+
+          const needCorrection = document.getElementById("sidebar-correction-flag").checked;
+          const correctCode = needCorrection ? document.getElementById("sidebar-correct-code-input").value.trim() : "";
+          
+          const editRecordId = document.getElementById("editRecordId").value; 
+
+          if (isNaN(lat) || isNaN(lng)) return;
+          
+          if (!folderId) { 
+            if (state.folders.length > 0) {
+              const optionsHtml = `<option value="CREATE_NEW">➕ 建立新資料夾...</option>` + getFolderOptionsHtml().replace('<option value="">(請選擇資料夾)</option>', '');
+              
+              GlobalModal.select("📂 選擇或建立資料夾", "尚未選擇儲存位置，請選擇現有資料夾或建立新的：", optionsHtml, (selectedValue) => {
+                if (selectedValue === "CREATE_NEW") {
+                  setTimeout(() => {
+                    GlobalModal.prompt("請輸入新資料夾名稱來建立：", "", (newName) => {
+                      if (newName && newName.trim()) {
+                        const newId = generateId();
+                        state.folders.push({ id: newId, name: newName.trim(), parentId: null });
+                        state.expandedFolders.add(newId);
+                        saveToLocalStorage();
+                        
+                        const folderSelect = document.getElementById("sidebar-folder");
+                        folderSelect.innerHTML = getFolderOptionsHtml(newId);
+                        folderSelect.value = newId;
+                        document.getElementById("sidebarSaveBtn").click();
+                      }
+                    });
+                  }, 150);
+                } else if (selectedValue) {
+                  const folderSelect = document.getElementById("sidebar-folder");
+                  folderSelect.value = selectedValue;
+                  document.getElementById("sidebarSaveBtn").click();
+                }
+              });
+            } else {
+              GlobalModal.prompt("目前尚未建立任何資料夾，請先建立資料夾：", "", (newName) => {
+                if (newName && newName.trim()) {
+                  const newId = generateId();
+                  state.folders.push({ id: newId, name: newName.trim(), parentId: null });
+                  state.expandedFolders.add(newId);
+                  saveToLocalStorage();
+                  
+                  const folderSelect = document.getElementById("sidebar-folder");
+                  folderSelect.innerHTML = getFolderOptionsHtml(newId);
+                  folderSelect.value = newId;
+                  document.getElementById("sidebarSaveBtn").click();
+                }
+              });
+            }
+            return;
+          }
+
+          state.lastFolderId = folderId;
+          
+          const collisionRecord = state.records.find(
+            r => r.folderId === folderId && 
+                 isSameMapPoint(r, { lat, lng, code }) &&
+                 r.id !== editRecordId
+          );
+
+          const performSave = () => {
+            if (editRecordId) {
+              state.records = state.records.filter(r => r.id !== editRecordId);
+            }
+            
+            if (collisionRecord) {
+              state.records = state.records.filter(r => r.id !== collisionRecord.id);
+            }
+
+            state.records.push({
+              id: editRecordId || generateId(), 
+              lat, lng, name: customName, code, folderId, defect, urgency,
+              icon: customIcon || undefined,
+              needCorrection, 
+              correctCode     
+            });
+            
+            saveToLocalStorage();
+            map.closePopup();
+            
+            const btn = document.getElementById("sidebarSaveBtn");
+            btn.textContent = "✅ 已儲存";
+            btn.style.background = "#16a34a";
+            setTimeout(() => { 
+              btn.textContent = "💾 儲存紀錄"; 
+              btn.style.background = "";
+            }, 2000);
+
+            if (isMobileLayout()) {
+              setStatus("✅ 已儲存紀錄");
+              window.setTimeout(() => {
+                setPanelCollapsed(true);
+                document.getElementById("panelToggle").setAttribute("aria-expanded", "false");
+                document.getElementById("panelToggle").title = "展開面板";
+              }, 450);
+              window.setTimeout(() => setStatus(""), 2200);
+            }
+          };
+
+          if (collisionRecord) {
+            GlobalModal.confirm(
+              `⚠️ 目標資料夾內已存在相同座標的設備：\n「${escapeHtml(collisionRecord.name || collisionRecord.code)}」\n\n按下「確定」將覆蓋該筆紀錄，按下「取消」請重新選擇資料夾。`, 
+              () => {
+                performSave();
+              }
+            );
+          } else {
+            performSave();
+          }
+        }
       }); 
 
-// ==========================================
-      // ★ 監聽「側邊欄」不良項目輸入框，即時更新預覽
-      // ==========================================
       document.addEventListener("input", (e) => {
         if (e.target.id === "sidebar-defect-input") {
           updateSidebarIconPreview();
         }
       });
 
-// ==========================================
-      // ★ updateRecordMarkers()
-      // ==========================================
       function updateRecordMarkers() {
         recordsLayer.clearLayers();
         const visibleRecords = state.records.filter(r => !state.hiddenRecordFolders.has(r.folderId));
         for (const record of visibleRecords) {
           const icon = getRecordIcon(record);
           
-          // ★ 如果有勾選圖資修正，強制把地圖底色變成醒目的桃紅色 (#be185d)；否則維持原本顏色
           const bgColor = record.needCorrection ? "#be185d" : getBadgeBgColor(icon);
 
-          let htmlContent, iconAnchor;
-          if (state.labelsHidden) {
-            const labelColor = colorForEquipmentName(record.name);
-            htmlContent = `
-              <div style="display:flex; flex-direction:column; align-items:center; transform:translate(-50%, calc(-100% + 12px)); width:max-content;">
-                <span class="point-label-chip" style="--label-color:${labelColor}; margin-bottom:2px;">${escapeHtml(record.name || record.code)}</span>
-                <div class="saved-badge-marker" style="background-color: ${bgColor};">${icon}</div>
-              </div>`;
-            iconAnchor = [0, 0];
-          } else {
-            htmlContent = `<div class="saved-badge-marker" style="background-color: ${bgColor};">${icon}</div>`;
-            iconAnchor = [13, 13];
-          }
+          // [修改] 移除 if 判斷，讓巡視紀錄的「標籤+圖示」永遠完整顯示！
+          const labelColor = colorForEquipmentName(record.name);
+          const htmlContent = `
+            <div style="display:flex; flex-direction:column; align-items:center; transform:translate(-50%, calc(-100% + 12px)); width:max-content;">
+              <span class="point-label-chip" style="--label-color:${labelColor}; margin-bottom:2px;">${escapeHtml(record.name || record.code)}</span>
+              <div class="saved-badge-marker" style="background-color: ${bgColor};">${icon}</div>
+            </div>`;
+          const iconAnchor = [0, 0];
 
- L.marker([record.lat, record.lng], {
+          L.marker([record.lat, record.lng], {
             icon: L.divIcon({ className: "", html: htmlContent, iconSize: [0, 0], iconAnchor }),
           }).on("click", () => {
             L.popup({ autoPanPadding: [10, 10] })
               .setLatLng([record.lat, record.lng])
-              .setContent(miniPopupHtml(record)) // ⬅️ 改用迷你導航視窗
+              .setContent(miniPopupHtml(record))
               .openOn(map);
-            openEditPanel(record); // ⬅️ 同步開啟左側編輯表單
+            openEditPanel(record);
           }).addTo(recordsLayer);
         }
       }
@@ -2252,8 +2855,7 @@ GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋�
       // 工具函式
       // ==========================================
       function setStatus(text) { statusBox.textContent = text; }
- function escapeHtml(value) {
-        // 利用字串相加，強迫避開編輯器的自動轉碼渲染
+      function escapeHtml(value) {
         const map = {
           '&': '&' + 'amp;',
           '<': '&' + 'lt;',
@@ -2263,9 +2865,16 @@ GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋�
         };
         return String(value ?? "").replace(/[&<>"']/g, m => map[m]);
       }
-	  
-	  function generateId() {
+      
+      function generateId() {
         return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+      }
+      function isSameMapPoint(a, b) {
+        if (!a || !b) return false;
+        const sameCode = a.code && b.code && String(a.code) === String(b.code);
+        const sameLatLng = Math.abs(Number(a.lat) - Number(b.lat)) < 0.0000001
+          && Math.abs(Number(a.lng) - Number(b.lng)) < 0.0000001;
+        return sameCode || sameLatLng;
       }
       function formatNumber(value) { return new Intl.NumberFormat("zh-TW").format(value); }
       function debounce(fn, wait = 180) {
@@ -2296,7 +2905,8 @@ GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋�
         return point.lat >= bounds.getSouth() && point.lat <= bounds.getNorth() && point.lng >= bounds.getWest() && point.lng <= bounds.getEast();
       }
       function matchesFilters(point) {
-        if (state.area && point.area !== state.area) return false;
+        // 巡視紀錄不受區域過濾影響
+        if (state.area && point.area !== "📂 巡視紀錄" && point.area !== state.area) return false;
         return matchesSearch(point, state.search);
       }
       function visibleFilteredPoints() {
@@ -2350,7 +2960,13 @@ GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋�
           this.canvas.width  = size.x; this.canvas.height = size.y;
           this.canvas.style.width = `${size.x}px`; this.canvas.style.height = `${size.y}px`;
           const ctx = this.context; ctx.clearRect(0, 0, size.x, size.y);
-          if (state.labelsHidden) { state.drawnItems = []; updateLabels(); updateStats(); return; }
+         // [新增] 只要按下隱藏，就直接清空畫布並中斷，讓背景的彩色方塊與圓點徹底消失！
+          if (state.labelsHidden) { 
+            state.drawnItems = []; 
+            updateLabels(); 
+            updateStats(); 
+            return; 
+          }
           state.visiblePoints = visibleFilteredPoints();
           if (map.getZoom() >= SHOW_POINTS_ZOOM && state.visiblePoints.length <= MAX_DIRECT_POINTS) {
             state.displayMode = "point";
@@ -2470,10 +3086,9 @@ GlobalModal.confirm("⚠️ 確定要還原備份嗎？現有資料將被覆蓋�
         if (state.labelsHidden || state.displayMode !== "point" || state.visiblePoints.length > MAX_POINT_LABELS) return;
         for (const point of state.visiblePoints) {
           const labelColor = colorForEquipmentName(point.name);
-L.marker([point.lat, point.lng], {
+          L.marker([point.lat, point.lng], {
             icon: L.divIcon({ className: "point-label", html: `<span class="point-label-chip" style="--label-color:${labelColor}">${escapeHtml(point.name)}</span>`, iconSize: null, iconAnchor: [-8, 20] }),
           }).on("click", () => {
-            // ★ 修正：點擊標籤時，開啟迷你視窗並連動左側編輯表單
             L.popup({ autoPanPadding: [10, 10] })
               .setLatLng([point.lat, point.lng])
               .setContent(miniPopupHtml(point))
@@ -2495,8 +3110,8 @@ L.marker([point.lat, point.lng], {
 
       document.getElementById("toggleLabelsBtn").addEventListener("click", (e) => {
         state.labelsHidden = !state.labelsHidden;
-        e.target.textContent = state.labelsHidden ? "顯示所有主圖標籤" : "隱藏所有主圖標籤";
         e.target.classList.toggle("is-hidden", state.labelsHidden);
+        syncMobileMapControls();
         renderer.redraw(); updateRecordMarkers();
       });
 
@@ -2508,24 +3123,26 @@ L.marker([point.lat, point.lng], {
         renderResults(searchMatches(state.search)); renderer.redraw();
       }
 
+      // ★ 修改後的 searchMatches：支援僅區域無關鍵字時列出點位，巡視紀錄不受區域過濾
       function searchMatches(search) {
-        if (!search.prefixes.length && !search.terms.some(t => t.length >= 2)) return [];
+        // 若無搜尋詞且無區域 → 空結果
+        if (!search.prefixes.length && !search.terms.some(t => t.length >= 2) && !state.area) {
+          return [];
+        }
         
-        // [修改] 使用 Map 依據座標去重複，確保同位置的紀錄能覆蓋原始圖資
         const outputMap = new Map();
 
-        // 1. 搜尋基礎圖資
+        // 1. 搜尋基礎圖資 (巡視紀錄例外，跳過區域過濾)
         for (const point of state.points) { 
-          if (state.area && point.area !== state.area) continue; 
+          if (state.area && point.area !== state.area && point.area !== "📂 巡視紀錄") continue; 
           if (matchesSearch(point, search)) {
             outputMap.set(`${point.lat},${point.lng}`, point);
           }
         }
 
-        // 2. [新增] 搜尋使用者建立/編輯的巡視紀錄
+        // 2. 搜尋巡視紀錄
         for (const record of state.records) {
           if (matchesSearch(record, search)) {
-            // 將紀錄加入結果，並加上特別的 area 標籤讓畫面顯示
             outputMap.set(`${record.lat},${record.lng}`, {
               ...record,
               area: "📂 巡視紀錄" 
@@ -2533,7 +3150,7 @@ L.marker([point.lat, point.lng], {
           }
         }
 
-        // 3. 轉回陣列、排序並取前 50 筆
+        // 3. 排序並取前50筆
         return Array.from(outputMap.values())
           .sort((a, b) => { 
             const r = searchResultRank(a, search) - searchResultRank(b, search); 
@@ -2627,7 +3244,6 @@ function renderDefectStats() {
           fragment.querySelector("button").addEventListener("click", () => {
             map.flyTo([point.lat, point.lng], map.getMaxZoom(), { duration: 0.45 });
             L.popup({ autoPanPadding: [10, 10] }).setLatLng([point.lat, point.lng]).setContent(miniPopupHtml(point)).openOn(map);
-            openEditPanel(point); // ⬅️ 同步開啟左側編輯表單
             document.getElementById("mapSearchPanel").classList.remove("is-open");
             searchInput.value = ""; applyFilter();
           });
@@ -2635,7 +3251,6 @@ function renderDefectStats() {
         }
       }
 
-    
       map.on("click", (e) => {
         if (state.displayMode === "prefix") {
           const prefix = state.drawnItems.find(item => { const b = item.hitBox; return b && e.containerPoint.x >= b.x && e.containerPoint.x <= b.x + b.width && e.containerPoint.y >= b.y && e.containerPoint.y <= b.y + b.height; });
@@ -2652,6 +3267,10 @@ function renderDefectStats() {
         }
       });
 
+      map.on("dragstart zoomstart", () => {
+        collapseFloatingControls();
+      });
+
 map.on("contextmenu", (e) => {
         const { lat, lng } = e.latlng, code = latLngToTpcCode(lat, lng);
         const newPoint = { lat, lng, name: "手動新增設備", code, area: "自訂" };
@@ -2663,15 +3282,33 @@ map.on("contextmenu", (e) => {
       // 定位功能
       // ==========================================
       let locationMarker = null, locationCircle = null, locationWatchId = null;
+      function setLocateButtonState(button, stateName) {
+        const labels = {
+          idle: "⌖",
+          loading: "…",
+          active: "⌖",
+          error: "!"
+        };
+        const titles = {
+          idle: "定位目前位置",
+          loading: "定位中",
+          active: "關閉定位",
+          error: "定位失敗"
+        };
+        button.textContent = labels[stateName] || labels.idle;
+        button.title = titles[stateName] || titles.idle;
+        button.setAttribute("aria-label", titles[stateName] || titles.idle);
+        button.setAttribute("aria-pressed", stateName === "active" ? "true" : "false");
+      }
       document.getElementById("locateButton").addEventListener("click", (e) => {
         if (locationWatchId !== null) {
           navigator.geolocation.clearWatch(locationWatchId); locationWatchId = null;
           if (locationMarker) { map.removeLayer(locationMarker); locationMarker = null; }
           if (locationCircle) { map.removeLayer(locationCircle); locationCircle = null; }
-          e.target.classList.remove("is-active"); e.target.textContent = "定位"; return;
+          e.target.classList.remove("is-active"); setLocateButtonState(e.target, "idle"); return;
         }
         if (!navigator.geolocation) { GlobalModal.alert("此瀏覽器不支援定位功能。"); return; }
-        e.target.textContent = "定位中...";
+        setLocateButtonState(e.target, "loading");
         locationWatchId = navigator.geolocation.watchPosition(
           (pos) => {
             const latlng = [pos.coords.latitude, pos.coords.longitude];
@@ -2680,9 +3317,9 @@ map.on("contextmenu", (e) => {
               locationCircle = L.circle(latlng, { radius: pos.coords.accuracy || 30, color: "#2563eb", weight: 1, fillColor: "#2563eb", fillOpacity: 0.12 }).addTo(map);
               map.flyTo(latlng, map.getMaxZoom(), { duration: 0.45 });
             } else { locationMarker.setLatLng(latlng); locationCircle.setLatLng(latlng).setRadius(pos.coords.accuracy || 30); }
-            e.target.classList.add("is-active"); e.target.textContent = "關閉定位";
+            e.target.classList.add("is-active"); setLocateButtonState(e.target, "active");
           },
-          (err) => { e.target.textContent = "定位失敗"; console.error("定位錯誤:", err); },
+          (err) => { setLocateButtonState(e.target, "error"); console.error("定位錯誤:", err); },
           { enableHighAccuracy: true }
         );
       });
@@ -2711,6 +3348,7 @@ map.on("contextmenu", (e) => {
         setStatus("載入設備資料...");
 		initSidebarForm(); // ★ 加入這行，初始化編輯表單內容
         loadFromLocalStorage(); renderFolders(); renderDefectStats(); updateRecordMarkers();
+        syncMobileMapControls();
         try {
           const { meta, points } = await tryFetchData();
           state.meta = meta; state.points = points;
@@ -2724,9 +3362,33 @@ map.on("contextmenu", (e) => {
       init();
 
       if ('serviceWorker' in navigator) {
+        let refreshingForServiceWorker = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshingForServiceWorker) return;
+          refreshingForServiceWorker = true;
+          window.location.reload();
+        });
+
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./service-worker.js')
-            .then(r => console.log('✅ PWA 離線核心註冊成功，範圍:', r.scope))
+            .then((registration) => {
+              console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
+              registration.update();
+
+              if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+
+              registration.addEventListener('updatefound', () => {
+                const worker = registration.installing;
+                if (!worker) return;
+                worker.addEventListener('statechange', () => {
+                  if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                    worker.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              });
+            })
             .catch(err => console.log('❌ PWA 註冊失敗:', err));
         });
       }
