@@ -4,6 +4,7 @@ import csv
 import json
 import math
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -257,6 +258,8 @@ def main() -> None:
 
     meta = {
         "source": source.name,
+        "sourceModified": datetime.fromtimestamp(source.stat().st_mtime).isoformat(timespec="seconds"),
+        "sourceSize": source.stat().st_size,
         "totalRows": sheet.max_row - 1,
         "converted": converted,
         "skipped": skipped,
