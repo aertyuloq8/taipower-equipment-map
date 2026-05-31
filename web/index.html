@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
   <head>
     <meta charset="utf-8" />
@@ -615,33 +615,23 @@
         }
 
         .top-controls {
-          align-items: flex-end;
-          display: grid;
-          grid-template-columns: auto 44px;
-          gap: 8px;
-          left: auto;
-          right: calc(10px + env(safe-area-inset-right, 0px));
+          align-items: center;
+          display: flex;
+          gap: 6px;
+          left: calc(10px + env(safe-area-inset-left, 0px));
+          right: auto;
           top: calc(10px + env(safe-area-inset-top, 0px));
-          width: auto;
+          width: calc(100vw - 20px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
         }
 
         #panelToggle {
           display: inline-flex !important;
-          grid-column: 2;
-          grid-row: 1;
           position: relative;
           z-index: 2;
         }
 
-        #toggleLabelsBtn.mobile-map-label-toggle {
-          grid-column: 1;
-          grid-row: 1;
-        }
-
         #mapSearchToggle {
-          grid-column: 1 / span 2;
-          grid-row: 2;
-          justify-self: end;
+          justify-self: auto;
         }
 
         body.is-panel-open .top-controls {
@@ -662,7 +652,7 @@
 
         .map-search-btn {
           border-radius: 8px;
-          min-width: 88px;
+          min-width: 82px;
         }
 
         .map-locate-button {
@@ -935,17 +925,18 @@
         .mobile-map-label-toggle {
           border-radius: 8px;
           box-shadow: 0 8px 22px rgba(22, 36, 52, 0.2);
+          flex: 0 1 auto;
           min-height: 44px;
-          min-width: 108px;
+          min-width: 96px;
           padding: 0 12px;
           white-space: nowrap;
         }
 
         .map-search-panel {
           border-radius: 14px;
-          left: auto;
+          left: calc(10px + env(safe-area-inset-left, 0px));
           max-height: calc(100dvh - 74px - env(safe-area-inset-top, 0px));
-          right: calc(10px + env(safe-area-inset-right, 0px));
+          right: auto;
           top: calc(64px + env(safe-area-inset-top, 0px));
           width: min(370px, calc(100vw - 20px));
         }
@@ -1108,6 +1099,8 @@
           border-right: 0;
           border-radius: 18px 0 0 18px;
           bottom: 0;
+          grid-template-columns: 58px minmax(0, 1fr);
+          grid-template-rows: minmax(0, 1fr);
           height: 100dvh;
           left: calc(100vw - min(430px, 52vw));
           max-height: none;
@@ -1129,13 +1122,45 @@
           transform: translateX(100%);
         }
 
+        .panel-head,
+        .panel-title {
+          display: none;
+        }
+
         .tab-nav {
-          border-radius: 18px 0 0 0;
-          padding-left: 10px;
+          align-self: stretch;
+          border-bottom: 0;
+          border-radius: 18px 0 0 18px;
+          border-right: 1px solid var(--line);
+          flex-direction: column;
+          grid-column: 1;
+          grid-row: 1;
+          min-height: 0;
+          overflow: hidden;
+          padding: 10px 6px;
         }
 
         .tab-btn {
-          min-height: 44px;
+          border-bottom: 0;
+          border-left: 3px solid transparent;
+          flex: 1 1 0;
+          font-size: 12px;
+          line-height: 1.2;
+          min-height: 0;
+          padding: 6px 4px;
+          white-space: normal;
+          writing-mode: vertical-rl;
+        }
+
+        .tab-btn.is-active {
+          border-bottom-color: transparent;
+          border-left-color: var(--accent);
+        }
+
+        .tab-content {
+          grid-column: 2;
+          grid-row: 1;
+          min-width: 0;
         }
 
         #tabEdit > div:first-child {
