@@ -3412,13 +3412,60 @@ map.on("contextmenu", (e) => {
           points: "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json" },
       ];
 
+// ==========================================
+      // 資料載入與快取 (Cache API) 機制
+      // ==========================================
       async function tryFetchData() {
+        // 定義快取的名稱
+        const CACHE_NAME = 'taipower-points-cache-v1';
+        
         for (const urls of DATA_URLS) {
           try {
-            const [metaRes, pointsRes] = await Promise.all([fetch(urls.meta, { cache: "no-cache" }), fetch(urls.points, { cache: "no-cache" })]);
-            if (metaRes.ok && pointsRes.ok) return { meta: await metaRes.json(), points: await pointsRes.json() };
-          } catch (e) { console.warn("資料來源嘗試失敗，切換備用：", urls.meta, e.message); }
+            // 1. 抓取 meta.json (檔案小，保持每次抓最新以確認連線與版本)
+            const metaRes = await fetch(urls.meta, { cache: "no-cache" });
+            if (!metaRes.ok) continue; // 如果失敗，換下一組備用網址
+            const meta = await metaRes.json();
+
+            let points = null;
+            
+            // 2. 開啟瀏覽器原生 Cache 空間
+            const cache = await caches.open(CACHE_NAME);
+            
+            // 3. 嘗試從快取中尋找 points.json
+            const cachedResponse = await cache.match(urls.points);
+
+            if (cachedResponse) {
+              // 【情況 A：有快取】直接讀取快取，達到秒開效果
+              points = await cachedResponse.json();
+              
+              // 背景偷偷向伺服器要最新的資料，更新快取供下次使用 (Stale-while-revalidate 策略)
+              fetch(urls.points)
+                .then(res => {
+                  if (res.ok) cache.put(urls.points, res.clone());
+                })
+                .catch(e => console.warn("背景更新 points.json 失敗 (可能無網路)", e));
+                
+            } else {
+              // 【情況 B：無快取】第一次載入或快取被清除了，直接下載
+              const pointsRes = await fetch(urls.points);
+              if (pointsRes.ok) {
+                // 將下載好的結果複製一份放進快取中
+                cache.put(urls.points, pointsRes.clone());
+                points = await pointsRes.json();
+              } else {
+                // 如果這組網址的 points.json 抓不到，換下一組
+                continue;
+              }
+            }
+
+            // 成功取得資料，回傳給系統
+            return { meta, points };
+
+          } catch (e) { 
+            console.warn("資料來源嘗試失敗，切換備用：", urls.meta, e.message); 
+          }
         }
+        
         throw new Error("所有資料來源皆無法連線，請檢查網路或資料目錄是否存在。");
       }
 
