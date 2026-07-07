@@ -508,6 +508,41 @@
         cursor: pointer;
       }
       .map-search-btn:hover { background: #eef8f9; color: var(--accent); }
+      .route-layer-toggle {
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--accent-dark);
+        font-size: 12px;
+        font-weight: 800;
+        min-height: 32px;
+        padding: 0 10px;
+        white-space: nowrap;
+      }
+      .route-layer-toggle:hover { background: #eef8f9; color: var(--accent); }
+      .route-layer-toggle.is-active {
+        background: var(--accent);
+        border-color: var(--accent-dark);
+        color: #fff;
+      }
+      .route-prefix-label {
+        pointer-events: none;
+      }
+      .route-prefix-label span {
+        align-items: center;
+        background: color-mix(in srgb, var(--route-color) 88%, white);
+        border: 3px solid rgba(255, 255, 255, 0.98);
+        border-radius: 999px;
+        box-shadow: 0 5px 16px rgba(22, 36, 52, 0.28);
+        color: #fff;
+        display: inline-flex;
+        font-size: 14px;
+        font-weight: 900;
+        min-height: 28px;
+        padding: 0 11px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+        white-space: nowrap;
+      }
       .map-search-panel {
         position: fixed;
         left: calc(10px + env(safe-area-inset-left, 0px));
@@ -1240,6 +1275,7 @@
       <div class="map-search-inner">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
           <span style="font-weight:800; font-size:14px; color:var(--accent-dark)">🔍 搜尋設備</span>
+          <button id="routeLayerToggle" class="route-layer-toggle" type="button" aria-pressed="false" title="依設備開頭連成推估路線">路線圖層</button>
           <button id="mapSearchClose"
             style="background:transparent; color:var(--muted); border:none; min-height:unset; padding:4px 8px; font-size:16px; cursor:pointer;">✕</button>
         </div>
@@ -1466,6 +1502,7 @@
       // 分頁切換 (新增了 'edit' 分頁支援)
       // ==========================================
       function switchTab(tabId) {
+        disableRouteLayerForTools();
         document.getElementById("panel").dataset.activeTab = tabId;
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('is-active'));
@@ -1525,6 +1562,7 @@
         collapsePanelControl();
       }
       document.getElementById("mapSearchToggle").addEventListener("click", () => {
+        disableRouteLayerForTools();
         const willOpen = !mapSearchPanel.classList.contains("is-open");
         if (willOpen) collapsePanelControl();
         mapSearchPanel.classList.toggle("is-open", willOpen);
@@ -1570,6 +1608,7 @@
       // 將資料帶入側邊欄，並切換分頁
       // ==========================================
       function openEditPanel(point) {
+        disableRouteLayerForTools();
         document.getElementById("editFormContainer").style.display = "flex";
         document.getElementById("sidebarSaveBtn").disabled = false;
 
@@ -1730,6 +1769,9 @@
       // Leaflet 地圖初始化
       // ==========================================
       const map = L.map("map", { preferCanvas: true, zoomControl: false, attributionControl: true });
+      map.createPane("routePane");
+      map.getPane("routePane").style.zIndex = 390;
+      map.getPane("routePane").style.pointerEvents = "none";
       L.control.zoom({ position: "bottomright" }).addTo(map);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap",
@@ -1738,6 +1780,7 @@
       const SHOW_POINTS_ZOOM   = 15;
       const MAX_POINT_LABELS   = 1200;
       const MAX_DIRECT_POINTS  = 3500;
+      const MAX_ROUTE_POINTS   = 4200;
       const STORAGE_KEY        = "taipower_inspection_v7";
 
       const state = {
@@ -1749,6 +1792,7 @@
         hiddenRecordFolders: new Set(), expandedFolders: new Set(),
         selectedFolders: new Set(), selectedRecords: new Set(),
         labelsHidden: false, lastFolderId: null,
+        routeLayerVisible: false,
       };
 
       const statusBox         = document.querySelector("#status");
@@ -1774,6 +1818,7 @@
         window.setTimeout(refreshViewportLayout, 260);
       });
 
+      let routeLayer   = L.layerGroup().addTo(map);
       let labelsLayer  = L.layerGroup().addTo(map);
       let recordsLayer = L.featureGroup().addTo(map);
 
@@ -1898,6 +1943,7 @@
       }
 
       function setPanelCollapsed(collapsed) {
+        if (!collapsed) disableRouteLayerForTools();
         document.querySelector("#panel").classList.toggle("is-collapsed", collapsed);
         document.querySelector(".app").classList.toggle("is-panel-collapsed", collapsed);
         document.body.classList.toggle("is-panel-open", !collapsed);
@@ -3020,6 +3066,184 @@
         const match = String(name || "").trim().match(/^[\u3400-\u9fff]+/);
         return match ? match[0].slice(0, 4) : UNKNOWN_EQUIPMENT_PREFIX;
       }
+      function equipmentRoutePrefix(name) {
+        const match = String(name || "").trim().match(/^[\u3400-\u9fff]+/);
+        return match ? match[0].slice(0, 4) : "";
+      }
+      const ROUTE_EXCLUDED_PREFIXES = new Set(["配電室", "亭置式", "地上配", "地下配"]);
+      function shouldExcludeRoutePoint(point) {
+        const name = String(point?.name || "").trim();
+        return [...ROUTE_EXCLUDED_PREFIXES].some(prefix => name.startsWith(prefix));
+      }
+      function routeNumberKey(name) {
+        const text = String(name || "");
+        const main = text.match(/^[\u3400-\u9fff]+(\d+)/);
+        const sideTokens = [...text.matchAll(/(左|右|前|後)(\d+)/g)]
+          .map(m => `${m[1] === "左" || m[1] === "前" ? 0 : 1}:${String(m[2]).padStart(4, "0")}`);
+        const branchTokens = [...text.matchAll(/[A-Z](\d*)|\d+/gi)].map(m => m[0]).join(":");
+        return [
+          main ? String(parseInt(main[1], 10)).padStart(6, "0") : "999999",
+          sideTokens.join("|"),
+          branchTokens,
+          text
+        ].join("|");
+      }
+      function routePointDistance(a, b) {
+        return map.distance([a.lat, a.lng], [b.lat, b.lng]);
+      }
+      function routeColor(prefix) {
+        return state.equipmentColorMap.get(prefix) || colorForPrefix(prefix);
+      }
+      function buildRouteGroups(points) {
+        const groups = new Map();
+        for (const point of points) {
+          if (shouldExcludeRoutePoint(point)) continue;
+          const prefix = equipmentRoutePrefix(point.name);
+          if (!prefix || prefix === UNKNOWN_EQUIPMENT_PREFIX) continue;
+          if (!groups.has(prefix)) groups.set(prefix, []);
+          groups.get(prefix).push(point);
+        }
+        return [...groups.entries()]
+          .filter(([, groupPoints]) => groupPoints.length >= 3)
+          .sort(([aPrefix, aPoints], [bPrefix, bPoints]) => bPoints.length - aPoints.length || compareNatural(aPrefix, bPrefix));
+      }
+      function routeEdgeLimit(points) {
+        const nearestDistances = points.map((point, index) => {
+          let nearest = Infinity;
+          for (let i = 0; i < points.length; i++) {
+            if (i === index) continue;
+            nearest = Math.min(nearest, routePointDistance(point, points[i]));
+          }
+          return nearest;
+        }).filter(Number.isFinite).sort((a, b) => a - b);
+        const median = nearestDistances[Math.floor(nearestDistances.length / 2)] || 90;
+        return Math.max(80, Math.min(420, median * 4.2));
+      }
+      function buildRouteEdges(points) {
+        const ordered = [...points].sort((a, b) => routeNumberKey(a.name).localeCompare(routeNumberKey(b.name), "zh-Hant", { numeric: true }));
+        const maxEdge = routeEdgeLimit(ordered);
+        const edges = [];
+        for (let i = 0; i < ordered.length; i++) {
+          const candidates = [];
+          for (let j = i + 1; j < ordered.length; j++) {
+            const seqGap = Math.abs(j - i);
+            if (seqGap > 14) break;
+            const distance = routePointDistance(ordered[i], ordered[j]);
+            if (distance <= maxEdge) candidates.push({ a: i, b: j, distance, seqGap });
+          }
+          candidates.sort((a, b) => a.distance - b.distance || a.seqGap - b.seqGap);
+          edges.push(...candidates.slice(0, 3));
+        }
+        edges.sort((a, b) => a.distance - b.distance || a.seqGap - b.seqGap);
+        const parent = ordered.map((_, i) => i);
+        const find = (x) => parent[x] === x ? x : (parent[x] = find(parent[x]));
+        const routeEdges = [];
+        for (const edge of edges) {
+          const rootA = find(edge.a), rootB = find(edge.b);
+          if (rootA === rootB) continue;
+          parent[rootA] = rootB;
+          routeEdges.push([ordered[edge.a], ordered[edge.b]]);
+        }
+        return routeEdges;
+      }
+      function routeLabelPoints(edges) {
+        const candidates = [];
+        for (const [a, b] of edges) {
+          candidates.push({
+            lat: (a.lat + b.lat) / 2,
+            lng: (a.lng + b.lng) / 2,
+            weight: routePointDistance(a, b),
+          });
+        }
+        candidates.sort((a, b) => b.weight - a.weight);
+        const targetCount = Math.max(1, Math.min(6, Math.ceil(edges.length / 18)));
+        const selected = [];
+        const minGap = map.getZoom() >= 17 ? 90 : 150;
+        for (const candidate of candidates) {
+          if (selected.length >= targetCount) break;
+          const tooClose = selected.some(existing => map.distance([existing.lat, existing.lng], [candidate.lat, candidate.lng]) < minGap);
+          if (!tooClose) selected.push(candidate);
+        }
+        if (!selected.length && candidates.length) selected.push(candidates[0]);
+        return selected;
+      }
+      function updateRouteLayer() {
+        routeLayer.clearLayers();
+        const btn = document.getElementById("routeLayerToggle");
+        if (btn) {
+          btn.classList.toggle("is-active", state.routeLayerVisible);
+          btn.setAttribute("aria-pressed", String(state.routeLayerVisible));
+        }
+        if (!state.routeLayerVisible || !state.points.length) return;
+
+        const sourcePoints = visibleFilteredPoints();
+        if (sourcePoints.length < 3) {
+          setStatus("目前視窗沒有足夠點位可形成路線");
+          return;
+        }
+        if (sourcePoints.length > MAX_ROUTE_POINTS) {
+          setStatus("路線點位過多，請放大地圖後再開啟路線圖層");
+          return;
+        }
+        const groups = buildRouteGroups(sourcePoints);
+        let routeCount = 0;
+        for (const [prefix, groupPoints] of groups.slice(0, 80)) {
+          const color = routeColor(prefix);
+          const edges = buildRouteEdges(groupPoints);
+          for (const edge of edges) {
+            routeCount++;
+            const latLngs = edge.map(point => [point.lat, point.lng]);
+            L.polyline(latLngs, {
+              color: "#fff",
+              weight: 8,
+              opacity: 0.38,
+              lineCap: "round",
+              lineJoin: "round",
+              interactive: false,
+              pane: "routePane",
+            }).addTo(routeLayer);
+            L.polyline(latLngs, {
+              color,
+              weight: 5,
+              opacity: 0.78,
+              lineCap: "round",
+              lineJoin: "round",
+              interactive: false,
+              pane: "routePane",
+            }).addTo(routeLayer);
+          }
+          for (const labelPoint of routeLabelPoints(edges)) {
+            L.marker([labelPoint.lat, labelPoint.lng], {
+              icon: L.divIcon({
+                className: "route-prefix-label",
+                html: `<span style="--route-color:${color}">${escapeHtml(prefix)}</span>`,
+                iconSize: null,
+                iconAnchor: [24, 18],
+              }),
+              interactive: false,
+              pane: "routePane",
+            }).addTo(routeLayer);
+          }
+        }
+        if (routeCount === 0) setStatus("目前視窗沒有足夠點位可形成路線");
+      }
+      function disableRouteLayerForTools() {
+        if (!state.routeLayerVisible) return false;
+        state.routeLayerVisible = false;
+        routeLayer.clearLayers();
+        const routeBtn = document.getElementById("routeLayerToggle");
+        if (routeBtn) {
+          routeBtn.classList.remove("is-active");
+          routeBtn.setAttribute("aria-pressed", "false");
+        }
+        state.labelsHidden = false;
+        const labelsBtn = document.getElementById("toggleLabelsBtn");
+        if (labelsBtn) labelsBtn.classList.remove("is-hidden");
+        syncMobileMapControls();
+        renderer.redraw();
+        updateRecordMarkers();
+        return true;
+      }
 
       const canvasLayer = L.Layer.extend({
         onAdd(currentMap) {
@@ -3043,6 +3267,7 @@
             state.drawnItems = []; 
             updateLabels(); 
             updateStats(); 
+            updateRouteLayer();
             return; 
           }
           state.visiblePoints = visibleFilteredPoints();
@@ -3064,7 +3289,7 @@
             );
             drawPrefixLabels(ctx, state.drawnItems);
           }
-          updateLabels(); updateStats();
+          updateLabels(); updateStats(); updateRouteLayer();
         },
       });
       const renderer = new canvasLayer().addTo(map);
@@ -3192,11 +3417,27 @@
         syncMobileMapControls();
         renderer.redraw(); updateRecordMarkers();
       });
+      document.getElementById("routeLayerToggle").addEventListener("click", () => {
+        state.routeLayerVisible = !state.routeLayerVisible;
+        if (state.routeLayerVisible) {
+          mapSearchPanel.classList.remove("is-open");
+          collapsePanelControl();
+          state.labelsHidden = true;
+          document.getElementById("toggleLabelsBtn").classList.add("is-hidden");
+          syncMobileMapControls();
+          renderer.redraw();
+        } else {
+          updateRouteLayer();
+        }
+        if (state.routeLayerVisible) setStatus("已顯示設備開頭推估路線");
+        window.setTimeout(() => setStatus(""), 1800);
+      });
 
       areaSelect.addEventListener("change", applyFilter);
       searchInput.addEventListener("input", debounce(applyFilter, 180));
 
       function applyFilter() {
+        disableRouteLayerForTools();
         state.area = areaSelect.value; state.query = searchInput.value.trim(); state.search = parseSearchQuery(state.query);
         renderResults(searchMatches(state.search)); renderer.redraw();
       }
@@ -3320,6 +3561,7 @@ function renderDefectStats() {
           fragment.querySelector("strong").textContent = point.name || "未命名";
           fragment.querySelector("span").textContent   = `${point.area || ""} / ${point.code || ""}`;
           fragment.querySelector("button").addEventListener("click", () => {
+            disableRouteLayerForTools();
             map.flyTo([point.lat, point.lng], map.getMaxZoom(), { duration: 0.45 });
             L.popup({ autoPanPadding: [10, 10] }).setLatLng([point.lat, point.lng]).setContent(miniPopupHtml(point)).openOn(map);
             document.getElementById("mapSearchPanel").classList.remove("is-open");
@@ -3330,6 +3572,7 @@ function renderDefectStats() {
       }
 
       map.on("click", (e) => {
+        disableRouteLayerForTools();
         if (state.displayMode === "prefix") {
           const prefix = state.drawnItems.find(item => { const b = item.hitBox; return b && e.containerPoint.x >= b.x && e.containerPoint.x <= b.x + b.width && e.containerPoint.y >= b.y && e.containerPoint.y <= b.y + b.height; });
           if (prefix) map.flyTo([prefix.lat, prefix.lng], Math.max(map.getZoom() + 2, SHOW_POINTS_ZOOM), { duration: 0.45 });
@@ -3349,7 +3592,8 @@ function renderDefectStats() {
         collapseFloatingControls();
       });
 
-map.on("contextmenu", (e) => {
+      map.on("contextmenu", (e) => {
+        disableRouteLayerForTools();
         const { lat, lng } = e.latlng, code = latLngToTpcCode(lat, lng);
         const newPoint = { lat, lng, name: "手動新增設備", code, area: "自訂" };
         L.popup({ autoPanPadding: [10, 10] }).setLatLng([lat, lng]).setContent(miniPopupHtml(newPoint)).openOn(map);
@@ -3379,6 +3623,7 @@ map.on("contextmenu", (e) => {
         button.setAttribute("aria-pressed", stateName === "active" ? "true" : "false");
       }
       document.getElementById("locateButton").addEventListener("click", (e) => {
+        disableRouteLayerForTools();
         if (locationWatchId !== null) {
           navigator.geolocation.clearWatch(locationWatchId); locationWatchId = null;
           if (locationMarker) { map.removeLayer(locationMarker); locationMarker = null; }
@@ -3412,60 +3657,13 @@ map.on("contextmenu", (e) => {
           points: "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json" },
       ];
 
-// ==========================================
-      // 資料載入與快取 (Cache API) 機制
-      // ==========================================
       async function tryFetchData() {
-        // 定義快取的名稱
-        const CACHE_NAME = 'taipower-points-cache-v1';
-        
         for (const urls of DATA_URLS) {
           try {
-            // 1. 抓取 meta.json (檔案小，保持每次抓最新以確認連線與版本)
-            const metaRes = await fetch(urls.meta, { cache: "no-cache" });
-            if (!metaRes.ok) continue; // 如果失敗，換下一組備用網址
-            const meta = await metaRes.json();
-
-            let points = null;
-            
-            // 2. 開啟瀏覽器原生 Cache 空間
-            const cache = await caches.open(CACHE_NAME);
-            
-            // 3. 嘗試從快取中尋找 points.json
-            const cachedResponse = await cache.match(urls.points);
-
-            if (cachedResponse) {
-              // 【情況 A：有快取】直接讀取快取，達到秒開效果
-              points = await cachedResponse.json();
-              
-              // 背景偷偷向伺服器要最新的資料，更新快取供下次使用 (Stale-while-revalidate 策略)
-              fetch(urls.points)
-                .then(res => {
-                  if (res.ok) cache.put(urls.points, res.clone());
-                })
-                .catch(e => console.warn("背景更新 points.json 失敗 (可能無網路)", e));
-                
-            } else {
-              // 【情況 B：無快取】第一次載入或快取被清除了，直接下載
-              const pointsRes = await fetch(urls.points);
-              if (pointsRes.ok) {
-                // 將下載好的結果複製一份放進快取中
-                cache.put(urls.points, pointsRes.clone());
-                points = await pointsRes.json();
-              } else {
-                // 如果這組網址的 points.json 抓不到，換下一組
-                continue;
-              }
-            }
-
-            // 成功取得資料，回傳給系統
-            return { meta, points };
-
-          } catch (e) { 
-            console.warn("資料來源嘗試失敗，切換備用：", urls.meta, e.message); 
-          }
+            const [metaRes, pointsRes] = await Promise.all([fetch(urls.meta, { cache: "no-cache" }), fetch(urls.points, { cache: "no-cache" })]);
+            if (metaRes.ok && pointsRes.ok) return { meta: await metaRes.json(), points: await pointsRes.json() };
+          } catch (e) { console.warn("資料來源嘗試失敗，切換備用：", urls.meta, e.message); }
         }
-        
         throw new Error("所有資料來源皆無法連線，請檢查網路或資料目錄是否存在。");
       }
 
