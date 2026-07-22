@@ -2685,13 +2685,19 @@
         reader.readAsText(file);
       });
 
-      // ==========================================
+     // ==========================================
       // Popup 相關函式
       // ==========================================
-      function googleNavUrl(point) { return `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}`; }
-      function streetViewUrl(point) { return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point.lat},${point.lng}`; }
-
- 
+      function googleMapsPinUrl(point) {
+        const lat = Number(point.lat);
+        const lng = Number(point.lng);
+        const query = Number.isFinite(lat) && Number.isFinite(lng)
+          ? `${lat.toFixed(6)},${lng.toFixed(6)}`
+          : `${point.lat},${point.lng}`;
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+      }
+      function googleNavUrl(point) { return googleMapsPinUrl(point); }
+      function streetViewUrl(point) { return googleMapsPinUrl(point); }
 
       // ==========================================
       // 全頁 click / input 事件委派
