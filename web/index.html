@@ -1360,7 +1360,6 @@
               </div>
               <div id="editPanelActions" style="display:none; flex-direction:row; gap:6px; flex-shrink:0; align-items:center;">
                 <a id="sidebarNavBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🗺️ 導航</a>
-                <a id="sidebarStreetBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🏙️ 街景</a>
               </div>
             </div>
             <div id="editPanelWarning" style="margin-top:6px;"></div>
@@ -1634,7 +1633,6 @@
 
         document.getElementById("editPanelActions").style.display = "flex";
         document.getElementById("sidebarNavBtn").href = googleNavUrl(point);
-        document.getElementById("sidebarStreetBtn").href = streetViewUrl(point);
 
         document.getElementById("sidebar-name-input").value = existingRecord ? (existingRecord.name || point.name || "手動新增設備") : (point.name || "手動新增設備");
         document.getElementById("sidebar-defect-input").value = existingRecord ? (existingRecord.defect || "") : "";
@@ -2685,7 +2683,7 @@
         reader.readAsText(file);
       });
 
-     // ==========================================
+      // ==========================================
       // Popup 相關函式
       // ==========================================
       function googleMapsPinUrl(point) {
@@ -2697,7 +2695,8 @@
         return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
       }
       function googleNavUrl(point) { return googleMapsPinUrl(point); }
-      function streetViewUrl(point) { return googleMapsPinUrl(point); }
+
+ 
 
       // ==========================================
       // 全頁 click / input 事件委派
