@@ -352,6 +352,7 @@
       }
       .photo-record-strip img {
         border-radius: 4px;
+        cursor: pointer;
         flex: 0 0 72px;
         height: 72px;
         object-fit: cover;
@@ -370,6 +371,102 @@
         padding: 0 10px;
       }
       .photo-record-actions button:hover { background: #eef8f9; }
+      .photo-record-defect {
+        background: #fffbeb;
+        border-left: 3px solid var(--amber);
+        color: #5f4a16;
+        font-size: 12px;
+        line-height: 1.45;
+        padding: 7px 8px;
+        word-break: break-word;
+      }
+      .photo-record-defect strong {
+        color: #8a5a13;
+        display: block;
+        font-size: 11px;
+        margin-bottom: 2px;
+      }
+      .photo-viewer {
+        align-items: center;
+        background: rgba(10, 20, 30, 0.84);
+        display: none;
+        inset: 0;
+        justify-content: center;
+        padding: calc(14px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px));
+        position: fixed;
+        z-index: 10010;
+      }
+      .photo-viewer.is-open { display: flex; }
+      .photo-viewer-dialog {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        max-height: min(900px, 100%);
+        max-width: 980px;
+        overflow: hidden;
+        width: min(100%, 980px);
+      }
+      .photo-viewer-head,
+      .photo-viewer-foot {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        padding: 10px 12px;
+      }
+      .photo-viewer-head { border-bottom: 1px solid var(--line); }
+      .photo-viewer-head strong {
+        font-size: 14px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .photo-viewer-close {
+        align-items: center;
+        background: #f1f5f9;
+        border: 1px solid var(--line);
+        color: var(--accent-dark);
+        display: inline-flex;
+        flex: 0 0 36px;
+        font-size: 21px;
+        height: 36px;
+        justify-content: center;
+        padding: 0;
+        width: 36px;
+      }
+      .photo-viewer-body {
+        align-items: center;
+        background: #17202a;
+        display: flex;
+        justify-content: center;
+        min-height: 160px;
+        overflow: auto;
+      }
+      .photo-viewer-body img {
+        display: block;
+        max-height: min(72vh, 760px);
+        max-width: 100%;
+        object-fit: contain;
+      }
+      .photo-viewer-foot {
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .photo-viewer-download {
+        background: var(--accent);
+        border-radius: 6px;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 800;
+        min-height: 36px;
+        padding: 8px 12px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
       .folder-list {
         flex-grow: 1;
         min-height: 0;
@@ -1426,6 +1523,22 @@
       </div>
     </div>
 
+    <div id="photoViewer" class="photo-viewer" role="dialog" aria-modal="true" aria-labelledby="photoViewerTitle" aria-hidden="true">
+      <section class="photo-viewer-dialog">
+        <header class="photo-viewer-head">
+          <strong id="photoViewerTitle">照片預覽</strong>
+          <button id="photoViewerClose" class="photo-viewer-close" type="button" aria-label="關閉照片預覽" title="關閉">&#215;</button>
+        </header>
+        <div class="photo-viewer-body">
+          <img id="photoViewerImage" alt="巡檢照片預覽" />
+        </div>
+        <footer class="photo-viewer-foot">
+          <span id="photoViewerMeta"></span>
+          <a id="photoViewerDownload" class="photo-viewer-download" href="#">下載照片</a>
+        </footer>
+      </section>
+    </div>
+
     <div class="top-controls">
       <button id="panelToggle" class="icon-button" type="button"
         aria-expanded="false" title="展開面板"
@@ -2023,20 +2136,59 @@
         renderEditPhotos();
       }
 
+      let photoViewerUrl = null;
+      let photoViewerRequest = 0;
+
+      function closePhotoViewer(cancelPending = true) {
+        if (cancelPending) photoViewerRequest++;
+        const viewer = document.getElementById("photoViewer");
+        if (!viewer) return;
+        viewer.classList.remove("is-open");
+        viewer.setAttribute("aria-hidden", "true");
+        document.getElementById("photoViewerImage").removeAttribute("src");
+        document.getElementById("photoViewerDownload").removeAttribute("href");
+        if (photoViewerUrl) URL.revokeObjectURL(photoViewerUrl);
+        photoViewerUrl = null;
+      }
+
       async function openStoredPhoto(photoId) {
+        const requestId = ++photoViewerRequest;
         try {
           const blob = await getPhotoBlob(photoId);
           if (!blob) {
             GlobalModal.alert("找不到這張照片。它可能尚未從完整 ZIP 備份還原。");
             return;
           }
-          const url = URL.createObjectURL(blob);
-          window.open(url, "_blank", "noopener");
-          window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+          if (requestId !== photoViewerRequest) return;
+          const record = state.records.find(item => (item.photos || []).some(photo => photo.id === photoId));
+          const photo = record?.photos?.find(item => item.id === photoId);
+          closePhotoViewer(false);
+          photoViewerUrl = URL.createObjectURL(blob);
+          const viewer = document.getElementById("photoViewer");
+          const image = document.getElementById("photoViewerImage");
+          const download = document.getElementById("photoViewerDownload");
+          document.getElementById("photoViewerTitle").textContent = photo?.fileName || "照片預覽";
+          document.getElementById("photoViewerMeta").textContent = record
+            ? `${record.name || record.code || "巡檢紀錄"} | ${record.defect || "未填寫改善事項"}`
+            : "巡檢照片";
+          image.src = photoViewerUrl;
+          image.alt = photo?.fileName || "巡檢照片預覽";
+          download.href = photoViewerUrl;
+          download.download = photo?.fileName || "巡檢照片.jpg";
+          viewer.classList.add("is-open");
+          viewer.setAttribute("aria-hidden", "false");
         } catch (error) {
           GlobalModal.alert("無法開啟照片：" + error.message);
         }
       }
+
+      document.getElementById("photoViewerClose").addEventListener("click", closePhotoViewer);
+      document.getElementById("photoViewer").addEventListener("click", event => {
+        if (event.target.id === "photoViewer") closePhotoViewer();
+      });
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape") closePhotoViewer();
+      });
 
       async function renderPhotoBrowser() {
         const grid = document.getElementById("photoBrowserGrid");
@@ -2069,6 +2221,10 @@
             </div>
             <div class="photo-record-strip">${record.photos.map(photo =>
               `<img data-photo-open="${escapeHtml(photo.id)}" data-browser-image="${escapeHtml(photo.id)}" alt="${escapeHtml(photo.fileName || "巡檢照片")}" title="點擊查看原圖" />`).join("")}</div>
+            <div class="photo-record-defect">
+              <strong>改善事項</strong>
+              <span>${escapeHtml(record.defect || "未填寫")}</span>
+            </div>
             <div class="photo-record-actions"><span>${escapeHtml(record.code || "未填圖號")}</span><span>${record.photos.length} 張</span></div>
           </article>`).join("");
         await Promise.all(records.flatMap(record => record.photos).map(async photo => {
@@ -2757,9 +2913,9 @@
       // ==========================================
       // 批次操作 (batchMoveBtn 已修改為部分執行)
       // ==========================================
-      function recordToExcelRow(record) {
+      function recordToExcelRow(record, includePhotoLinks = false) {
         const photos = Array.isArray(record.photos) ? record.photos : [];
-        return {
+        const row = {
           "巡視日期(目錄)": getFullFolderPath(record.folderId),
           "土木設備": record.name || "",
           "圖號座標": record.code || "",
@@ -2776,18 +2932,67 @@
           "照片檔案": photos.map(photo => photo.fileName || photo.id).join(" | "),
           "照片識別碼": photos.map(photo => photo.id).join(" | "),
         };
+        if (includePhotoLinks) row["照片連結"] = "";
+        return row;
       }
 
-      function createRecordsWorkbook(records, fallbackFolderPath = "") {
-        const rows = records.length ? records.map(recordToExcelRow) : [{
+      function setExcelHyperlink(worksheet, columnIndex, rowIndex, target, tooltip) {
+        const ref = XLSX.utils.encode_cell({ c: columnIndex, r: rowIndex });
+        const cell = worksheet[ref] || (worksheet[ref] = { t: "s", v: "" });
+        cell.l = { Target: target, Tooltip: tooltip };
+      }
+
+      function createRecordsWorkbook(records, fallbackFolderPath = "", photoLinkFor = null) {
+        const includePhotoLinks = typeof photoLinkFor === "function";
+        const emptyRow = {
           "巡視日期(目錄)": fallbackFolderPath,
           "土木設備": "", "圖號座標": "", "不良項目": "", "緩急程度": "",
           "設計單號": "", "設計日期": "", "施工單位": "", "施工單號": "", "施工日期": "",
           "圖資修正": "", "正確圖號": "", "照片數量": 0, "照片檔案": "", "照片識別碼": "",
-        }];
+        };
+        if (includePhotoLinks) emptyRow["照片連結"] = "";
+        const rows = records.length
+          ? records.map(record => recordToExcelRow(record, includePhotoLinks))
+          : [emptyRow];
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
+
+        if (includePhotoLinks && records.length) {
+          const mainLinkColumn = Object.keys(rows[0]).indexOf("照片連結");
+          const photoLinkRows = [];
+          records.forEach((record, recordIndex) => {
+            const linkedPhotos = (record.photos || []).map(photo => ({ photo, target: photoLinkFor(record, photo) }))
+              .filter(item => item.target);
+            const firstLink = linkedPhotos[0];
+            if (firstLink) {
+              const mainLinkRef = XLSX.utils.encode_cell({ c: mainLinkColumn, r: recordIndex + 1 });
+              if (!ws[mainLinkRef]) ws[mainLinkRef] = { t: "s", v: "" };
+              ws[mainLinkRef].v = `開啟第一張圖片 (${linkedPhotos.length})`;
+              setExcelHyperlink(ws, mainLinkColumn, recordIndex + 1, firstLink.target, firstLink.photo.fileName || "開啟照片");
+            }
+            linkedPhotos.forEach(({ photo, target }) => {
+              photoLinkRows.push({
+                "巡視日期(目錄)": getFullFolderPath(record.folderId),
+                "土木設備": record.name || "",
+                "圖號座標": record.code || "",
+                "改善事項": record.defect || "",
+                "照片檔案": photo.fileName || photo.id,
+                "照片連結": "開啟圖片",
+                target,
+              });
+            });
+          });
+          if (photoLinkRows.length) {
+            const photoRows = photoLinkRows.map(({ target, ...row }) => row);
+            const photoWs = XLSX.utils.json_to_sheet(photoRows);
+            const photoLinkColumn = Object.keys(photoRows[0]).indexOf("照片連結");
+            photoLinkRows.forEach((row, index) => {
+              setExcelHyperlink(photoWs, photoLinkColumn, index + 1, row.target, row["照片檔案"] || "開啟照片");
+            });
+            XLSX.utils.book_append_sheet(wb, photoWs, "照片連結");
+          }
+        }
         return wb;
       }
 
@@ -3174,6 +3379,15 @@
         return String(value || "record").replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_").slice(0, 70) || "record";
       }
 
+      function photoArchivePath(record, photo) {
+        const fileName = `${zipPathPart(photo.id)}_${zipPathPart(photo.fileName || "photo.jpg")}`;
+        return `photos/${zipPathPart(record.id)}/${fileName}`;
+      }
+
+      function excelPhotoLinkTarget(path) {
+        return String(path).split("/").map(part => encodeURIComponent(part)).join("/");
+      }
+
       async function exportSystemBackup() {
         if (!window.JSZip) {
           GlobalModal.alert("完整備份元件尚未載入，請確認網路後重試。");
@@ -3195,29 +3409,40 @@
             records: state.records,
           };
           zip.file("records.json", JSON.stringify(backupData, null, 2));
-          const workbook = createRecordsWorkbook(state.records);
-          zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
 
           let photoCount = 0;
+          const exportedPhotoPaths = new Map();
           for (const record of state.records) {
             for (const photo of record.photos || []) {
               const blob = await getPhotoBlob(photo.id);
               if (!blob) continue;
-              const fileName = `${zipPathPart(photo.id)}_${zipPathPart(photo.fileName || "photo.jpg")}`;
-              zip.file(`photos/${zipPathPart(record.id)}/${fileName}`, blob);
+              const path = photoArchivePath(record, photo);
+              zip.file(path, blob);
+              exportedPhotoPaths.set(photo.id, path);
               photoCount++;
             }
           }
+          const workbook = createRecordsWorkbook(
+            state.records,
+            "",
+            (record, photo) => {
+              const path = exportedPhotoPaths.get(photo.id);
+              return path ? excelPhotoLinkTarget(path) : "";
+            }
+          );
+          zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
           zip.file("README.txt", [
             "台電土木設備巡檢系統 V2 完整備份",
             `匯出時間：${exportedAt}`,
             `巡檢紀錄：${state.records.length} 筆`,
             `照片檔案：${photoCount} 張`,
-            "records.json 用於完整還原；records.xlsx 可直接以 Excel 瀏覽。",
+            "請先解壓縮 ZIP，再開啟 records.xlsx。",
+            "records.xlsx 的「巡視紀錄」與「照片連結」工作表可點擊照片連結開啟同包 photos 資料夾內的圖片。",
+            "records.json 用於完整還原。",
           ].join("\r\n"));
           const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
           downloadBlob(blob, `巡檢完整備份_V2_${new Date().toISOString().slice(0, 10)}.zip`);
-          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${photoCount} 張照片。`);
+          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${photoCount} 張照片。解壓縮 ZIP 後，records.xlsx 可直接點擊照片連結。`);
         } catch (error) {
           console.error("完整備份失敗：", error);
           GlobalModal.alert("完整備份失敗：" + error.message);
