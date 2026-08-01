@@ -2024,9 +2024,41 @@
       function putPhotoBlob(photoId, blob) {
         return photoDbRequest("readwrite", store => store.put({ id: photoId, blob, updatedAt: Date.now() }));
       }
-      async function getPhotoBlob(photoId) {
+      function findPhotoMetadata(photoId) {
+        for (const record of state.records || []) {
+          const photo = (record.photos || []).find(item => item.id === photoId);
+          if (photo) return photo;
+        }
+        return null;
+      }
+      function inferPhotoMimeType(photo, blob) {
+        const metadataType = String(photo?.type || "").toLowerCase();
+        if (/^image\/(jpeg|png|webp|gif|bmp|heic|heif)$/.test(metadataType)) return metadataType;
+        const fileName = String(photo?.fileName || "").toLowerCase();
+        if (/\.png$/.test(fileName)) return "image/png";
+        if (/\.webp$/.test(fileName)) return "image/webp";
+        if (/\.gif$/.test(fileName)) return "image/gif";
+        if (/\.bmp$/.test(fileName)) return "image/bmp";
+        if (/\.jpe?g$/.test(fileName)) return "image/jpeg";
+        const blobType = String(blob?.type || "").toLowerCase();
+        return blobType.startsWith("image/") ? blobType : "image/jpeg";
+      }
+      function normalizePhotoBlob(blob, photo) {
+        if (!blob) return null;
+        const mimeType = inferPhotoMimeType(photo, blob);
+        return String(blob.type || "").toLowerCase() === mimeType
+          ? blob
+          : new Blob([blob], { type: mimeType });
+      }
+      async function getPhotoBlob(photoId, photoMeta = null) {
         const item = await photoDbRequest("readonly", store => store.get(photoId));
-        return item?.blob || null;
+        if (!item?.blob) return null;
+        const photo = photoMeta || findPhotoMetadata(photoId);
+        const normalized = normalizePhotoBlob(item.blob, photo);
+        if (normalized !== item.blob) {
+          putPhotoBlob(photoId, normalized).catch(error => console.warn("修復照片格式失敗：", error));
+        }
+        return normalized;
       }
       function deletePhotoBlob(photoId) {
         return photoDbRequest("readwrite", store => store.delete(photoId));
@@ -2126,7 +2158,7 @@
           </div>`).join("");
         await Promise.all(photos.map(async ({ meta, blob }) => {
           const image = strip.querySelector(`[data-photo-image="${CSS.escape(meta.id)}"]`);
-          const sourceBlob = blob || await getPhotoBlob(meta.id);
+          const sourceBlob = blob || await getPhotoBlob(meta.id, meta);
           if (!image || !sourceBlob || epoch !== photoRenderEpoch) return;
           const url = URL.createObjectURL(sourceBlob);
           photoPreviewUrls.push(url);
@@ -2195,14 +2227,14 @@
       async function openStoredPhoto(photoId) {
         const requestId = ++photoViewerRequest;
         try {
-          const blob = await getPhotoBlob(photoId);
+          const record = state.records.find(item => (item.photos || []).some(photo => photo.id === photoId));
+          const photo = record?.photos?.find(item => item.id === photoId);
+          const blob = await getPhotoBlob(photoId, photo);
           if (!blob) {
             GlobalModal.alert("找不到這張照片。它可能尚未從完整 ZIP 備份還原。");
             return;
           }
           if (requestId !== photoViewerRequest) return;
-          const record = state.records.find(item => (item.photos || []).some(photo => photo.id === photoId));
-          const photo = record?.photos?.find(item => item.id === photoId);
           closePhotoViewer(false);
           photoViewerUrl = URL.createObjectURL(blob);
           const viewer = document.getElementById("photoViewer");
@@ -2312,7 +2344,7 @@
           </article>`).join("");
         await Promise.all(records.flatMap(record => record.photos).map(async photo => {
           const image = grid.querySelector(`[data-browser-image="${CSS.escape(photo.id)}"]`);
-          const blob = await getPhotoBlob(photo.id);
+          const blob = await getPhotoBlob(photo.id, photo);
           if (image && blob) {
             const url = URL.createObjectURL(blob);
             photoBrowserPreviewUrls.push(url);
@@ -3496,7 +3528,7 @@
           const exportedPhotoPaths = new Map();
           for (const record of state.records) {
             for (const photo of record.photos || []) {
-              const blob = await getPhotoBlob(photo.id);
+              const blob = await getPhotoBlob(photo.id, photo);
               if (!blob) continue;
               const path = photoArchivePath(record, photo);
               zip.file(path, blob);
@@ -3567,7 +3599,11 @@
           if (entry.dir || !path.startsWith("photos/")) continue;
           const fileName = path.split("/").pop();
           const photoId = [...metaById.keys()].find(id => fileName.startsWith(`${id}_`));
-          if (photoId) photoEntries.push({ id: photoId, blob: await entry.async("blob") });
+          if (photoId) {
+            const photo = metaById.get(photoId);
+            const blob = normalizePhotoBlob(await entry.async("blob"), photo);
+            photoEntries.push({ id: photoId, blob });
+          }
         }
         return { parsed, photoEntries };
       }
