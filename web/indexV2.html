@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>土木設備分布地圖 V2</title>
+    <title>土木設備分布地圖照片版</title>
     <link rel="manifest" href="manifest-v2.json" />
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -220,6 +220,80 @@
       .btn-import-json { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }
       .btn-export-zip { background: #ecfeff; color: #0f766e; border: 1px dashed #0f766e; }
       .btn-import-zip { background: #f5f3ff; color: #6d28d9; border: 1px dashed #6d28d9; }
+      .edition-switch-link {
+        align-items: center;
+        align-self: stretch;
+        background: #eef8f9;
+        border: 1px solid #9bd4d9;
+        border-radius: 6px;
+        color: var(--accent-dark);
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 800;
+        justify-content: center;
+        margin: 0 18px 10px;
+        min-height: 36px;
+        padding: 7px 10px;
+        text-decoration: none;
+      }
+      .edition-switch-link:hover { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+      .storage-health {
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        display: grid;
+        gap: 8px;
+        margin: 0 0 10px;
+        padding: 10px;
+      }
+      .storage-health-head,
+      .storage-health-values,
+      .storage-health-actions {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+      }
+      .storage-health-head strong { color: var(--accent-dark); font-size: 13px; }
+      .storage-health-values { align-items: stretch; gap: 6px; }
+      .storage-health-value {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        color: var(--muted);
+        flex: 1;
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 6px 8px;
+      }
+      .storage-health-value strong { color: var(--text); display: block; font-size: 12px; }
+      .storage-persistence { color: var(--muted); font-size: 11px; min-height: 16px; }
+      .storage-persistence.is-protected { color: #0f766e; font-weight: 800; }
+      .storage-refresh-button {
+        align-items: center;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        color: var(--accent-dark);
+        display: inline-flex;
+        font-size: 16px;
+        height: 30px;
+        justify-content: center;
+        min-height: 30px;
+        padding: 0;
+        width: 30px;
+      }
+      .storage-persist-button {
+        background: #fff;
+        border: 1px solid #9bd4d9;
+        border-radius: 6px;
+        color: var(--accent-dark);
+        flex: 1;
+        font-size: 12px;
+        font-weight: 800;
+        min-height: 34px;
+        padding: 6px 10px;
+      }
+      .storage-persist-button:disabled { background: #ecfdf5; border-color: #86efac; color: #047857; cursor: default; }
       .photo-panel {
         border: 1px solid var(--line);
         border-radius: 6px;
@@ -1600,9 +1674,10 @@
     <main class="app is-panel-collapsed">
       <aside id="panel" class="panel is-collapsed">
         <header class="panel-head">
-          <div class="panel-title"><h1>土木設備分布地圖</h1></div>
+          <div class="panel-title"><h1>土木設備分布地圖照片版</h1></div>
           <button id="toggleLabelsBtn" class="btn-global-toggle">隱藏所有主圖標籤</button>
         </header>
+        <a class="edition-switch-link" href="./index.html" title="切換至不含照片功能的基本地圖版">↩ 開啟基本版</a>
         <nav class="tab-nav">
           <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
           <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
@@ -1655,6 +1730,20 @@
               <button id="importSystemBtn" class="btn-action btn-import-zip" title="從完整 ZIP 或舊版 JSON 備份還原">📂 資料還原</button>
               <input type="file" id="importSystemInput" accept=".zip,.json" style="display:none" />
             </div>
+            <section class="storage-health" aria-label="裝置儲存狀態">
+              <div class="storage-health-head">
+                <strong>裝置儲存</strong>
+                <button id="storageRefreshBtn" class="storage-refresh-button" type="button" title="更新儲存狀態" aria-label="更新儲存狀態">↻</button>
+              </div>
+              <div class="storage-health-values">
+                <span class="storage-health-value">照片<strong id="photoStorageUsage">讀取中</strong></span>
+                <span class="storage-health-value">本網站可用<strong id="storageAvailable">讀取中</strong></span>
+              </div>
+              <div id="storagePersistenceStatus" class="storage-persistence">資料保護：檢查中</div>
+              <div class="storage-health-actions">
+                <button id="requestPersistentStorageBtn" class="storage-persist-button" type="button">保護此裝置資料</button>
+              </div>
+            </section>
             <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; padding:8px 12px; border-radius:6px; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
               <div style="display:flex; align-items:center; gap:8px">
                 <button id="selectAllBtn" style="background:#0f766e; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">全選 ☑️</button>
@@ -1847,6 +1936,7 @@
         if (tabId === 'records') {
           document.getElementById('tabRecordsBtn').classList.add('is-active');
           document.getElementById('tabRecords').classList.add('is-active');
+          refreshStorageStatus();
         } else if (tabId === 'stats') {
           document.getElementById('tabStatsBtn').classList.add('is-active');
           document.getElementById('tabStats').classList.add('is-active');
@@ -1980,8 +2070,7 @@
         document.getElementById("photoBrowserGrid").addEventListener("click", (event) => {
           const image = event.target.closest("[data-photo-open]");
           if (image) {
-            if (image.currentSrc || image.src) window.open(image.currentSrc || image.src, "_blank", "noopener");
-            else openStoredPhoto(image.dataset.photoOpen);
+            openStoredPhoto(image.dataset.photoOpen);
             return;
           }
           const card = event.target.closest("[data-photo-record]");
@@ -1989,6 +2078,8 @@
           const record = state.records.find(item => item.id === card.dataset.photoRecord);
           if (record) openEditPanel(record);
         });
+        document.getElementById("storageRefreshBtn").addEventListener("click", refreshStorageStatus);
+        document.getElementById("requestPersistentStorageBtn").addEventListener("click", requestPersistentStorage);
       }
 
       // ==========================================
@@ -2078,9 +2169,103 @@
           transaction.onabort = () => reject(transaction.error || new Error("照片資料庫還原已取消"));
         });
       }
+
+      function formatStorageBytes(bytes) {
+        const value = Number(bytes);
+        if (!Number.isFinite(value) || value < 0) return "--";
+        if (value < 1024) return `${Math.round(value)} B`;
+        const units = ["KB", "MB", "GB", "TB"];
+        let size = value / 1024;
+        let unit = 0;
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024;
+          unit++;
+        }
+        return `${size >= 10 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
+      }
+
+      async function getPhotoStorageUsage() {
+        const entries = await photoDbRequest("readonly", store => store.getAll());
+        return entries.reduce((summary, entry) => {
+          if (!entry?.blob) return summary;
+          summary.count++;
+          summary.bytes += Number(entry.blob.size) || 0;
+          return summary;
+        }, { count: 0, bytes: 0 });
+      }
+
+      async function refreshStorageStatus() {
+        const photoUsageEl = document.getElementById("photoStorageUsage");
+        const availableEl = document.getElementById("storageAvailable");
+        const persistenceEl = document.getElementById("storagePersistenceStatus");
+        const persistButton = document.getElementById("requestPersistentStorageBtn");
+        if (!photoUsageEl || !availableEl || !persistenceEl || !persistButton) return;
+        photoUsageEl.textContent = "更新中";
+        availableEl.textContent = "更新中";
+        persistenceEl.classList.remove("is-protected");
+        persistenceEl.textContent = "資料保護：檢查中";
+        try {
+          const storage = navigator.storage;
+          const [photos, estimate, persisted] = await Promise.all([
+            getPhotoStorageUsage(),
+            storage?.estimate ? storage.estimate() : Promise.resolve(null),
+            storage?.persisted ? storage.persisted() : Promise.resolve(null),
+          ]);
+          photoUsageEl.textContent = `${photos.count} 張 / ${formatStorageBytes(photos.bytes)}`;
+          const remaining = Number.isFinite(estimate?.quota) && Number.isFinite(estimate?.usage)
+            ? Math.max(0, estimate.quota - estimate.usage)
+            : null;
+          availableEl.textContent = remaining === null ? "瀏覽器未提供" : formatStorageBytes(remaining);
+          if (persisted === true) {
+            persistenceEl.textContent = "資料保護：已啟用";
+            persistenceEl.classList.add("is-protected");
+            persistButton.textContent = "已啟用資料保護";
+            persistButton.disabled = true;
+          } else if (!storage?.persist) {
+            persistenceEl.textContent = "資料保護：此瀏覽器不支援";
+            persistButton.textContent = "此瀏覽器不支援";
+            persistButton.disabled = true;
+          } else {
+            persistenceEl.textContent = "資料保護：未啟用";
+            persistButton.textContent = "保護此裝置資料";
+            persistButton.disabled = false;
+          }
+        } catch (error) {
+          console.warn("讀取儲存狀態失敗：", error);
+          photoUsageEl.textContent = "無法讀取";
+          availableEl.textContent = "無法讀取";
+          persistenceEl.textContent = "資料保護：無法讀取";
+          persistButton.disabled = true;
+        }
+      }
+
+      async function requestPersistentStorage() {
+        if (!navigator.storage?.persist) {
+          GlobalModal.alert("此瀏覽器不支援資料保護請求，請持續建立完整備份。");
+          return;
+        }
+        const button = document.getElementById("requestPersistentStorageBtn");
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "處理中";
+        try {
+          const granted = await navigator.storage.persist();
+          await refreshStorageStatus();
+          GlobalModal.alert(granted
+            ? "此裝置已啟用資料保護。瀏覽器較不會在空間不足時自動清除照片，但仍請定期建立完整備份。"
+            : "瀏覽器未授予資料保護。照片仍可使用，但請更頻繁建立完整備份。");
+        } catch (error) {
+          console.warn("資料保護請求失敗：", error);
+          GlobalModal.alert("資料保護請求失敗，請持續建立完整備份。");
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+
       async function deleteRecordPhotos(records) {
         const photoIds = records.flatMap(record => Array.isArray(record?.photos) ? record.photos.map(photo => photo.id).filter(Boolean) : []);
         await Promise.all(photoIds.map(deletePhotoBlob));
+        refreshStorageStatus();
       }
 
       function photoFileName(name, type = "image/jpeg") {
@@ -3546,7 +3731,7 @@
           );
           zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
           zip.file("README.txt", [
-            "台電土木設備巡檢系統 V2 完整備份",
+            "土木設備分布地圖照片版完整備份",
             `匯出時間：${exportedAt}`,
             `巡檢紀錄：${state.records.length} 筆`,
             `照片檔案：${photoCount} 張`,
@@ -3555,7 +3740,7 @@
             "records.json 用於完整還原。",
           ].join("\r\n"));
           const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
-          downloadBlob(blob, `巡檢完整備份_V2_${new Date().toISOString().slice(0, 10)}.zip`);
+          downloadBlob(blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}.zip`);
           GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${photoCount} 張照片。解壓縮 ZIP 後，records.xlsx 可直接點擊照片連結。`);
         } catch (error) {
           console.error("完整備份失敗：", error);
@@ -3581,6 +3766,7 @@
         saveToLocalStorage();
         renderer.redraw();
         renderPhotoBrowser();
+        refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
       }
@@ -3589,7 +3775,7 @@
         if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
         const zip = await JSZip.loadAsync(file);
         const recordsEntry = zip.file("records.json");
-        if (!recordsEntry) throw new Error("找不到 records.json，這不是巡檢系統 V2 完整備份");
+        if (!recordsEntry) throw new Error("找不到 records.json，這不是照片版完整備份");
         const parsed = JSON.parse(await recordsEntry.async("string"));
         if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("records.json 格式錯誤");
         const metaById = new Map(parsed.records.flatMap(record => (record.photos || []).map(photo => [photo.id, photo])));
@@ -3887,6 +4073,7 @@
             });
 
             saveToLocalStorage();
+            refreshStorageStatus();
             deleteRecordPhotos([{ photos: removedPhotoIds.map(id => ({ id })) }]).catch(error => console.warn("移除舊照片失敗：", error));
             beginEditPhotos(state.records.find(record => record.id === finalRecordId));
             map.closePopup();
@@ -4653,7 +4840,7 @@ function renderDefectStats() {
       async function init() {
         setStatus("載入設備資料...");
 		initSidebarForm(); // ★ 加入這行，初始化編輯表單內容
-        loadFromLocalStorage(); renderFolders(); renderDefectStats(); updateRecordMarkers();
+        loadFromLocalStorage(); renderFolders(); renderDefectStats(); updateRecordMarkers(); refreshStorageStatus();
         syncMobileMapControls();
         try {
           const { meta, points } = await tryFetchData();

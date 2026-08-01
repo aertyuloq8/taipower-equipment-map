@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-v2-photo-v1";
+const CACHE_NAME = "equipment-map-photo-edition-v2";
 const APP_SHELL = "./indexV2.html";
 const STATIC_ASSETS = [
   APP_SHELL,
@@ -19,7 +19,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys
-        .filter(key => key.startsWith("equipment-map-v2-photo-") && key !== CACHE_NAME)
+        .filter(key => (key.startsWith("equipment-map-v2-photo-") || key.startsWith("equipment-map-photo-edition-")) && key !== CACHE_NAME)
         .map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );

@@ -212,6 +212,23 @@
       .btn-import-csv  { background: #f0fdf4; color: #16a34a; border: 1px dashed #16a34a; }
       .btn-export-json { background: #fffbeb; color: #d97706; border: 1px dashed #d97706; }
       .btn-import-json { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }
+      .photo-edition-link {
+        align-items: center;
+        align-self: stretch;
+        background: #eef8f9;
+        border: 1px solid #9bd4d9;
+        border-radius: 6px;
+        color: var(--accent-dark);
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 800;
+        justify-content: center;
+        margin: 0 18px 10px;
+        min-height: 36px;
+        padding: 7px 10px;
+        text-decoration: none;
+      }
+      .photo-edition-link:hover { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
       .folder-list {
         flex-grow: 1;
         min-height: 0;
@@ -1297,6 +1314,7 @@
           <div class="panel-title"><h1>土木設備分布地圖</h1></div>
           <button id="toggleLabelsBtn" class="btn-global-toggle">隱藏所有主圖標籤</button>
         </header>
+        <a class="photo-edition-link" href="./indexV2.html" title="開啟可拍照、備份照片的巡檢版本">📷 開啟照片版</a>
         <nav class="tab-nav">
           <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
           <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
