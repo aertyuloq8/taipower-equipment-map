@@ -3967,8 +3967,87 @@
 
       const INSPECTION_CARD_FILE = "inspection-card.html";
 
+      function inspectionCardDetailPath(photoId) {
+        return `cards/${zipPathPart(photoId)}.html`;
+      }
+
       function inspectionCardLinkTarget(photoId) {
-        return `${INSPECTION_CARD_FILE}?photo=${encodeURIComponent(photoId)}`;
+        return excelPhotoLinkTarget(inspectionCardDetailPath(photoId));
+      }
+
+      function createInspectionCardDetailHtml(card) {
+        const cardData = JSON.stringify({
+          name: card.name || "",
+          code: card.code || "",
+          defect: card.defect || "",
+          photoPath: `../${card.photoPath || ""}`,
+          listPath: `../${INSPECTION_CARD_FILE}`,
+        })
+          .replace(/</g, "\\u003c")
+          .replace(/>/g, "\\u003e")
+          .replace(/&/g, "\\u0026")
+          .replace(/\u2028/g, "\\u2028")
+          .replace(/\u2029/g, "\\u2029");
+        return `<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>巡檢卡</title>
+  <style>
+    :root { color-scheme: light; --accent: #087f8c; --bg: #eef2f5; --text: #17202a; --line: #d9e1e8; }
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif; margin: 0; }
+    main { margin: 0 auto; max-width: 980px; padding: 24px 16px 40px; }
+    .card { background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(22, 36, 52, 0.13); overflow: hidden; }
+    .card-head { background: var(--accent); color: #fff; padding: 18px 22px; }
+    .card-head h1 { font-size: 24px; line-height: 1.35; margin: 0; overflow-wrap: anywhere; }
+    .photo-frame { background: #fff; padding: 20px; text-align: center; }
+    .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 72vh; max-width: 100%; object-fit: contain; }
+    .details { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 18px 22px 22px; }
+    .detail { font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
+    .back { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; margin-bottom: 14px; padding: 8px 12px; text-decoration: none; }
+    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 15px 16px; } .card-head h1 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    (() => {
+      const card = ${cardData};
+      const app = document.getElementById("app");
+      const text = (tag, value, className = "") => {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        element.textContent = value;
+        return element;
+      };
+      const back = document.createElement("a");
+      back.className = "back";
+      back.href = card.listPath;
+      back.textContent = "返回巡檢卡列表";
+      const section = document.createElement("article");
+      section.className = "card";
+      const head = document.createElement("header");
+      head.className = "card-head";
+      head.append(text("h1", card.name || card.code || "巡檢紀錄"));
+      const photoFrame = document.createElement("div");
+      photoFrame.className = "photo-frame";
+      const image = document.createElement("img");
+      image.src = card.photoPath;
+      image.alt = card.name || card.code || "巡檢照片";
+      photoFrame.append(image);
+      const details = document.createElement("section");
+      details.className = "details";
+      details.append(text("div", "圖號：" + (card.code || "未填寫"), "detail"));
+      details.append(text("div", "改善事項：" + (card.defect || "未填寫"), "detail"));
+      section.append(head, photoFrame, details);
+      app.append(back, section);
+      document.title = (card.name || card.code || "巡檢卡") + " | 巡檢卡";
+    })();
+  <\/script>
+</body>
+</html>`;
       }
 
       function createInspectionCardHtml(cards) {
@@ -4034,7 +4113,7 @@
         list.append(text("h1", "巡檢卡"));
         cards.forEach(card => {
           const link = document.createElement("a");
-          link.href = "?photo=" + encodeURIComponent(card.id);
+          link.href = card.cardPath || ("?photo=" + encodeURIComponent(card.id));
           link.append(
             text("span", (card.name || card.code || "巡檢紀錄") + " | " + (card.code || "未填圖號"), "list-title"),
             text("span", "改善事項：" + (card.defect || "未填寫"), "list-defect")
@@ -4047,7 +4126,7 @@
         app.replaceChildren();
         const back = document.createElement("a");
         back.className = "back";
-        back.href = "#";
+        back.href = "${INSPECTION_CARD_FILE}";
         back.textContent = "返回巡檢卡列表";
         const section = document.createElement("article");
         section.className = "card";
@@ -4110,6 +4189,7 @@
               const blob = await getPhotoBlob(photo.id, photo);
               if (!blob) continue;
               const path = photoArchivePath(record, photo);
+              const cardPath = inspectionCardDetailPath(photo.id);
               zip.file(path, blob);
               const originalTarget = excelPhotoLinkTarget(path);
               exportedPhotoLinks.set(photo.id, {
@@ -4122,11 +4202,15 @@
                 code: record.code || "",
                 defect: record.defect || "",
                 photoPath: originalTarget,
+                cardPath,
               });
               photoCount++;
             }
           }
           zip.file(INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards));
+          inspectionCards.forEach(card => {
+            zip.file(card.cardPath, createInspectionCardDetailHtml(card));
+          });
           const workbook = createRecordsWorkbook(
             state.records,
             "",
@@ -4140,7 +4224,7 @@
             `照片檔案：${photoCount} 張`,
             "請先解壓縮 ZIP，再開啟 records.xlsx。",
             `Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「原始照片連結」。`,
-            `${INSPECTION_CARD_FILE} 使用同包 photos 資料夾內的原始圖片，不會額外複製照片檔案。`,
+            `${INSPECTION_CARD_FILE} 是巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的原始圖片，不會額外複製照片檔案。`,
             "records.json 用於完整還原。",
           ].join("\r\n"));
           const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
