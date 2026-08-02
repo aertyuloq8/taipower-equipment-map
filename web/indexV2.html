@@ -47,7 +47,7 @@
         border-right: 1px solid var(--line);
         box-shadow: var(--shadow);
         display: grid;
-        grid-template-rows: auto auto minmax(0, 1fr);
+        grid-template-rows: auto auto auto minmax(0, 1fr);
         min-height: 0;
         overflow: hidden;
         position: relative;
@@ -1069,7 +1069,7 @@
           max-height: calc(100dvh - 74px - env(safe-area-inset-top, 0px));
           position: fixed;
           right: 0;
-          grid-template-rows: auto minmax(0, 1fr);
+          grid-template-rows: auto auto minmax(0, 1fr);
           transform: translateY(0);
           transition: transform 220ms ease;
           width: 100vw;
@@ -1495,7 +1495,7 @@
           border-radius: 18px 0 0 18px;
           bottom: 0;
           grid-template-columns: 58px minmax(0, 1fr);
-          grid-template-rows: minmax(0, 1fr);
+          grid-template-rows: minmax(0, 1fr) auto;
           height: 100dvh;
           left: calc(100vw - min(430px, 52vw));
           max-height: none;
@@ -1522,6 +1522,14 @@
           display: none;
         }
 
+        .edition-switch-link {
+          grid-column: 2;
+          grid-row: 2;
+          margin: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+          min-height: 32px;
+          padding: 5px 8px;
+        }
+
         .tab-nav {
           align-self: stretch;
           border-bottom: 0;
@@ -1529,7 +1537,7 @@
           border-right: 1px solid var(--line);
           flex-direction: column;
           grid-column: 1;
-          grid-row: 1;
+          grid-row: 1 / span 2;
           min-height: 0;
           overflow: hidden;
           padding: 10px 6px;
