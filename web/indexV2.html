@@ -2583,18 +2583,7 @@
         return lines;
       }
 
-      function formatShareCoordinate(value) {
-        const number = Number(value);
-        return Number.isFinite(number) ? number.toFixed(6) : "未記錄";
-      }
-
-      function formatShareDate(value) {
-        if (!value) return "未記錄";
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-TW", { hour12: false });
-      }
-
-      // Build a self-contained image so mobile sharing includes the inspection context instead of a page link.
+      // Build a self-contained image so mobile sharing includes the needed inspection context instead of a page link.
       async function createInspectionShareCard() {
         if (!photoViewerPhoto?.id) throw new Error("尚未選擇照片");
         const blob = await getPhotoBlob(photoViewerPhoto.id, photoViewerPhoto);
@@ -2611,10 +2600,7 @@
         const title = record.name || record.code || "巡檢紀錄";
         const details = [
           `圖號：${record.code || "未填寫"}`,
-          `位置：${formatShareCoordinate(record.lat)}, ${formatShareCoordinate(record.lng)}`,
           `改善事項：${record.defect || "未填寫"}`,
-          `緩急：${record.urgency || "未設定"}`,
-          `拍攝時間：${formatShareDate(photoViewerPhoto.capturedAt)}`,
         ];
 
         const measureCanvas = document.createElement("canvas");
@@ -2623,7 +2609,7 @@
         const titleLines = wrapCanvasText(measure, title, contentWidth);
         measure.font = "400 28px system-ui, sans-serif";
         const detailLines = details.flatMap(detail => wrapCanvasText(measure, detail, contentWidth));
-        const headerHeight = 54 + titleLines.length * 42 + 24;
+        const headerHeight = 26 + titleLines.length * 42 + 22;
         const detailHeight = 34 + detailLines.length * 42 + 26;
         const canvas = document.createElement("canvas");
         canvas.width = width;
@@ -2634,12 +2620,9 @@
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.fillStyle = "#087f8c";
         context.fillRect(0, 0, canvas.width, headerHeight);
-        context.fillStyle = "#dff5f6";
-        context.font = "800 22px system-ui, sans-serif";
-        context.fillText("巡檢紀錄分享", padding, 36);
         context.fillStyle = "#ffffff";
         context.font = "700 34px system-ui, sans-serif";
-        let titleY = 80;
+        let titleY = 50;
         titleLines.forEach(line => {
           context.fillText(line, padding, titleY);
           titleY += 42;
