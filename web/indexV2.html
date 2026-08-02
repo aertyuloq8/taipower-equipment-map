@@ -3438,7 +3438,10 @@
           "照片檔案": photos.map(photo => photo.fileName || photo.id).join(" | "),
           "照片識別碼": photos.map(photo => photo.id).join(" | "),
         };
-        if (includePhotoLinks) row["照片連結"] = "";
+        if (includePhotoLinks) {
+          row["巡檢卡連結"] = "";
+          row["原始照片連結"] = "";
+        }
         return row;
       }
 
@@ -3456,7 +3459,10 @@
           "設計單號": "", "設計日期": "", "施工單位": "", "施工單號": "", "施工日期": "",
           "圖資修正": "", "正確圖號": "", "照片數量": 0, "照片檔案": "", "照片識別碼": "",
         };
-        if (includePhotoLinks) emptyRow["照片連結"] = "";
+        if (includePhotoLinks) {
+          emptyRow["巡檢卡連結"] = "";
+          emptyRow["原始照片連結"] = "";
+        }
         const rows = records.length
           ? records.map(record => recordToExcelRow(record, includePhotoLinks))
           : [emptyRow];
@@ -3465,36 +3471,59 @@
         XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
 
         if (includePhotoLinks && records.length) {
-          const mainLinkColumn = Object.keys(rows[0]).indexOf("照片連結");
+          const cardLinkColumn = Object.keys(rows[0]).indexOf("巡檢卡連結");
+          const originalLinkColumn = Object.keys(rows[0]).indexOf("原始照片連結");
           const photoLinkRows = [];
           records.forEach((record, recordIndex) => {
-            const linkedPhotos = (record.photos || []).map(photo => ({ photo, target: photoLinkFor(record, photo) }))
-              .filter(item => item.target);
+            const linkedPhotos = (record.photos || []).map(photo => {
+              const links = photoLinkFor(record, photo);
+              return {
+                photo,
+                cardTarget: typeof links === "string" ? links : (links?.card || ""),
+                originalTarget: typeof links === "string" ? links : (links?.original || ""),
+              };
+            }).filter(item => item.cardTarget || item.originalTarget);
             const firstLink = linkedPhotos[0];
             if (firstLink) {
-              const mainLinkRef = XLSX.utils.encode_cell({ c: mainLinkColumn, r: recordIndex + 1 });
-              if (!ws[mainLinkRef]) ws[mainLinkRef] = { t: "s", v: "" };
-              ws[mainLinkRef].v = `開啟第一張圖片 (${linkedPhotos.length})`;
-              setExcelHyperlink(ws, mainLinkColumn, recordIndex + 1, firstLink.target, firstLink.photo.fileName || "開啟照片");
+              if (firstLink.cardTarget) {
+                const cardLinkRef = XLSX.utils.encode_cell({ c: cardLinkColumn, r: recordIndex + 1 });
+                if (!ws[cardLinkRef]) ws[cardLinkRef] = { t: "s", v: "" };
+                ws[cardLinkRef].v = `開啟第一張巡檢卡 (${linkedPhotos.length})`;
+                setExcelHyperlink(ws, cardLinkColumn, recordIndex + 1, firstLink.cardTarget, firstLink.photo.fileName || "開啟巡檢卡");
+              }
+              if (firstLink.originalTarget) {
+                const originalLinkRef = XLSX.utils.encode_cell({ c: originalLinkColumn, r: recordIndex + 1 });
+                if (!ws[originalLinkRef]) ws[originalLinkRef] = { t: "s", v: "" };
+                ws[originalLinkRef].v = `開啟第一張原圖 (${linkedPhotos.length})`;
+                setExcelHyperlink(ws, originalLinkColumn, recordIndex + 1, firstLink.originalTarget, firstLink.photo.fileName || "開啟原始照片");
+              }
             }
-            linkedPhotos.forEach(({ photo, target }) => {
+            linkedPhotos.forEach(({ photo, cardTarget, originalTarget }) => {
               photoLinkRows.push({
                 "巡視日期(目錄)": getFullFolderPath(record.folderId),
                 "土木設備": record.name || "",
                 "圖號座標": record.code || "",
                 "改善事項": record.defect || "",
                 "照片檔案": photo.fileName || photo.id,
-                "照片連結": "開啟圖片",
-                target,
+                "巡檢卡連結": cardTarget ? "開啟巡檢卡" : "",
+                "原始照片連結": originalTarget ? "開啟原圖" : "",
+                cardTarget,
+                originalTarget,
               });
             });
           });
           if (photoLinkRows.length) {
-            const photoRows = photoLinkRows.map(({ target, ...row }) => row);
+            const photoRows = photoLinkRows.map(({ cardTarget, originalTarget, ...row }) => row);
             const photoWs = XLSX.utils.json_to_sheet(photoRows);
-            const photoLinkColumn = Object.keys(photoRows[0]).indexOf("照片連結");
+            const photoCardColumn = Object.keys(photoRows[0]).indexOf("巡檢卡連結");
+            const photoOriginalColumn = Object.keys(photoRows[0]).indexOf("原始照片連結");
             photoLinkRows.forEach((row, index) => {
-              setExcelHyperlink(photoWs, photoLinkColumn, index + 1, row.target, row["照片檔案"] || "開啟照片");
+              if (row.cardTarget) {
+                setExcelHyperlink(photoWs, photoCardColumn, index + 1, row.cardTarget, row["照片檔案"] || "開啟巡檢卡");
+              }
+              if (row.originalTarget) {
+                setExcelHyperlink(photoWs, photoOriginalColumn, index + 1, row.originalTarget, row["照片檔案"] || "開啟原始照片");
+              }
             });
             XLSX.utils.book_append_sheet(wb, photoWs, "照片連結");
           }
@@ -3894,6 +3923,114 @@
         return String(path).split("/").map(part => encodeURIComponent(part)).join("/");
       }
 
+      const INSPECTION_CARD_FILE = "inspection-card.html";
+
+      function inspectionCardLinkTarget(photoId) {
+        return `${INSPECTION_CARD_FILE}#${encodeURIComponent(photoId)}`;
+      }
+
+      function createInspectionCardHtml(cards) {
+        const cardData = JSON.stringify(cards)
+          .replace(/</g, "\\u003c")
+          .replace(/>/g, "\\u003e")
+          .replace(/&/g, "\\u0026")
+          .replace(/\u2028/g, "\\u2028")
+          .replace(/\u2029/g, "\\u2029");
+        return `<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>巡檢卡</title>
+  <style>
+    :root { color-scheme: light; --accent: #087f8c; --bg: #eef2f5; --text: #17202a; --line: #d9e1e8; }
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif; margin: 0; }
+    main { margin: 0 auto; max-width: 980px; padding: 24px 16px 40px; }
+    .card { background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(22, 36, 52, 0.13); overflow: hidden; }
+    .card-head { background: var(--accent); color: #fff; padding: 18px 22px; }
+    .card-head h1 { font-size: 24px; line-height: 1.35; margin: 0; overflow-wrap: anywhere; }
+    .photo-frame { background: #fff; padding: 20px; text-align: center; }
+    .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 72vh; max-width: 100%; object-fit: contain; }
+    .details { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 18px 22px 22px; }
+    .detail { font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
+    .back { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; margin-bottom: 14px; padding: 8px 12px; text-decoration: none; }
+    .list { background: #fff; border: 1px solid var(--line); display: grid; gap: 8px; padding: 18px; }
+    .list a { border: 1px solid var(--line); color: #075d67; font-weight: 800; padding: 12px; text-decoration: none; overflow-wrap: anywhere; }
+    .list a:hover { background: #eef8f9; }
+    .empty { background: #fff; border: 1px solid var(--line); color: #687584; padding: 22px; }
+    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 15px 16px; } .card-head h1 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <script>
+    (() => {
+      const cards = ${cardData};
+      const app = document.getElementById("app");
+      const text = (tag, value, className = "") => {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        element.textContent = value;
+        return element;
+      };
+      const selectedId = () => {
+        try { return decodeURIComponent(location.hash.slice(1)); } catch { return ""; }
+      };
+      const showList = () => {
+        app.replaceChildren();
+        if (!cards.length) {
+          app.append(text("div", "這份備份沒有照片巡檢卡。", "empty"));
+          return;
+        }
+        const list = document.createElement("section");
+        list.className = "list";
+        list.append(text("h1", "巡檢卡"));
+        cards.forEach(card => {
+          const link = document.createElement("a");
+          link.href = "#" + encodeURIComponent(card.id);
+          link.textContent = (card.name || card.code || "巡檢紀錄") + " | " + (card.code || "未填圖號");
+          list.append(link);
+        });
+        app.append(list);
+      };
+      const showCard = card => {
+        app.replaceChildren();
+        const back = document.createElement("a");
+        back.className = "back";
+        back.href = "#";
+        back.textContent = "返回巡檢卡列表";
+        const section = document.createElement("article");
+        section.className = "card";
+        const head = document.createElement("header");
+        head.className = "card-head";
+        head.append(text("h1", card.name || card.code || "巡檢紀錄"));
+        const photoFrame = document.createElement("div");
+        photoFrame.className = "photo-frame";
+        const image = document.createElement("img");
+        image.src = card.photoPath;
+        image.alt = card.name || card.code || "巡檢照片";
+        photoFrame.append(image);
+        const details = document.createElement("section");
+        details.className = "details";
+        details.append(text("div", "圖號：" + (card.code || "未填寫"), "detail"));
+        details.append(text("div", "改善事項：" + (card.defect || "未填寫"), "detail"));
+        section.append(head, photoFrame, details);
+        app.append(back, section);
+        document.title = (card.name || card.code || "巡檢卡") + " | 巡檢卡";
+      };
+      const render = () => {
+        const card = cards.find(item => item.id === selectedId());
+        if (card) showCard(card); else showList();
+      };
+      window.addEventListener("hashchange", render);
+      render();
+    })();
+  <\/script>
+</body>
+</html>`;
+      }
+
       async function exportSystemBackup() {
         if (!window.JSZip) {
           GlobalModal.alert("完整備份元件尚未載入，請確認網路後重試。");
@@ -3917,24 +4054,34 @@
           zip.file("records.json", JSON.stringify(backupData, null, 2));
 
           let photoCount = 0;
-          const exportedPhotoPaths = new Map();
+          const exportedPhotoLinks = new Map();
+          const inspectionCards = [];
           for (const record of state.records) {
             for (const photo of record.photos || []) {
               const blob = await getPhotoBlob(photo.id, photo);
               if (!blob) continue;
               const path = photoArchivePath(record, photo);
               zip.file(path, blob);
-              exportedPhotoPaths.set(photo.id, path);
+              const originalTarget = excelPhotoLinkTarget(path);
+              exportedPhotoLinks.set(photo.id, {
+                card: inspectionCardLinkTarget(photo.id),
+                original: originalTarget,
+              });
+              inspectionCards.push({
+                id: photo.id,
+                name: record.name || "",
+                code: record.code || "",
+                defect: record.defect || "",
+                photoPath: originalTarget,
+              });
               photoCount++;
             }
           }
+          zip.file(INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards));
           const workbook = createRecordsWorkbook(
             state.records,
             "",
-            (record, photo) => {
-              const path = exportedPhotoPaths.get(photo.id);
-              return path ? excelPhotoLinkTarget(path) : "";
-            }
+            (record, photo) => exportedPhotoLinks.get(photo.id) || null
           );
           zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
           zip.file("README.txt", [
@@ -3943,12 +4090,13 @@
             `巡檢紀錄：${state.records.length} 筆`,
             `照片檔案：${photoCount} 張`,
             "請先解壓縮 ZIP，再開啟 records.xlsx。",
-            "records.xlsx 的「巡視紀錄」與「照片連結」工作表可點擊照片連結開啟同包 photos 資料夾內的圖片。",
+            `Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「原始照片連結」。`,
+            `${INSPECTION_CARD_FILE} 使用同包 photos 資料夾內的原始圖片，不會額外複製照片檔案。`,
             "records.json 用於完整還原。",
           ].join("\r\n"));
           const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
           downloadBlob(blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}.zip`);
-          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${photoCount} 張照片。解壓縮 ZIP 後，records.xlsx 可直接點擊照片連結。`);
+          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${photoCount} 張照片。解壓縮 ZIP 後，records.xlsx 可開啟巡檢卡或原始照片。`);
         } catch (error) {
           console.error("完整備份失敗：", error);
           GlobalModal.alert("完整備份失敗：" + error.message);
