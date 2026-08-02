@@ -558,6 +558,12 @@
         text-decoration: none;
         white-space: nowrap;
       }
+      .photo-viewer-share-card {
+        background: var(--accent);
+        border-color: var(--accent-dark);
+        color: #fff;
+      }
+      .photo-viewer-share-card:hover { background: var(--accent-dark); }
       .photo-viewer-download {
         background: var(--accent);
         border-radius: 6px;
@@ -1692,9 +1698,10 @@
         <footer class="photo-viewer-foot">
           <span id="photoViewerMeta"></span>
           <div class="photo-viewer-actions">
-            <button id="photoViewerCopy" class="photo-viewer-action" type="button">複製圖片</button>
-            <button id="photoViewerShare" class="photo-viewer-action" type="button">分享圖片</button>
-            <a id="photoViewerDownload" class="photo-viewer-action photo-viewer-download" href="#">下載照片</a>
+            <button id="photoViewerCopy" class="photo-viewer-action" type="button">複製原圖</button>
+            <button id="photoViewerShare" class="photo-viewer-action photo-viewer-share-card" type="button">分享巡檢卡</button>
+            <button id="photoViewerShareOriginal" class="photo-viewer-action" type="button">分享原圖</button>
+            <a id="photoViewerDownload" class="photo-viewer-action photo-viewer-download" href="#">下載原圖</a>
           </div>
         </footer>
       </section>
@@ -2445,6 +2452,7 @@
       let photoViewerRequest = 0;
       let photoViewerBlob = null;
       let photoViewerPhoto = null;
+      let photoViewerRecord = null;
       let photoBrowserPreviewUrls = [];
 
       function clearPhotoBrowserPreviewUrls() {
@@ -2464,6 +2472,7 @@
         photoViewerUrl = null;
         photoViewerBlob = null;
         photoViewerPhoto = null;
+        photoViewerRecord = null;
       }
 
       async function openStoredPhoto(photoId) {
@@ -2484,6 +2493,7 @@
           const download = document.getElementById("photoViewerDownload");
           photoViewerBlob = blob;
           photoViewerPhoto = photo;
+          photoViewerRecord = record || null;
           document.getElementById("photoViewerTitle").textContent = photo?.fileName || "照片預覽";
           document.getElementById("photoViewerMeta").textContent = record
             ? `${record.name || record.code || "巡檢紀錄"} | ${record.defect || "未填寫改善事項"}`
@@ -2500,45 +2510,202 @@
       }
 
       async function copyPhotoFromViewer() {
-        if (!photoViewerBlob || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+        if (!photoViewerPhoto?.id || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
           GlobalModal.alert("此瀏覽器不支援直接複製圖片，請使用下載照片。");
           return;
         }
         try {
-          const type = photoViewerBlob.type || "image/jpeg";
-          await navigator.clipboard.write([new ClipboardItem({ [type]: photoViewerBlob })]);
+          const blob = await getPhotoBlob(photoViewerPhoto.id, photoViewerPhoto);
+          if (!blob) throw new Error("找不到目前開啟的照片");
+          const clipboardBlob = await createClipboardImageBlob(blob);
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": clipboardBlob })]);
           GlobalModal.alert("圖片已複製，可貼到訊息或文件中。");
         } catch (error) {
-          if (error?.name !== "NotAllowedError") GlobalModal.alert("複製圖片失敗：" + error.message);
+          if (error?.name === "NotAllowedError") {
+            GlobalModal.alert("瀏覽器未允許複製圖片，剪貼簿沒有更新。請不要使用先前貼上的舊圖片，可改用下載或分享功能。");
+            return;
+          }
+          GlobalModal.alert("複製圖片失敗：" + error.message);
         }
       }
 
-      async function sharePhotoFromViewer() {
-        if (!photoViewerBlob || typeof navigator.share !== "function") {
+      function loadImageFromBlob(blob) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(blob);
+          const image = new Image();
+          image.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+          };
+          image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("圖片解碼失敗"));
+          };
+          image.src = url;
+        });
+      }
+
+      function canvasToBlob(canvas, type, quality) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("圖片產生失敗")), type, quality);
+        });
+      }
+
+      async function createClipboardImageBlob(blob) {
+        const image = await loadImageFromBlob(blob);
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        return canvasToBlob(canvas, "image/png");
+      }
+
+      function wrapCanvasText(context, text, maxWidth) {
+        const lines = [];
+        let line = "";
+        for (const character of String(text || "")) {
+          if (character === "\n") {
+            lines.push(line || " ");
+            line = "";
+            continue;
+          }
+          const candidate = line + character;
+          if (line && context.measureText(candidate).width > maxWidth) {
+            lines.push(line);
+            line = character;
+          } else {
+            line = candidate;
+          }
+        }
+        lines.push(line || " ");
+        return lines;
+      }
+
+      function formatShareCoordinate(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number.toFixed(6) : "未記錄";
+      }
+
+      function formatShareDate(value) {
+        if (!value) return "未記錄";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-TW", { hour12: false });
+      }
+
+      // Build a self-contained image so mobile sharing includes the inspection context instead of a page link.
+      async function createInspectionShareCard() {
+        if (!photoViewerPhoto?.id) throw new Error("尚未選擇照片");
+        const blob = await getPhotoBlob(photoViewerPhoto.id, photoViewerPhoto);
+        if (!blob) throw new Error("找不到目前開啟的照片");
+
+        const image = await loadImageFromBlob(blob);
+        const record = photoViewerRecord || {};
+        const width = 1200;
+        const padding = 56;
+        const contentWidth = width - padding * 2;
+        const imageScale = Math.min(contentWidth / image.naturalWidth, 1120 / image.naturalHeight, 1);
+        const imageWidth = Math.max(1, Math.round(image.naturalWidth * imageScale));
+        const imageHeight = Math.max(1, Math.round(image.naturalHeight * imageScale));
+        const title = record.name || record.code || "巡檢紀錄";
+        const details = [
+          `圖號：${record.code || "未填寫"}`,
+          `位置：${formatShareCoordinate(record.lat)}, ${formatShareCoordinate(record.lng)}`,
+          `改善事項：${record.defect || "未填寫"}`,
+          `緩急：${record.urgency || "未設定"}`,
+          `拍攝時間：${formatShareDate(photoViewerPhoto.capturedAt)}`,
+        ];
+
+        const measureCanvas = document.createElement("canvas");
+        const measure = measureCanvas.getContext("2d");
+        measure.font = "700 34px system-ui, sans-serif";
+        const titleLines = wrapCanvasText(measure, title, contentWidth);
+        measure.font = "400 28px system-ui, sans-serif";
+        const detailLines = details.flatMap(detail => wrapCanvasText(measure, detail, contentWidth));
+        const headerHeight = 54 + titleLines.length * 42 + 24;
+        const detailHeight = 34 + detailLines.length * 42 + 26;
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = headerHeight + imageHeight + detailHeight + padding * 2;
+        const context = canvas.getContext("2d");
+
+        context.fillStyle = "#eef2f5";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "#087f8c";
+        context.fillRect(0, 0, canvas.width, headerHeight);
+        context.fillStyle = "#dff5f6";
+        context.font = "800 22px system-ui, sans-serif";
+        context.fillText("巡檢紀錄分享", padding, 36);
+        context.fillStyle = "#ffffff";
+        context.font = "700 34px system-ui, sans-serif";
+        let titleY = 80;
+        titleLines.forEach(line => {
+          context.fillText(line, padding, titleY);
+          titleY += 42;
+        });
+
+        const imageX = Math.round((width - imageWidth) / 2);
+        const imageY = headerHeight + padding;
+        context.fillStyle = "#ffffff";
+        context.fillRect(padding - 8, imageY - 8, contentWidth + 16, imageHeight + 16);
+        context.drawImage(image, imageX, imageY, imageWidth, imageHeight);
+
+        const detailY = imageY + imageHeight + padding;
+        context.fillStyle = "#ffffff";
+        context.fillRect(padding - 8, detailY - 16, contentWidth + 16, detailHeight + 16);
+        context.fillStyle = "#17202a";
+        context.font = "400 28px system-ui, sans-serif";
+        let textY = detailY + 18;
+        detailLines.forEach(line => {
+          context.fillText(line, padding, textY);
+          textY += 42;
+        });
+        return canvasToBlob(canvas, "image/png");
+      }
+
+      async function shareImageFile(blob, fileName) {
+        if (typeof navigator.share !== "function") {
           GlobalModal.alert("此瀏覽器不支援圖片分享，請使用下載照片。");
           return;
         }
         try {
-          const fileName = photoViewerPhoto?.fileName || "巡檢照片.jpg";
-          const file = new File([photoViewerBlob], fileName, { type: photoViewerBlob.type || "image/jpeg" });
+          const file = new File([blob], fileName, { type: blob.type || "image/jpeg" });
           const canShareFile = typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
           if (!canShareFile) {
             GlobalModal.alert("此裝置不支援分享圖片檔案，請使用下載照片。");
             return;
           }
-          await navigator.share({
-            files: [file],
-            title: photoViewerPhoto?.fileName || "巡檢照片",
-            text: "巡檢照片",
-          });
+          await navigator.share({ files: [file] });
         } catch (error) {
           if (error?.name !== "AbortError") GlobalModal.alert("分享圖片失敗：" + error.message);
         }
       }
 
+      async function shareInspectionCardFromViewer() {
+        try {
+          const card = await createInspectionShareCard();
+          await shareImageFile(card, "inspection-share-card.png");
+        } catch (error) {
+          GlobalModal.alert("建立巡檢分享卡失敗：" + error.message);
+        }
+      }
+
+      async function sharePhotoFromViewer() {
+        try {
+          if (!photoViewerPhoto?.id) throw new Error("尚未選擇照片");
+          const blob = await getPhotoBlob(photoViewerPhoto.id, photoViewerPhoto);
+          if (!blob) throw new Error("找不到目前開啟的照片");
+          await shareImageFile(blob, photoViewerPhoto.fileName || "巡檢照片.jpg");
+        } catch (error) {
+          GlobalModal.alert("分享原圖失敗：" + error.message);
+        }
+      }
+
       document.getElementById("photoViewerClose").addEventListener("click", closePhotoViewer);
       document.getElementById("photoViewerCopy").addEventListener("click", copyPhotoFromViewer);
-      document.getElementById("photoViewerShare").addEventListener("click", sharePhotoFromViewer);
+      document.getElementById("photoViewerShare").addEventListener("click", shareInspectionCardFromViewer);
+      document.getElementById("photoViewerShareOriginal").addEventListener("click", sharePhotoFromViewer);
       document.getElementById("photoViewer").addEventListener("click", event => {
         if (event.target.id === "photoViewer") closePhotoViewer();
       });
