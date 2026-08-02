@@ -229,6 +229,7 @@
         text-decoration: none;
       }
       .photo-edition-link:hover { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+      .photo-edition-link-compact { display: none; }
       .folder-list {
         flex-grow: 1;
         min-height: 0;
@@ -763,11 +764,50 @@
         }
 
         .panel-head {
-          display: none;
+          align-items: center;
+          display: flex;
+          flex-direction: row;
+          gap: 10px;
+          min-height: 60px;
+          padding: 18px 16px 8px;
         }
 
         .panel-title {
+          display: block;
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+
+        .panel-title h1 {
+          font-size: 16px;
+          line-height: 1.25;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .panel-head > .btn-global-toggle,
+        .photo-edition-link-full {
           display: none;
+        }
+
+        .photo-edition-link-compact {
+          align-items: center;
+          align-self: auto;
+          background: #eef8f9;
+          border: 1px solid #9bd4d9;
+          border-radius: 6px;
+          color: var(--accent-dark);
+          display: inline-flex;
+          flex: 0 0 auto;
+          font-size: 12px;
+          font-weight: 800;
+          justify-content: center;
+          margin: 0;
+          min-height: 34px;
+          padding: 5px 9px;
+          text-decoration: none;
+          white-space: nowrap;
         }
 
         h1 {
@@ -1179,6 +1219,14 @@
           display: none;
         }
 
+        .photo-edition-link-full {
+          display: inline-flex;
+        }
+
+        .photo-edition-link-compact {
+          display: none;
+        }
+
         .photo-edition-link {
           grid-column: 2;
           grid-row: 2;
@@ -1320,9 +1368,10 @@
       <aside id="panel" class="panel is-collapsed">
         <header class="panel-head">
           <div class="panel-title"><h1>土木設備分布地圖</h1></div>
+          <a class="photo-edition-link photo-edition-link-compact" href="./indexV2.html" title="開啟可拍照、備份照片的巡檢版本">開啟照片版</a>
           <button id="toggleLabelsBtn" class="btn-global-toggle">隱藏所有主圖標籤</button>
         </header>
-        <a class="photo-edition-link" href="./indexV2.html" title="開啟可拍照、備份照片的巡檢版本">📷 開啟照片版</a>
+        <a class="photo-edition-link photo-edition-link-full" href="./indexV2.html" title="開啟可拍照、備份照片的巡檢版本">📷 開啟照片版</a>
         <nav class="tab-nav">
           <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
           <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
