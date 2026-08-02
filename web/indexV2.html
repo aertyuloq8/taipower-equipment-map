@@ -545,6 +545,9 @@
         gap: 6px;
         justify-content: flex-end;
       }
+      .photo-viewer-actions [hidden] {
+        display: none !important;
+      }
       .photo-viewer-action {
         background: #f1f5f9;
         border: 1px solid var(--line);
@@ -1698,6 +1701,7 @@
         <footer class="photo-viewer-foot">
           <span id="photoViewerMeta"></span>
           <div class="photo-viewer-actions">
+            <button id="photoViewerDownloadCard" class="photo-viewer-action photo-viewer-share-card" type="button" hidden>下載巡檢卡</button>
             <button id="photoViewerCopy" class="photo-viewer-action" type="button">複製原圖</button>
             <button id="photoViewerShare" class="photo-viewer-action photo-viewer-share-card" type="button">分享巡檢卡</button>
             <button id="photoViewerShareOriginal" class="photo-viewer-action" type="button">分享原圖</button>
@@ -2494,6 +2498,7 @@
           photoViewerBlob = blob;
           photoViewerPhoto = photo;
           photoViewerRecord = record || null;
+          syncPhotoViewerActions();
           document.getElementById("photoViewerTitle").textContent = photo?.fileName || "照片預覽";
           document.getElementById("photoViewerMeta").textContent = record
             ? `${record.name || record.code || "巡檢紀錄"} | ${record.defect || "未填寫改善事項"}`
@@ -2665,6 +2670,42 @@
         }
       }
 
+      function supportsNativeFileSharing() {
+        const isMobile = navigator.userAgentData?.mobile === true
+          || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+          || (navigator.maxTouchPoints > 1 && window.matchMedia?.("(pointer: coarse)").matches);
+        if (!isMobile) return false;
+        if (typeof navigator.share !== "function") return false;
+        if (typeof navigator.canShare !== "function") return true;
+        try {
+          const sample = new File(
+            [new Blob([""], { type: "image/png" })],
+            "share.png",
+            { type: "image/png" }
+          );
+          return navigator.canShare({ files: [sample] });
+        } catch {
+          return false;
+        }
+      }
+
+      function syncPhotoViewerActions() {
+        const canShareFiles = supportsNativeFileSharing();
+        document.getElementById("photoViewerShare").hidden = !canShareFiles;
+        document.getElementById("photoViewerShareOriginal").hidden = !canShareFiles;
+        document.getElementById("photoViewerDownloadCard").hidden = canShareFiles;
+      }
+
+      async function downloadInspectionCardFromViewer() {
+        try {
+          const card = await createInspectionShareCard();
+          const code = photoViewerRecord?.code || photoViewerPhoto?.id || "巡檢卡";
+          downloadBlob(card, `巡檢卡_${code}.png`);
+        } catch (error) {
+          GlobalModal.alert("建立巡檢卡下載失敗：" + error.message);
+        }
+      }
+
       async function shareInspectionCardFromViewer() {
         try {
           const card = await createInspectionShareCard();
@@ -2689,6 +2730,7 @@
       document.getElementById("photoViewerCopy").addEventListener("click", copyPhotoFromViewer);
       document.getElementById("photoViewerShare").addEventListener("click", shareInspectionCardFromViewer);
       document.getElementById("photoViewerShareOriginal").addEventListener("click", sharePhotoFromViewer);
+      document.getElementById("photoViewerDownloadCard").addEventListener("click", downloadInspectionCardFromViewer);
       document.getElementById("photoViewer").addEventListener("click", event => {
         if (event.target.id === "photoViewer") closePhotoViewer();
       });
