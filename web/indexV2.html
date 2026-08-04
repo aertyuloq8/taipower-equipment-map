@@ -4264,7 +4264,7 @@
           code: card.code || "",
           defect: card.defect || "",
           photoPath: `../${card.photoPath || ""}`,
-          listPath: `../${INSPECTION_CARD_FILE}`,
+          listPath: `../${INSPECTION_CARD_FILE}?return=${encodeURIComponent(card.id || "")}`,
         })
           .replace(/</g, "\\u003c")
           .replace(/>/g, "\\u003e")
@@ -4292,7 +4292,7 @@
     .screen-actions { display: flex; gap: 8px; margin-bottom: 14px; }
     .back, .print-card { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; padding: 8px 12px; text-decoration: none; }
     .print-card { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
-    @media print { body { background: #fff; } main { max-width: none; padding: 0; } .screen-actions { display: none !important; } .card { border: 0; box-shadow: none; } .photo-frame img { max-height: 62vh; } }
+    @media print { :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { background: #fff; } main { max-width: none; padding: 0; } .screen-actions { display: none !important; } .card { border: 0; box-shadow: none; } .card-head { background: #087f8c !important; color: #fff !important; } .photo-frame img { max-height: 62vh; } }
     @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 15px 16px; } .card-head h1 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } .screen-actions { flex-wrap: wrap; } }
   </style>
 </head>
@@ -4381,7 +4381,9 @@
     .folder-group-head { align-items: center; background: #f8fafc; border-bottom: 1px solid var(--line); display: flex; gap: 8px; min-height: 46px; padding: 8px 12px; }
     .folder-group-head strong { flex: 1; overflow-wrap: anywhere; }
     .folder-group-count { color: #687584; font-size: 12px; }
+    .folder-toggle { background: #fff; border: 1px solid var(--line); color: #075d67; cursor: pointer; flex: 0 0 auto; font-size: 13px; font-weight: 800; min-height: 32px; padding: 5px 9px; }
     .folder-records { display: grid; gap: 8px; padding: 10px; }
+    .folder-records[hidden] { display: none; }
     .folder-record { align-items: flex-start; border: 1px solid var(--line); display: flex; gap: 8px; padding: 10px; }
     .folder-record a { color: #075d67; display: grid; gap: 4px; min-width: 0; text-decoration: none; }
     .folder-record a:hover { background: #eef8f9; }
@@ -4398,7 +4400,7 @@
     .details { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 18px 22px 22px; }
     .detail { font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
     .back { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; padding: 8px 12px; text-decoration: none; }
-    @media print { body { background: #fff; } main { max-width: none; padding: 0; } .screen-toolbar, .screen-actions, .folder-group, .print-view-title { display: none !important; } .inspection-card { border: 0; box-shadow: none; break-after: page; margin: 0; } .inspection-card:last-child { break-after: auto; } .photo-frame img { max-height: 62vh; } }
+    @media print { :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { background: #fff; } main { max-width: none; padding: 0; } .screen-toolbar, .screen-actions, .folder-group, .print-view-title { display: none !important; } .inspection-card { border: 0; box-shadow: none; break-after: page; margin: 0; } .inspection-card:last-child { break-after: auto; } .card-head { background: #087f8c !important; color: #fff !important; } .photo-frame img { max-height: 62vh; } }
     @media (max-width: 600px) { main { padding: 12px 10px 28px; } .screen-toolbar { align-items: stretch; } .screen-toolbar h1 { font-size: 20px; } .screen-toolbar-actions { width: 100%; } .screen-toolbar button { flex: 1 1 140px; } .folder-group.depth-1 { margin-left: 10px; } .folder-group.depth-2 { margin-left: 20px; } .folder-record { padding: 9px; } .card-head { padding: 15px 16px; } .card-head h2 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } }
   </style>
 </head>
@@ -4519,6 +4521,28 @@
           });
         });
       };
+      const saveListScroll = cardId => {
+        try {
+          sessionStorage.setItem("inspection-card-scroll", JSON.stringify({
+            id: cardId || "",
+            top: window.scrollY || document.documentElement.scrollTop || 0,
+          }));
+        } catch (error) { /* Storage may be unavailable in a restricted browser context. */ }
+      };
+      const createCardLink = card => {
+        const link = document.createElement("a");
+        link.href = card.cardPath || ("?photo=" + encodeURIComponent(card.id));
+        link.addEventListener("click", () => saveListScroll(card.id));
+        return link;
+      };
+      const setFolderExpanded = (records, expanded) => {
+        records.hidden = !expanded;
+        const toggle = records.previousElementSibling?.querySelector(".folder-toggle");
+        if (toggle) {
+          toggle.setAttribute("aria-expanded", String(expanded));
+          toggle.textContent = expanded ? "收合" : "展開";
+        }
+      };
       const buildFolderGroup = (folder, depth = 0) => {
         if (!hasCardsInFolderTree(folder.id)) return null;
         const section = document.createElement("section");
@@ -4530,18 +4554,21 @@
         checkbox.dataset.folderSelect = folder.id;
         const directCount = (cardsByFolder.get(folder.id) || []).length;
         const totalCount = cardIdsInFolderTree(folder.id).length;
-        head.append(checkbox, text("strong", folder.name || "未命名資料夾"), text("span", totalCount + " 張卡" + (directCount ? "" : "（子層）"), "folder-group-count"));
-        section.append(head);
+        const toggle = createButton("展開", "folder-toggle");
+        toggle.setAttribute("aria-expanded", "false");
         const records = document.createElement("div");
         records.className = "folder-records";
+        setFolderExpanded(records, false);
+        toggle.addEventListener("click", () => setFolderExpanded(records, records.hidden));
+        head.append(checkbox, text("strong", folder.name || "未命名資料夾"), text("span", totalCount + " 張卡" + (directCount ? "" : "（子層）"), "folder-group-count"), toggle);
+        section.append(head);
         (cardsByFolder.get(folder.id) || []).forEach(card => {
           const row = document.createElement("div");
           row.className = "folder-record";
           const cardCheckbox = document.createElement("input");
           cardCheckbox.type = "checkbox";
           cardCheckbox.dataset.cardSelect = card.id;
-          const link = document.createElement("a");
-          link.href = card.cardPath || ("?photo=" + encodeURIComponent(card.id));
+          const link = createCardLink(card);
           link.append(text("span", (card.name || card.code || "巡檢紀錄") + " | " + (card.code || "未填圖號"), "record-title"), text("span", "改善事項：" + (card.defect || "未填寫"), "record-defect"));
           row.append(cardCheckbox, link);
           records.append(row);
@@ -4558,7 +4585,36 @@
         if (queryId) return queryId;
         try { return decodeURIComponent(location.hash.slice(1)); } catch { return ""; }
       };
+      const readReturnState = () => {
+        const queryId = new URLSearchParams(location.search).get("return") || "";
+        let stored = null;
+        try {
+          const raw = sessionStorage.getItem("inspection-card-scroll");
+          if (raw) stored = JSON.parse(raw);
+          sessionStorage.removeItem("inspection-card-scroll");
+        } catch (error) { /* Storage may be unavailable in a restricted browser context. */ }
+        const id = queryId || (stored && stored.id) || "";
+        const top = stored && Number.isFinite(Number(stored.top)) ? Math.max(0, Number(stored.top)) : null;
+        return id || top !== null ? { id, top } : null;
+      };
+      const restoreListPosition = returnState => {
+        if (!returnState) return;
+        window.requestAnimationFrame(() => {
+          const target = [...app.querySelectorAll("[data-card-select]")].find(input => input.dataset.cardSelect === returnState.id);
+          if (target) {
+            let records = target.closest(".folder-records");
+            while (records) {
+              setFolderExpanded(records, true);
+              const group = records.closest(".folder-group");
+              records = group?.parentElement?.closest(".folder-records") || null;
+            }
+          }
+          if (returnState.top !== null) window.scrollTo(0, returnState.top);
+          else if (target) target.closest(".folder-record")?.scrollIntoView({ block: "center" });
+        });
+      };
       const showList = () => {
+        const returnState = readReturnState();
         app.replaceChildren();
         if (!cards.length) {
           app.append(text("div", "這份備份沒有照片巡檢卡。", "empty"));
@@ -4592,18 +4648,21 @@
           group.className = "folder-group";
           const head = document.createElement("div");
           head.className = "folder-group-head";
-          head.append(text("strong", "未歸類"), text("span", uncategorized.length + " 張卡", "folder-group-count"));
-          group.append(head);
+          const toggle = createButton("展開", "folder-toggle");
+          toggle.setAttribute("aria-expanded", "false");
           const records = document.createElement("div");
           records.className = "folder-records";
+          setFolderExpanded(records, false);
+          toggle.addEventListener("click", () => setFolderExpanded(records, records.hidden));
+          head.append(text("strong", "未歸類"), text("span", uncategorized.length + " 張卡", "folder-group-count"), toggle);
+          group.append(head);
           uncategorized.forEach(card => {
             const row = document.createElement("div");
             row.className = "folder-record";
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.dataset.cardSelect = card.id;
-            const link = document.createElement("a");
-            link.href = card.cardPath || ("?photo=" + encodeURIComponent(card.id));
+            const link = createCardLink(card);
             link.append(text("span", (card.name || card.code || "巡檢紀錄") + " | " + (card.code || "未填圖號"), "record-title"), text("span", "改善事項：" + (card.defect || "未填寫"), "record-defect"));
             row.append(checkbox, link);
             records.append(row);
@@ -4614,6 +4673,7 @@
         bindListActions();
         updateSelectionUi();
         document.title = "巡檢卡 | 巡檢卡";
+        restoreListPosition(returnState);
       };
       const showCard = card => {
         app.replaceChildren();
@@ -4621,7 +4681,7 @@
         actions.className = "screen-actions";
         const back = document.createElement("a");
         back.className = "back";
-        back.href = "${INSPECTION_CARD_FILE}";
+        back.href = "${INSPECTION_CARD_FILE}?return=" + encodeURIComponent(card.id || "");
         back.textContent = "返回巡檢卡列表";
         const print = createButton("列印巡檢卡", "primary");
         print.addEventListener("click", printCurrentCards);
