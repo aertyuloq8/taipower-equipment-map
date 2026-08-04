@@ -519,13 +519,46 @@
         justify-content: center;
         min-height: 160px;
         overflow: auto;
+        position: relative;
+        touch-action: none;
       }
       .photo-viewer-body img {
+        cursor: default;
         display: block;
         max-height: min(72vh, 760px);
         max-width: 100%;
         object-fit: contain;
+        transform-origin: center center;
+        transition: transform 120ms ease;
+        user-select: none;
       }
+      .photo-viewer-body.is-zoomed img { cursor: grab; }
+      .photo-viewer-body.is-dragging img { cursor: grabbing; transition: none; }
+      .photo-viewer-zoom-controls {
+        background: rgba(23, 32, 42, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 7px;
+        display: flex;
+        gap: 4px;
+        left: 10px;
+        padding: 4px;
+        position: absolute;
+        top: 10px;
+        z-index: 2;
+      }
+      .photo-viewer-zoom-controls button {
+        background: transparent;
+        border: 0;
+        color: #fff;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 900;
+        min-height: 32px;
+        min-width: 32px;
+        padding: 0 6px;
+      }
+      .photo-viewer-zoom-controls button:hover { background: rgba(255, 255, 255, 0.16); }
+      #photoViewerZoomReset { font-size: 11px; min-width: 52px; }
       .photo-viewer-foot {
         border-top: 1px solid var(--line);
         color: var(--muted);
@@ -1696,6 +1729,11 @@
           <button id="photoViewerClose" class="photo-viewer-close" type="button" aria-label="關閉照片預覽" title="關閉">&#215;</button>
         </header>
         <div class="photo-viewer-body">
+          <div class="photo-viewer-zoom-controls" aria-label="照片縮放控制">
+            <button id="photoViewerZoomOut" type="button" title="縮小照片" aria-label="縮小照片">−</button>
+            <button id="photoViewerZoomReset" type="button" title="回復適合視窗" aria-label="回復適合視窗">適合</button>
+            <button id="photoViewerZoomIn" type="button" title="放大照片" aria-label="放大照片">＋</button>
+          </div>
           <img id="photoViewerImage" alt="巡檢照片預覽" />
         </div>
         <footer class="photo-viewer-foot">
@@ -2338,40 +2376,22 @@
 
       function photoFileName(name, type = "image/jpeg") {
         const source = String(name || "photo").replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^_+|_+$/g, "") || "photo";
-        const extension = /\.(jpe?g|png|webp)$/i.test(source)
+        const extension = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(source)
           ? source.split(".").pop().toLowerCase()
-          : (type === "image/png" ? "png" : "jpg");
+          : ({
+              "image/png": "png",
+              "image/webp": "webp",
+              "image/gif": "gif",
+              "image/bmp": "bmp",
+              "image/heic": "heic",
+              "image/heif": "heif",
+            }[String(type || "").toLowerCase()] || "jpg");
         return `${source.replace(/\.[^.]+$/, "").slice(0, 60)}.${extension}`;
       }
 
-      async function optimizePhoto(file) {
+      async function preparePhotoForStorage(file) {
         if (!file.type.startsWith("image/")) throw new Error(`${file.name || "檔案"} 不是圖片`);
-        const fallback = file.slice(0, file.size, file.type || "image/jpeg");
-        if (file.size === 0) return fallback;
-        const sourceUrl = URL.createObjectURL(file);
-        try {
-          const image = await new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error("照片讀取失敗"));
-            img.src = sourceUrl;
-          });
-          const maxSize = 1600;
-          const scale = Math.min(1, maxSize / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
-          const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
-          const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          canvas.getContext("2d").drawImage(image, 0, 0, width, height);
-          const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.78));
-          return blob || fallback;
-        } catch (error) {
-          console.warn("照片壓縮失敗，改用原始檔案：", error);
-          return fallback;
-        } finally {
-          URL.revokeObjectURL(sourceUrl);
-        }
+        return file.slice(0, file.size, file.type || "image/jpeg");
       }
 
       function clearPhotoPreviewUrls() {
@@ -2413,7 +2433,8 @@
           const image = strip.querySelector(`[data-photo-image="${CSS.escape(meta.id)}"]`);
           const sourceBlob = blob || await getPhotoBlob(meta.id, meta);
           if (!image || !sourceBlob || epoch !== photoRenderEpoch) return;
-          const url = URL.createObjectURL(sourceBlob);
+          const previewBlob = await createPhotoPreviewBlob(sourceBlob);
+          const url = URL.createObjectURL(previewBlob);
           photoPreviewUrls.push(url);
           image.src = url;
         }));
@@ -2425,13 +2446,15 @@
         const accepted = [];
         for (const file of files) {
           try {
-            const blob = await optimizePhoto(file);
+            const blob = await preparePhotoForStorage(file);
             accepted.push({
               meta: {
                 id: `photo_${generateId()}`,
                 fileName: photoFileName(file.name, blob.type),
                 type: blob.type || "image/jpeg",
                 size: blob.size,
+                originalSize: blob.size,
+                originalType: blob.type || "image/jpeg",
                 capturedAt: new Date().toISOString(),
               },
               blob,
@@ -2458,6 +2481,32 @@
       let photoViewerPhoto = null;
       let photoViewerRecord = null;
       let photoBrowserPreviewUrls = [];
+      let photoViewerScale = 1;
+      let photoViewerOffset = { x: 0, y: 0 };
+      let photoViewerDrag = null;
+
+      function applyPhotoViewerTransform() {
+        const image = document.getElementById("photoViewerImage");
+        const body = image?.closest(".photo-viewer-body");
+        if (!image || !body) return;
+        image.style.transform = `translate(${photoViewerOffset.x}px, ${photoViewerOffset.y}px) scale(${photoViewerScale})`;
+        body.classList.toggle("is-zoomed", photoViewerScale > 1);
+        body.classList.toggle("is-dragging", Boolean(photoViewerDrag));
+      }
+
+      function resetPhotoViewerZoom() {
+        photoViewerScale = 1;
+        photoViewerOffset = { x: 0, y: 0 };
+        photoViewerDrag = null;
+        applyPhotoViewerTransform();
+      }
+
+      function changePhotoViewerZoom(delta) {
+        const nextScale = Math.min(4, Math.max(1, Number((photoViewerScale + delta).toFixed(2))));
+        if (nextScale === 1) photoViewerOffset = { x: 0, y: 0 };
+        photoViewerScale = nextScale;
+        applyPhotoViewerTransform();
+      }
 
       function clearPhotoBrowserPreviewUrls() {
         photoBrowserPreviewUrls.forEach(url => URL.revokeObjectURL(url));
@@ -2472,6 +2521,7 @@
         viewer.setAttribute("aria-hidden", "true");
         document.getElementById("photoViewerImage").removeAttribute("src");
         document.getElementById("photoViewerDownload").removeAttribute("href");
+        resetPhotoViewerZoom();
         if (photoViewerUrl) URL.revokeObjectURL(photoViewerUrl);
         photoViewerUrl = null;
         photoViewerBlob = null;
@@ -2505,6 +2555,7 @@
             : "巡檢照片";
           image.src = photoViewerUrl;
           image.alt = photo?.fileName || "巡檢照片預覽";
+          resetPhotoViewerZoom();
           download.href = photoViewerUrl;
           download.download = photo?.fileName || "巡檢照片.jpg";
           viewer.classList.add("is-open");
@@ -2731,6 +2782,42 @@
       document.getElementById("photoViewerShare").addEventListener("click", shareInspectionCardFromViewer);
       document.getElementById("photoViewerShareOriginal").addEventListener("click", sharePhotoFromViewer);
       document.getElementById("photoViewerDownloadCard").addEventListener("click", downloadInspectionCardFromViewer);
+      document.getElementById("photoViewerZoomOut").addEventListener("click", () => changePhotoViewerZoom(-0.5));
+      document.getElementById("photoViewerZoomReset").addEventListener("click", resetPhotoViewerZoom);
+      document.getElementById("photoViewerZoomIn").addEventListener("click", () => changePhotoViewerZoom(0.5));
+      const photoViewerBody = document.querySelector(".photo-viewer-body");
+      photoViewerBody.addEventListener("wheel", event => {
+        if (!document.getElementById("photoViewer").classList.contains("is-open")) return;
+        event.preventDefault();
+        changePhotoViewerZoom(event.deltaY < 0 ? 0.25 : -0.25);
+      }, { passive: false });
+      photoViewerBody.addEventListener("pointerdown", event => {
+        if (photoViewerScale <= 1 || event.target.id !== "photoViewerImage") return;
+        photoViewerDrag = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          offsetX: photoViewerOffset.x,
+          offsetY: photoViewerOffset.y,
+        };
+        event.target.setPointerCapture?.(event.pointerId);
+        applyPhotoViewerTransform();
+      });
+      photoViewerBody.addEventListener("pointermove", event => {
+        if (!photoViewerDrag || photoViewerDrag.pointerId !== event.pointerId) return;
+        photoViewerOffset = {
+          x: photoViewerDrag.offsetX + event.clientX - photoViewerDrag.startX,
+          y: photoViewerDrag.offsetY + event.clientY - photoViewerDrag.startY,
+        };
+        applyPhotoViewerTransform();
+      });
+      const endPhotoViewerDrag = event => {
+        if (!photoViewerDrag || photoViewerDrag.pointerId !== event.pointerId) return;
+        photoViewerDrag = null;
+        applyPhotoViewerTransform();
+      };
+      photoViewerBody.addEventListener("pointerup", endPhotoViewerDrag);
+      photoViewerBody.addEventListener("pointercancel", endPhotoViewerDrag);
       document.getElementById("photoViewer").addEventListener("click", event => {
         if (event.target.id === "photoViewer") closePhotoViewer();
       });
@@ -2780,7 +2867,8 @@
           const image = grid.querySelector(`[data-browser-image="${CSS.escape(photo.id)}"]`);
           const blob = await getPhotoBlob(photo.id, photo);
           if (image && blob) {
-            const url = URL.createObjectURL(blob);
+            const previewBlob = await createPhotoPreviewBlob(blob);
+            const url = URL.createObjectURL(previewBlob);
             photoBrowserPreviewUrls.push(url);
             image.src = url;
           }
@@ -3270,6 +3358,8 @@
               fileName: String(photo.fileName || "巡檢照片.jpg"),
               type: String(photo.type || "image/jpeg"),
               size: Number(photo.size) || 0,
+              originalSize: Number(photo.originalSize) || Number(photo.size) || 0,
+              originalType: String(photo.originalType || photo.type || "image/jpeg"),
               capturedAt: photo.capturedAt || null,
             }))
             : [];
@@ -3461,8 +3551,84 @@
       // ==========================================
       // 批次操作 (batchMoveBtn 已修改為部分執行)
       // ==========================================
-      function recordToExcelRow(record, includePhotoLinks = false) {
+      const equipmentNameCollator = new Intl.Collator("zh-Hant", { sensitivity: "base" });
+
+      function tokenizeEquipmentSuffix(value) {
+        return (String(value || "").match(/\d+|右|左|[^0-9右左]+/g) || [])
+          .map(token => {
+            const compact = token.replace(/\s+/g, "");
+            if (!compact) return null;
+            if (/^\d+$/.test(compact)) return { kind: "number", value: Number(compact) };
+            if (compact === "右") return { kind: "direction", value: 1 };
+            if (compact === "左") return { kind: "direction", value: 2 };
+            return { kind: "text", value: compact };
+          })
+          .filter(Boolean);
+      }
+
+      function equipmentSortKey(value) {
+        const source = String(value || "").trim();
+        const firstNumberIndex = source.search(/\d/);
+        if (firstNumberIndex < 0) return { prefix: source.replace(/\s+/g, ""), primary: null, suffix: [] };
+        const prefix = source.slice(0, firstNumberIndex).replace(/\s+/g, "");
+        const numberMatch = source.slice(firstNumberIndex).match(/^\d+/);
+        const primaryText = numberMatch?.[0] || "";
+        return {
+          prefix,
+          primary: primaryText ? Number(primaryText) : null,
+          suffix: tokenizeEquipmentSuffix(source.slice(firstNumberIndex + primaryText.length)),
+        };
+      }
+
+      function compareEquipmentSuffix(left, right) {
+        const tokenRank = { number: 0, direction: 1, text: 2 };
+        const length = Math.max(left.length, right.length);
+        for (let index = 0; index < length; index++) {
+          const a = left[index];
+          const b = right[index];
+          if (!a || !b) return a ? 1 : -1;
+          if (a.kind !== b.kind) return tokenRank[a.kind] - tokenRank[b.kind];
+          if (a.value !== b.value) {
+            if (a.kind === "text") return equipmentNameCollator.compare(a.value, b.value);
+            return a.value - b.value;
+          }
+        }
+        return 0;
+      }
+
+      function compareEquipmentNames(leftName, rightName) {
+        const left = equipmentSortKey(leftName);
+        const right = equipmentSortKey(rightName);
+        const prefixResult = equipmentNameCollator.compare(left.prefix, right.prefix);
+        if (prefixResult) return prefixResult;
+        if (left.primary === null || right.primary === null) {
+          if (left.primary === null && right.primary !== null) return -1;
+          if (left.primary !== null && right.primary === null) return 1;
+          return compareEquipmentSuffix(left.suffix, right.suffix);
+        }
+        if (left.primary !== right.primary) return left.primary - right.primary;
+        return compareEquipmentSuffix(left.suffix, right.suffix);
+      }
+
+      function sortInspectionRecords(records) {
+        return [...records]
+          .map((record, index) => ({ record, index }))
+          .sort((left, right) => {
+            const nameResult = compareEquipmentNames(
+              left.record?.name || left.record?.code || "",
+              right.record?.name || right.record?.code || ""
+            );
+            return nameResult || left.index - right.index;
+          })
+          .map(item => item.record);
+      }
+
+      function recordToExcelRow(record, includePhotoLinks = false, photoLinkLabels = null) {
         const photos = Array.isArray(record.photos) ? record.photos : [];
+        const labels = {
+          card: photoLinkLabels?.card || "巡檢卡連結",
+          original: photoLinkLabels?.original || "原始照片連結",
+        };
         const row = {
           "巡視日期(目錄)": getFullFolderPath(record.folderId),
           "土木設備": record.name || "",
@@ -3481,8 +3647,8 @@
           "照片識別碼": photos.map(photo => photo.id).join(" | "),
         };
         if (includePhotoLinks) {
-          row["巡檢卡連結"] = "";
-          row["原始照片連結"] = "";
+          row[labels.card] = "";
+          row[labels.original] = "";
         }
         return row;
       }
@@ -3493,8 +3659,13 @@
         cell.l = { Target: target, Tooltip: tooltip };
       }
 
-      function createRecordsWorkbook(records, fallbackFolderPath = "", photoLinkFor = null) {
+      function createRecordsWorkbook(records, fallbackFolderPath = "", photoLinkFor = null, photoLinkLabels = null) {
         const includePhotoLinks = typeof photoLinkFor === "function";
+        const labels = {
+          card: photoLinkLabels?.card || "巡檢卡連結",
+          original: photoLinkLabels?.original || "原始照片連結",
+        };
+        const orderedRecords = sortInspectionRecords(records);
         const emptyRow = {
           "巡視日期(目錄)": fallbackFolderPath,
           "土木設備": "", "圖號座標": "", "不良項目": "", "緩急程度": "",
@@ -3502,21 +3673,21 @@
           "圖資修正": "", "正確圖號": "", "照片數量": 0, "照片檔案": "", "照片識別碼": "",
         };
         if (includePhotoLinks) {
-          emptyRow["巡檢卡連結"] = "";
-          emptyRow["原始照片連結"] = "";
+          emptyRow[labels.card] = "";
+          emptyRow[labels.original] = "";
         }
-        const rows = records.length
-          ? records.map(record => recordToExcelRow(record, includePhotoLinks))
+        const rows = orderedRecords.length
+          ? orderedRecords.map(record => recordToExcelRow(record, includePhotoLinks, labels))
           : [emptyRow];
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "巡視紀錄");
 
-        if (includePhotoLinks && records.length) {
-          const cardLinkColumn = Object.keys(rows[0]).indexOf("巡檢卡連結");
-          const originalLinkColumn = Object.keys(rows[0]).indexOf("原始照片連結");
+        if (includePhotoLinks && orderedRecords.length) {
+          const cardLinkColumn = Object.keys(rows[0]).indexOf(labels.card);
+          const originalLinkColumn = Object.keys(rows[0]).indexOf(labels.original);
           const photoLinkRows = [];
-          records.forEach((record, recordIndex) => {
+          orderedRecords.forEach((record, recordIndex) => {
             const linkedPhotos = (record.photos || []).map(photo => {
               const links = photoLinkFor(record, photo);
               return {
@@ -3547,8 +3718,8 @@
                 "圖號座標": record.code || "",
                 "改善事項": record.defect || "",
                 "照片檔案": photo.fileName || photo.id,
-                "巡檢卡連結": cardTarget ? "開啟巡檢卡" : "",
-                "原始照片連結": originalTarget ? "開啟原圖" : "",
+                [labels.card]: cardTarget ? "開啟巡檢卡" : "",
+                [labels.original]: originalTarget ? "開啟原圖" : "",
                 cardTarget,
                 originalTarget,
               });
@@ -3557,8 +3728,8 @@
           if (photoLinkRows.length) {
             const photoRows = photoLinkRows.map(({ cardTarget, originalTarget, ...row }) => row);
             const photoWs = XLSX.utils.json_to_sheet(photoRows);
-            const photoCardColumn = Object.keys(photoRows[0]).indexOf("巡檢卡連結");
-            const photoOriginalColumn = Object.keys(photoRows[0]).indexOf("原始照片連結");
+            const photoCardColumn = Object.keys(photoRows[0]).indexOf(labels.card);
+            const photoOriginalColumn = Object.keys(photoRows[0]).indexOf(labels.original);
             photoLinkRows.forEach((row, index) => {
               if (row.cardTarget) {
                 setExcelHyperlink(photoWs, photoCardColumn, index + 1, row.cardTarget, row["照片檔案"] || "開啟巡檢卡");
@@ -3616,7 +3787,15 @@
               XLSX.writeFile(workbook, `${safeFileBaseName}.xlsx`);
               return;
             }
-            exportRecordsAsZip(records, folders, safeFileBaseName);
+            GlobalModal.select(
+              "選擇 ZIP 照片版本",
+              "完整備份建議使用原圖；壓縮版適合分享，還原後只會保留壓縮圖片。",
+              [
+                '<option value="original">原圖：可完整備份與還原</option>',
+                '<option value="compressed">壓縮版：檔案較小，適合分享</option>',
+              ].join(""),
+              photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile)
+            );
           }
         );
       }
@@ -4004,9 +4183,65 @@
         return String(value || "record").replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_").slice(0, 70) || "record";
       }
 
-      function photoArchivePath(record, photo) {
-        const fileName = `${zipPathPart(photo.id)}_${zipPathPart(photo.fileName || "photo.jpg")}`;
+      function photoArchiveFileName(photo, profile = "original") {
+        const originalName = photoFileName(photo.fileName || "photo.jpg", photo.type || "image/jpeg");
+        if (profile !== "compressed") return originalName;
+        return `${originalName.replace(/\.[^.]+$/, "")}.jpg`;
+      }
+
+      function photoArchivePath(record, photo, profile = "original") {
+        const fileName = `${zipPathPart(photo.id)}_${zipPathPart(photoArchiveFileName(photo, profile))}`;
         return `photos/${zipPathPart(record.id)}/${fileName}`;
+      }
+
+      function folderPathFromList(folderId, folders) {
+        const folderById = new Map((folders || []).map(folder => [folder.id, folder]));
+        const path = [];
+        const visited = new Set();
+        let currentId = folderId;
+        while (currentId && !visited.has(currentId)) {
+          visited.add(currentId);
+          const folder = folderById.get(currentId);
+          if (!folder) break;
+          path.unshift(folder.name || "未命名資料夾");
+          currentId = folder.parentId || null;
+        }
+        return path.join(" / ");
+      }
+
+      async function compressPhotoForExport(blob) {
+        try {
+          const image = await loadImageFromBlob(blob);
+          const maxSize = 1920;
+          const sourceWidth = image.naturalWidth || image.width;
+          const sourceHeight = image.naturalHeight || image.height;
+          const scale = Math.min(1, maxSize / Math.max(sourceWidth, sourceHeight));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+          canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          return await canvasToBlob(canvas, "image/jpeg", 0.82);
+        } catch (error) {
+          console.warn("匯出壓縮失敗，改用原圖：", error);
+          return blob;
+        }
+      }
+
+      async function createPhotoPreviewBlob(blob, maxSize = 720) {
+        try {
+          const image = await loadImageFromBlob(blob);
+          const sourceWidth = image.naturalWidth || image.width;
+          const sourceHeight = image.naturalHeight || image.height;
+          const scale = Math.min(1, maxSize / Math.max(sourceWidth, sourceHeight));
+          if (scale === 1) return blob;
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+          canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          return await canvasToBlob(canvas, "image/jpeg", 0.78);
+        } catch (error) {
+          return blob;
+        }
       }
 
       function excelPhotoLinkTarget(path) {
@@ -4054,8 +4289,11 @@
     .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 72vh; max-width: 100%; object-fit: contain; }
     .details { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 18px 22px 22px; }
     .detail { font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
-    .back { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; margin-bottom: 14px; padding: 8px 12px; text-decoration: none; }
-    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 15px 16px; } .card-head h1 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } }
+    .screen-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+    .back, .print-card { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; padding: 8px 12px; text-decoration: none; }
+    .print-card { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
+    @media print { body { background: #fff; } main { max-width: none; padding: 0; } .screen-actions { display: none !important; } .card { border: 0; box-shadow: none; } .photo-frame img { max-height: 62vh; } }
+    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 15px 16px; } .card-head h1 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } .screen-actions { flex-wrap: wrap; } }
   </style>
 </head>
 <body>
@@ -4070,10 +4308,18 @@
         element.textContent = value;
         return element;
       };
+      const actions = document.createElement("div");
+      actions.className = "screen-actions";
       const back = document.createElement("a");
       back.className = "back";
       back.href = card.listPath;
       back.textContent = "返回巡檢卡列表";
+      const print = document.createElement("button");
+      print.className = "print-card";
+      print.type = "button";
+      print.textContent = "列印巡檢卡";
+      print.addEventListener("click", () => window.print());
+      actions.append(back, print);
       const section = document.createElement("article");
       section.className = "card";
       const head = document.createElement("header");
@@ -4090,7 +4336,7 @@
       details.append(text("div", "圖號：" + (card.code || "未填寫"), "detail"));
       details.append(text("div", "改善事項：" + (card.defect || "未填寫"), "detail"));
       section.append(head, photoFrame, details);
-      app.append(back, section);
+      app.append(actions, section);
       document.title = (card.name || card.code || "巡檢卡") + " | 巡檢卡";
     })();
   <\/script>
@@ -4098,8 +4344,8 @@
 </html>`;
       }
 
-      function createInspectionCardHtml(cards) {
-        const cardData = JSON.stringify(cards)
+      function createInspectionCardHtml(cards, folders = []) {
+        const cardData = JSON.stringify({ cards, folders })
           .replace(/</g, "\\u003c")
           .replace(/>/g, "\\u003e")
           .replace(/&/g, "\\u0026")
@@ -4123,27 +4369,189 @@
     .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 72vh; max-width: 100%; object-fit: contain; }
     .details { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 18px 22px 22px; }
     .detail { font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
-    .back { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; margin-bottom: 14px; padding: 8px 12px; text-decoration: none; }
-    .list { background: #fff; border: 1px solid var(--line); display: grid; gap: 8px; padding: 18px; }
-    .list a { border: 1px solid var(--line); color: #075d67; display: grid; gap: 4px; padding: 12px; text-decoration: none; overflow-wrap: anywhere; }
-    .list a:hover { background: #eef8f9; }
-    .list-title { font-weight: 800; }
-    .list-defect { color: #5f4a16; font-size: 14px; font-weight: 400; }
+    .screen-toolbar { align-items: center; background: #fff; border: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 12px; padding: 12px; }
+    .screen-toolbar h1 { font-size: 22px; margin: 0; }
+    .screen-toolbar-actions, .screen-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .screen-toolbar button, .screen-actions button, .screen-actions a { background: #fff; border: 1px solid var(--line); color: #075d67; cursor: pointer; display: inline-block; font-weight: 800; min-height: 36px; padding: 8px 12px; text-decoration: none; }
+    .screen-toolbar button.primary, .screen-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .selection-summary { color: #687584; font-size: 13px; margin-right: auto; }
+    .folder-group { background: #fff; border: 1px solid var(--line); margin-bottom: 10px; }
+    .folder-group.depth-1 { margin-left: 18px; }
+    .folder-group.depth-2 { margin-left: 36px; }
+    .folder-group-head { align-items: center; background: #f8fafc; border-bottom: 1px solid var(--line); display: flex; gap: 8px; min-height: 46px; padding: 8px 12px; }
+    .folder-group-head strong { flex: 1; overflow-wrap: anywhere; }
+    .folder-group-count { color: #687584; font-size: 12px; }
+    .folder-records { display: grid; gap: 8px; padding: 10px; }
+    .folder-record { align-items: flex-start; border: 1px solid var(--line); display: flex; gap: 8px; padding: 10px; }
+    .folder-record a { color: #075d67; display: grid; gap: 4px; min-width: 0; text-decoration: none; }
+    .folder-record a:hover { background: #eef8f9; }
+    .record-title { font-weight: 800; overflow-wrap: anywhere; }
+    .record-defect { color: #5f4a16; font-size: 14px; overflow-wrap: anywhere; }
+    .folder-record input, .folder-group-head input { flex: 0 0 auto; height: 20px; margin: 2px 0 0; width: 20px; }
     .empty { background: #fff; border: 1px solid var(--line); color: #687584; padding: 22px; }
-    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 15px 16px; } .card-head h1 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } }
+    .print-view-title { margin: 0 0 12px; }
+    .inspection-card { background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(22, 36, 52, 0.13); margin-bottom: 18px; overflow: hidden; }
+    .card-head { background: var(--accent); color: #fff; padding: 18px 22px; }
+    .card-head h2 { font-size: 24px; line-height: 1.35; margin: 0; overflow-wrap: anywhere; }
+    .photo-frame { background: #fff; padding: 20px; text-align: center; }
+    .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 72vh; max-width: 100%; object-fit: contain; }
+    .details { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 18px 22px 22px; }
+    .detail { font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
+    .back { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; padding: 8px 12px; text-decoration: none; }
+    @media print { body { background: #fff; } main { max-width: none; padding: 0; } .screen-toolbar, .screen-actions, .folder-group, .print-view-title { display: none !important; } .inspection-card { border: 0; box-shadow: none; break-after: page; margin: 0; } .inspection-card:last-child { break-after: auto; } .photo-frame img { max-height: 62vh; } }
+    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .screen-toolbar { align-items: stretch; } .screen-toolbar h1 { font-size: 20px; } .screen-toolbar-actions { width: 100%; } .screen-toolbar button { flex: 1 1 140px; } .folder-group.depth-1 { margin-left: 10px; } .folder-group.depth-2 { margin-left: 20px; } .folder-record { padding: 9px; } .card-head { padding: 15px 16px; } .card-head h2 { font-size: 20px; } .photo-frame { padding: 10px; } .details { padding: 16px; } .detail { font-size: 16px; } }
   </style>
 </head>
 <body>
   <main id="app"></main>
   <script>
     (() => {
-      const cards = ${cardData};
+      const payload = ${cardData};
+      const cards = Array.isArray(payload.cards) ? payload.cards : [];
+      const folders = Array.isArray(payload.folders) ? payload.folders : [];
       const app = document.getElementById("app");
+      const selectedIds = new Set();
       const text = (tag, value, className = "") => {
         const element = document.createElement(tag);
         if (className) element.className = className;
         element.textContent = value;
         return element;
+      };
+      const createButton = (label, className = "") => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        if (className) button.className = className;
+        return button;
+      };
+      const childrenByParent = new Map();
+      folders.forEach(folder => {
+        const parentId = folder.parentId || null;
+        if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+        childrenByParent.get(parentId).push(folder);
+      });
+      const cardsByFolder = new Map();
+      cards.forEach(card => {
+        const folderId = card.folderId || null;
+        if (!cardsByFolder.has(folderId)) cardsByFolder.set(folderId, []);
+        cardsByFolder.get(folderId).push(card);
+      });
+      const folderChildren = folderId => childrenByParent.get(folderId || null) || [];
+      const cardIdsInFolderTree = folderId => {
+        const result = [];
+        (cardsByFolder.get(folderId) || []).forEach(card => result.push(card.id));
+        folderChildren(folderId).forEach(child => result.push(...cardIdsInFolderTree(child.id)));
+        return result;
+      };
+      const hasCardsInFolderTree = folderId => cardIdsInFolderTree(folderId).length > 0;
+      const createCardArticle = card => {
+        const article = document.createElement("article");
+        article.className = "inspection-card";
+        const head = document.createElement("header");
+        head.className = "card-head";
+        head.append(text("h2", card.name || card.code || "巡檢紀錄"));
+        const photoFrame = document.createElement("div");
+        photoFrame.className = "photo-frame";
+        const image = document.createElement("img");
+        image.src = card.photoPath || "";
+        image.alt = card.name || card.code || "巡檢照片";
+        photoFrame.append(image);
+        const details = document.createElement("section");
+        details.className = "details";
+        details.append(text("div", "圖號：" + (card.code || "未填寫"), "detail"));
+        details.append(text("div", "改善事項：" + (card.defect || "未填寫"), "detail"));
+        article.append(head, photoFrame, details);
+        return article;
+      };
+      const updateSelectionUi = () => {
+        app.querySelectorAll("[data-card-select]").forEach(input => {
+          input.checked = selectedIds.has(input.dataset.cardSelect);
+        });
+        app.querySelectorAll("[data-folder-select]").forEach(input => {
+          const ids = cardIdsInFolderTree(input.dataset.folderSelect);
+          const selectedCount = ids.filter(id => selectedIds.has(id)).length;
+          input.checked = ids.length > 0 && selectedCount === ids.length;
+          input.indeterminate = selectedCount > 0 && selectedCount < ids.length;
+        });
+        const summary = app.querySelector("[data-selection-summary]");
+        if (summary) summary.textContent = "已選 " + selectedIds.size + " 張巡檢卡";
+      };
+      const waitForImages = () => Promise.all([...app.querySelectorAll("img")].map(image => {
+        if (image.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          image.addEventListener("load", resolve, { once: true });
+          image.addEventListener("error", resolve, { once: true });
+        });
+      }));
+      const printCurrentCards = () => waitForImages().then(() => window.print());
+      const showSelectedCards = (autoPrint = false) => {
+        const selectedCards = cards.filter(card => selectedIds.has(card.id));
+        if (!selectedCards.length) {
+          window.alert("請先勾選資料夾或巡檢卡。");
+          return;
+        }
+        app.replaceChildren();
+        const actions = document.createElement("div");
+        actions.className = "screen-actions";
+        const back = createButton("返回巡檢卡列表");
+        back.addEventListener("click", showList);
+        const print = createButton("列印所選巡檢卡", "primary");
+        print.addEventListener("click", printCurrentCards);
+        actions.append(back, print);
+        app.append(actions, text("h1", "已選巡檢卡（" + selectedCards.length + " 張）", "print-view-title"));
+        selectedCards.forEach(card => app.append(createCardArticle(card)));
+        document.title = "已選巡檢卡 | 巡檢卡";
+        if (autoPrint) window.setTimeout(printCurrentCards, 80);
+      };
+      const bindListActions = () => {
+        app.querySelectorAll("[data-card-select]").forEach(input => {
+          input.addEventListener("change", event => {
+            const id = event.target.dataset.cardSelect;
+            if (event.target.checked) selectedIds.add(id); else selectedIds.delete(id);
+            updateSelectionUi();
+          });
+        });
+        app.querySelectorAll("[data-folder-select]").forEach(input => {
+          input.addEventListener("change", event => {
+            const ids = cardIdsInFolderTree(event.target.dataset.folderSelect);
+            ids.forEach(id => event.target.checked ? selectedIds.add(id) : selectedIds.delete(id));
+            updateSelectionUi();
+          });
+        });
+      };
+      const buildFolderGroup = (folder, depth = 0) => {
+        if (!hasCardsInFolderTree(folder.id)) return null;
+        const section = document.createElement("section");
+        section.className = "folder-group depth-" + Math.min(depth, 2);
+        const head = document.createElement("div");
+        head.className = "folder-group-head";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.folderSelect = folder.id;
+        const directCount = (cardsByFolder.get(folder.id) || []).length;
+        const totalCount = cardIdsInFolderTree(folder.id).length;
+        head.append(checkbox, text("strong", folder.name || "未命名資料夾"), text("span", totalCount + " 張卡" + (directCount ? "" : "（子層）"), "folder-group-count"));
+        section.append(head);
+        const records = document.createElement("div");
+        records.className = "folder-records";
+        (cardsByFolder.get(folder.id) || []).forEach(card => {
+          const row = document.createElement("div");
+          row.className = "folder-record";
+          const cardCheckbox = document.createElement("input");
+          cardCheckbox.type = "checkbox";
+          cardCheckbox.dataset.cardSelect = card.id;
+          const link = document.createElement("a");
+          link.href = card.cardPath || ("?photo=" + encodeURIComponent(card.id));
+          link.append(text("span", (card.name || card.code || "巡檢紀錄") + " | " + (card.code || "未填圖號"), "record-title"), text("span", "改善事項：" + (card.defect || "未填寫"), "record-defect"));
+          row.append(cardCheckbox, link);
+          records.append(row);
+        });
+        folderChildren(folder.id).forEach(child => {
+          const childSection = buildFolderGroup(child, depth + 1);
+          if (childSection) records.append(childSection);
+        });
+        section.append(records);
+        return section;
       };
       const selectedId = () => {
         const queryId = new URLSearchParams(location.search).get("photo");
@@ -4156,43 +4564,69 @@
           app.append(text("div", "這份備份沒有照片巡檢卡。", "empty"));
           return;
         }
-        const list = document.createElement("section");
-        list.className = "list";
-        list.append(text("h1", "巡檢卡"));
-        cards.forEach(card => {
-          const link = document.createElement("a");
-          link.href = card.cardPath || ("?photo=" + encodeURIComponent(card.id));
-          link.append(
-            text("span", (card.name || card.code || "巡檢紀錄") + " | " + (card.code || "未填圖號"), "list-title"),
-            text("span", "改善事項：" + (card.defect || "未填寫"), "list-defect")
-          );
-          list.append(link);
+        const toolbar = document.createElement("section");
+        toolbar.className = "screen-toolbar";
+        toolbar.append(text("h1", "巡檢卡"));
+        const summary = text("span", "已選 0 張巡檢卡", "selection-summary");
+        summary.dataset.selectionSummary = "true";
+        const toolbarActions = document.createElement("div");
+        toolbarActions.className = "screen-toolbar-actions";
+        const selectAll = createButton("全選");
+        selectAll.addEventListener("click", () => { cards.forEach(card => selectedIds.add(card.id)); updateSelectionUi(); });
+        const clearAll = createButton("清除");
+        clearAll.addEventListener("click", () => { selectedIds.clear(); updateSelectionUi(); });
+        const generate = createButton("產生所選巡檢卡", "primary");
+        generate.addEventListener("click", () => showSelectedCards(false));
+        const print = createButton("列印所選巡檢卡", "primary");
+        print.addEventListener("click", () => showSelectedCards(true));
+        toolbarActions.append(selectAll, clearAll, generate, print);
+        toolbar.append(summary, toolbarActions);
+        app.append(toolbar);
+        folderChildren(null).forEach(folder => {
+          const group = buildFolderGroup(folder);
+          if (group) app.append(group);
         });
-        app.append(list);
+        const uncategorized = cardsByFolder.get(null) || [];
+        if (uncategorized.length) {
+          const group = document.createElement("section");
+          group.className = "folder-group";
+          const head = document.createElement("div");
+          head.className = "folder-group-head";
+          head.append(text("strong", "未歸類"), text("span", uncategorized.length + " 張卡", "folder-group-count"));
+          group.append(head);
+          const records = document.createElement("div");
+          records.className = "folder-records";
+          uncategorized.forEach(card => {
+            const row = document.createElement("div");
+            row.className = "folder-record";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.dataset.cardSelect = card.id;
+            const link = document.createElement("a");
+            link.href = card.cardPath || ("?photo=" + encodeURIComponent(card.id));
+            link.append(text("span", (card.name || card.code || "巡檢紀錄") + " | " + (card.code || "未填圖號"), "record-title"), text("span", "改善事項：" + (card.defect || "未填寫"), "record-defect"));
+            row.append(checkbox, link);
+            records.append(row);
+          });
+          group.append(records);
+          app.append(group);
+        }
+        bindListActions();
+        updateSelectionUi();
+        document.title = "巡檢卡 | 巡檢卡";
       };
       const showCard = card => {
         app.replaceChildren();
+        const actions = document.createElement("div");
+        actions.className = "screen-actions";
         const back = document.createElement("a");
         back.className = "back";
         back.href = "${INSPECTION_CARD_FILE}";
         back.textContent = "返回巡檢卡列表";
-        const section = document.createElement("article");
-        section.className = "card";
-        const head = document.createElement("header");
-        head.className = "card-head";
-        head.append(text("h1", card.name || card.code || "巡檢紀錄"));
-        const photoFrame = document.createElement("div");
-        photoFrame.className = "photo-frame";
-        const image = document.createElement("img");
-        image.src = card.photoPath;
-        image.alt = card.name || card.code || "巡檢照片";
-        photoFrame.append(image);
-        const details = document.createElement("section");
-        details.className = "details";
-        details.append(text("div", "圖號：" + (card.code || "未填寫"), "detail"));
-        details.append(text("div", "改善事項：" + (card.defect || "未填寫"), "detail"));
-        section.append(head, photoFrame, details);
-        app.append(back, section);
+        const print = createButton("列印巡檢卡", "primary");
+        print.addEventListener("click", printCurrentCards);
+        actions.append(back, print);
+        app.append(actions, createCardArticle(card));
         document.title = (card.name || card.code || "巡檢卡") + " | 巡檢卡";
       };
       const render = () => {
@@ -4207,27 +4641,36 @@
 </html>`;
       }
 
-      async function createPhotoArchive(records, folders, archiveTitle) {
+      async function createPhotoArchive(records, folders, archiveTitle, photoProfile = "original") {
         if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試。");
 
         const zip = new JSZip();
         const exportedAt = new Date().toISOString();
-        zip.file("records.json", JSON.stringify({
-          format: "taipower-inspection-v2-photo-backup",
-          version: 1,
-          exportedAt,
-          folders,
-          records,
-        }, null, 2));
+        const orderedRecords = sortInspectionRecords(records);
+        const archiveRecords = orderedRecords.map(record => ({
+          ...record,
+          photos: (record.photos || []).map(photo => ({ ...photo })),
+        }));
 
         let photoCount = 0;
         const exportedPhotoLinks = new Map();
         const inspectionCards = [];
-        for (const record of records) {
+        for (const record of archiveRecords) {
           for (const photo of record.photos || []) {
-            const blob = await getPhotoBlob(photo.id, photo);
-            if (!blob) continue;
-            const path = photoArchivePath(record, photo);
+            const sourcePhoto = { ...photo };
+            const sourceBlob = await getPhotoBlob(photo.id, sourcePhoto);
+            if (!sourceBlob) continue;
+            const blob = photoProfile === "compressed"
+              ? await compressPhotoForExport(sourceBlob)
+              : sourceBlob;
+            if (photoProfile === "compressed") {
+              photo.originalSize = Number(photo.originalSize) || sourceBlob.size;
+              photo.originalType = photo.originalType || sourceBlob.type || "image/jpeg";
+              photo.size = blob.size;
+              photo.type = blob.type || "image/jpeg";
+              photo.fileName = photoArchiveFileName(photo, "compressed");
+            }
+            const path = photoArchivePath(record, photo, photoProfile);
             const cardPath = inspectionCardDetailPath(photo.id);
             zip.file(path, blob);
             const originalTarget = excelPhotoLinkTarget(path);
@@ -4242,29 +4685,41 @@
               defect: record.defect || "",
               photoPath: originalTarget,
               cardPath,
+              folderId: record.folderId || null,
+              folderPath: folderPathFromList(record.folderId, folders),
             });
             photoCount++;
           }
         }
 
-        zip.file(INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards));
+        zip.file("records.json", JSON.stringify({
+          format: "taipower-inspection-v2-photo-backup",
+          version: 2,
+          exportedAt,
+          photoProfile,
+          folders,
+          records: archiveRecords,
+        }, null, 2));
+        zip.file(INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards, folders));
         inspectionCards.forEach(card => {
           zip.file(card.cardPath, createInspectionCardDetailHtml(card));
         });
         const workbook = createRecordsWorkbook(
-          records,
+          archiveRecords,
           "",
-          (record, photo) => exportedPhotoLinks.get(photo.id) || null
+          (record, photo) => exportedPhotoLinks.get(photo.id) || null,
+          photoProfile === "compressed" ? { original: "照片連結" } : null
         );
         zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
         zip.file("README.txt", [
           archiveTitle,
           `匯出時間：${exportedAt}`,
-          `巡檢紀錄：${records.length} 筆`,
+          `巡檢紀錄：${archiveRecords.length} 筆`,
           `照片檔案：${photoCount} 張`,
+          `照片版本：${photoProfile === "compressed" ? "匯出壓縮版（適合分享，無法恢復未匯出的原始細節）" : "原圖（可完整還原）"}`,
           "請先解壓縮 ZIP，再開啟 records.xlsx。",
-          "Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「原始照片連結」。",
-          `${INSPECTION_CARD_FILE} 是巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的原始圖片，不會額外複製照片檔案。`,
+          `Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「${photoProfile === "compressed" ? "照片連結" : "原始照片連結"}」。`,
+          `${INSPECTION_CARD_FILE} 是依資料夾分類的巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的圖片，不會額外複製照片檔案。`,
           "records.json 可用於資料還原。還原前請先確認不會覆蓋現有資料。",
         ].join("\r\n"));
 
@@ -4274,11 +4729,11 @@
         };
       }
 
-      async function exportRecordsAsZip(records, folders, fileBaseName) {
+      async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original") {
         try {
-          const { blob, photoCount } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出");
+          const { blob, photoCount } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile);
           downloadBlob(blob, `${fileBaseName}.zip`);
-          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。`);
+          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。`);
         } catch (error) {
           console.error("ZIP 匯出失敗：", error);
           GlobalModal.alert("ZIP 匯出失敗：" + error.message);
