@@ -1945,7 +1945,7 @@
                     <button type="button" id="photoClearPendingBtn" title="移除尚未儲存的照片">清除新增</button>
                   </div>
                 </div>
-                <input id="photoInput" type="file" accept="image/*" capture="environment" multiple style="display:none">
+                <input id="photoInput" type="file" accept="image/*" multiple style="display:none">
                 <div id="photoStrip" class="photo-strip"></div>
               </section>
             </div>
@@ -2143,12 +2143,15 @@
 
         document.getElementById("photoCaptureBtn").addEventListener("click", () => {
           const input = document.getElementById("photoInput");
-          input.setAttribute("capture", "environment");
+          // Let the phone's native source chooser open its full camera app.
+          input.removeAttribute("capture");
+          input.removeAttribute("multiple");
           input.click();
         });
         document.getElementById("photoPickBtn").addEventListener("click", () => {
           const input = document.getElementById("photoInput");
           input.removeAttribute("capture");
+          input.setAttribute("multiple", "");
           input.click();
         });
         document.getElementById("photoClearPendingBtn").addEventListener("click", () => {
@@ -2484,6 +2487,10 @@
       let photoViewerScale = 1;
       let photoViewerOffset = { x: 0, y: 0 };
       let photoViewerDrag = null;
+      let photoViewerPointers = new Map();
+      let photoViewerPinch = null;
+      let photoViewerLastTap = null;
+      let photoViewerLastPinchAt = 0;
 
       function applyPhotoViewerTransform() {
         const image = document.getElementById("photoViewerImage");
@@ -2494,18 +2501,50 @@
         body.classList.toggle("is-dragging", Boolean(photoViewerDrag));
       }
 
+      function getPhotoViewerBodyPoint(clientX, clientY) {
+        const body = document.querySelector(".photo-viewer-body");
+        if (!body) return { x: 0, y: 0 };
+        const rect = body.getBoundingClientRect();
+        return {
+          x: clientX - (rect.left + rect.width / 2),
+          y: clientY - (rect.top + rect.height / 2),
+        };
+      }
+
+      function setPhotoViewerScaleAt(nextScale, clientX, clientY, baseScale = photoViewerScale, baseOffset = photoViewerOffset) {
+        const body = document.querySelector(".photo-viewer-body");
+        const rect = body?.getBoundingClientRect();
+        const focusX = Number.isFinite(clientX) ? clientX : rect ? rect.left + rect.width / 2 : 0;
+        const focusY = Number.isFinite(clientY) ? clientY : rect ? rect.top + rect.height / 2 : 0;
+        const scale = Math.min(4, Math.max(1, Number(nextScale.toFixed(2))));
+        if (scale === 1) {
+          photoViewerScale = 1;
+          photoViewerOffset = { x: 0, y: 0 };
+        } else {
+          const point = getPhotoViewerBodyPoint(focusX, focusY);
+          const ratio = scale / Math.max(0.01, baseScale);
+          photoViewerScale = scale;
+          photoViewerOffset = {
+            x: point.x - (point.x - baseOffset.x) * ratio,
+            y: point.y - (point.y - baseOffset.y) * ratio,
+          };
+        }
+        applyPhotoViewerTransform();
+      }
+
       function resetPhotoViewerZoom() {
         photoViewerScale = 1;
         photoViewerOffset = { x: 0, y: 0 };
         photoViewerDrag = null;
+        photoViewerPointers.clear();
+        photoViewerPinch = null;
+        photoViewerLastTap = null;
         applyPhotoViewerTransform();
       }
 
       function changePhotoViewerZoom(delta) {
         const nextScale = Math.min(4, Math.max(1, Number((photoViewerScale + delta).toFixed(2))));
-        if (nextScale === 1) photoViewerOffset = { x: 0, y: 0 };
-        photoViewerScale = nextScale;
-        applyPhotoViewerTransform();
+        setPhotoViewerScaleAt(nextScale);
       }
 
       function clearPhotoBrowserPreviewUrls() {
@@ -2792,32 +2831,120 @@
         changePhotoViewerZoom(event.deltaY < 0 ? 0.25 : -0.25);
       }, { passive: false });
       photoViewerBody.addEventListener("pointerdown", event => {
-        if (photoViewerScale <= 1 || event.target.id !== "photoViewerImage") return;
-        photoViewerDrag = {
+        if (!document.getElementById("photoViewer").classList.contains("is-open") || event.target.id !== "photoViewerImage") return;
+        event.preventDefault();
+        photoViewerPointers.set(event.pointerId, {
           pointerId: event.pointerId,
+          clientX: event.clientX,
+          clientY: event.clientY,
           startX: event.clientX,
           startY: event.clientY,
-          offsetX: photoViewerOffset.x,
-          offsetY: photoViewerOffset.y,
-        };
+          downAt: Date.now(),
+          moved: false,
+        });
         event.target.setPointerCapture?.(event.pointerId);
+        if (photoViewerPointers.size >= 2) {
+          const [first, second] = [...photoViewerPointers.values()].slice(0, 2);
+          photoViewerPinch = {
+            startDistance: Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)),
+            startCenter: {
+              x: (first.clientX + second.clientX) / 2,
+              y: (first.clientY + second.clientY) / 2,
+            },
+            startScale: photoViewerScale,
+            startOffset: { ...photoViewerOffset },
+          };
+          photoViewerDrag = null;
+          photoViewerLastTap = null;
+        } else if (photoViewerScale > 1) {
+          photoViewerDrag = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            offsetX: photoViewerOffset.x,
+            offsetY: photoViewerOffset.y,
+          };
+        }
         applyPhotoViewerTransform();
       });
       photoViewerBody.addEventListener("pointermove", event => {
-        if (!photoViewerDrag || photoViewerDrag.pointerId !== event.pointerId) return;
+        const pointer = photoViewerPointers.get(event.pointerId);
+        if (!pointer) return;
+        pointer.moved = pointer.moved || Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > 8;
+        pointer.clientX = event.clientX;
+        pointer.clientY = event.clientY;
+        if (photoViewerPinch && photoViewerPointers.size >= 2) {
+          event.preventDefault();
+          const [first, second] = [...photoViewerPointers.values()].slice(0, 2);
+          const currentDistance = Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY));
+          const currentCenter = {
+            x: (first.clientX + second.clientX) / 2,
+            y: (first.clientY + second.clientY) / 2,
+          };
+          const ratio = currentDistance / photoViewerPinch.startDistance;
+          const nextScale = Math.min(4, Math.max(1, Number((photoViewerPinch.startScale * ratio).toFixed(2))));
+          const startPoint = getPhotoViewerBodyPoint(photoViewerPinch.startCenter.x, photoViewerPinch.startCenter.y);
+          const currentPoint = getPhotoViewerBodyPoint(currentCenter.x, currentCenter.y);
+          const scaleRatio = nextScale / Math.max(0.01, photoViewerPinch.startScale);
+          photoViewerScale = nextScale;
+          photoViewerOffset = nextScale === 1
+            ? { x: 0, y: 0 }
+            : {
+                x: currentPoint.x - (startPoint.x - photoViewerPinch.startOffset.x) * scaleRatio,
+                y: currentPoint.y - (startPoint.y - photoViewerPinch.startOffset.y) * scaleRatio,
+              };
+          applyPhotoViewerTransform();
+          return;
+        }
+        if (photoViewerDrag?.pointerId !== event.pointerId) return;
+        event.preventDefault();
         photoViewerOffset = {
           x: photoViewerDrag.offsetX + event.clientX - photoViewerDrag.startX,
           y: photoViewerDrag.offsetY + event.clientY - photoViewerDrag.startY,
         };
         applyPhotoViewerTransform();
       });
-      const endPhotoViewerDrag = event => {
-        if (!photoViewerDrag || photoViewerDrag.pointerId !== event.pointerId) return;
-        photoViewerDrag = null;
+      const endPhotoViewerPointer = event => {
+        const pointer = photoViewerPointers.get(event.pointerId);
+        if (!pointer) return;
+        const now = Date.now();
+        const wasPinching = Boolean(photoViewerPinch);
+        const wasDragging = photoViewerDrag?.pointerId === event.pointerId;
+        photoViewerPointers.delete(event.pointerId);
+        if (wasPinching) {
+          photoViewerLastPinchAt = now;
+          photoViewerLastTap = null;
+          photoViewerPinch = null;
+          photoViewerDrag = null;
+          const remaining = [...photoViewerPointers.values()][0];
+          if (remaining && photoViewerScale > 1) {
+            photoViewerDrag = {
+              pointerId: remaining.pointerId,
+              startX: remaining.clientX,
+              startY: remaining.clientY,
+              offsetX: photoViewerOffset.x,
+              offsetY: photoViewerOffset.y,
+            };
+          }
+        } else if (wasDragging) {
+          photoViewerDrag = null;
+        }
+        const isTap = !wasPinching && !pointer.moved && now - pointer.downAt < 300;
+        if (isTap && now - photoViewerLastPinchAt >= 350) {
+          if (photoViewerLastTap && now - photoViewerLastTap.time < 320
+            && Math.hypot(event.clientX - photoViewerLastTap.x, event.clientY - photoViewerLastTap.y) < 36) {
+            setPhotoViewerScaleAt(photoViewerScale > 1 ? 1 : 2, event.clientX, event.clientY);
+            photoViewerLastTap = null;
+          } else {
+            photoViewerLastTap = { time: now, x: event.clientX, y: event.clientY };
+          }
+        } else if (!photoViewerPointers.size) {
+          photoViewerLastTap = null;
+        }
         applyPhotoViewerTransform();
       };
-      photoViewerBody.addEventListener("pointerup", endPhotoViewerDrag);
-      photoViewerBody.addEventListener("pointercancel", endPhotoViewerDrag);
+      photoViewerBody.addEventListener("pointerup", endPhotoViewerPointer);
+      photoViewerBody.addEventListener("pointercancel", endPhotoViewerPointer);
       document.getElementById("photoViewer").addEventListener("click", event => {
         if (event.target.id === "photoViewer") closePhotoViewer();
       });
