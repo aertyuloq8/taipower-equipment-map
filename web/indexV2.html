@@ -1818,7 +1818,7 @@
                 <span style="color:#b91c1c; font-size:13px; font-weight:bold">已選：<span id="selectedCount">0 項</span></span>
               </div>
               <div id="batchActionGroup" style="display:none; gap:6px; flex-wrap:wrap">
-                <button id="batchExportBtn" style="background:#16a34a; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">匯出 📤</button>
+                <button id="batchExportBtn" title="匯出勾選資料，可選擇 Excel 或 ZIP" style="background:#16a34a; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">匯出 📤</button>
                 <button id="batchMoveBtn"   style="background:#2563eb; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">移動 🚚</button>
                 <button id="batchDeleteBtn" style="background:#dc2626; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">刪除 🗑️</button>
               </div>
@@ -3412,7 +3412,7 @@
                     <button class="btn-small" data-rename="${folder.id}" title="重新命名">✏️改名</button>
                     <button class="btn-small" data-move-up="${folder.id}" title="向上移">⬆️</button>
                     <button class="btn-small" data-move-down="${folder.id}" title="向下移">⬇️</button>
-                    <button class="btn-small" data-export="${folder.id}" title="匯出此層+子層 Excel">📤匯出</button>
+                    <button class="btn-small" data-export="${folder.id}" title="匯出此層與子層，可選擇 Excel 或 ZIP">📤匯出</button>
                     <button class="btn-small ${isHidden ? "" : "active-eye"}" data-toggle-visibility="${folder.id}" title="顯示/隱藏">${isHidden ? "🙈" : "👁️"}</button>
                     <button class="btn-small text-danger" data-delete-folder="${folder.id}" title="刪除">✖</button>
                   </div>
@@ -3573,6 +3573,54 @@
         return wb;
       }
 
+      function getFolderSubsetForExport(records, selectedFolderIds = []) {
+        const foldersById = new Map(state.folders.map(folder => [folder.id, folder]));
+        const includedIds = new Set();
+        const addFolderTree = folderId => {
+          if (!folderId || includedIds.has(folderId)) return;
+          includedIds.add(folderId);
+          state.folders
+            .filter(folder => folder.parentId === folderId)
+            .forEach(folder => addFolderTree(folder.id));
+        };
+
+        const addParentChain = folderId => {
+          const visited = new Set();
+          while (folderId && !visited.has(folderId)) {
+            includedIds.add(folderId);
+            visited.add(folderId);
+            folderId = foldersById.get(folderId)?.parentId || null;
+          }
+        };
+
+        selectedFolderIds.forEach(folderId => {
+          addFolderTree(folderId);
+          addParentChain(folderId);
+        });
+        records.forEach(record => addParentChain(record.folderId));
+        return state.folders.filter(folder => includedIds.has(folder.id));
+      }
+
+      function chooseRecordExportFormat(records, folders, fileBaseName, fallbackFolderPath = "") {
+        const safeFileBaseName = zipPathPart(fileBaseName);
+        GlobalModal.select(
+          "選擇匯出格式",
+          `將匯出 ${records.length} 筆巡檢紀錄。`,
+          [
+            '<option value="zip">ZIP：含照片、巡檢卡與 Excel</option>',
+            '<option value="xlsx">Excel：僅匯出表格資料</option>',
+          ].join(""),
+          format => {
+            if (format === "xlsx") {
+              const workbook = createRecordsWorkbook(records, fallbackFolderPath);
+              XLSX.writeFile(workbook, `${safeFileBaseName}.xlsx`);
+              return;
+            }
+            exportRecordsAsZip(records, folders, safeFileBaseName);
+          }
+        );
+      }
+
       document.getElementById("batchExportBtn").addEventListener("click", () => {
         if (state.selectedFolders.size === 0 && state.selectedRecords.size === 0) { GlobalModal.alert("請先勾選要匯出的資料夾或紀錄。"); return; }
         const uniqueRecordIds = new Set();
@@ -3584,8 +3632,8 @@
           if (r) exportRecords.push(r);
         });
         if (exportRecords.length === 0) { GlobalModal.alert("勾選範圍內沒有紀錄可匯出。"); return; }
-        const wb = createRecordsWorkbook(exportRecords);
-        XLSX.writeFile(wb, `批次匯出_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        const exportFolders = getFolderSubsetForExport(exportRecords, [...state.selectedFolders]);
+        chooseRecordExportFormat(exportRecords, exportFolders, `批次匯出_${new Date().toISOString().slice(0, 10)}`);
       });
 
       document.getElementById("batchDeleteBtn").addEventListener("click", () => {
@@ -3803,8 +3851,8 @@
           const fId = target.dataset.export, folder = state.folders.find(f => f.id === fId);
           if (!folder) return;
           const targetRecords = getAllRecordsInFolder(fId), pathName = getFullFolderPath(fId);
-          const wb = createRecordsWorkbook(targetRecords, pathName);
-          XLSX.writeFile(wb, `巡視紀錄_${folder.name}.xlsx`);
+          const exportFolders = getFolderSubsetForExport(targetRecords, [fId]);
+          chooseRecordExportFormat(targetRecords, exportFolders, `巡視紀錄_${pathName || folder.name}`, pathName);
         } else if (target.dataset.deleteFolder) {
           const fId = target.dataset.deleteFolder, folder = state.folders.find(f => f.id === fId);
           if (!folder) return;
@@ -4159,6 +4207,84 @@
 </html>`;
       }
 
+      async function createPhotoArchive(records, folders, archiveTitle) {
+        if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試。");
+
+        const zip = new JSZip();
+        const exportedAt = new Date().toISOString();
+        zip.file("records.json", JSON.stringify({
+          format: "taipower-inspection-v2-photo-backup",
+          version: 1,
+          exportedAt,
+          folders,
+          records,
+        }, null, 2));
+
+        let photoCount = 0;
+        const exportedPhotoLinks = new Map();
+        const inspectionCards = [];
+        for (const record of records) {
+          for (const photo of record.photos || []) {
+            const blob = await getPhotoBlob(photo.id, photo);
+            if (!blob) continue;
+            const path = photoArchivePath(record, photo);
+            const cardPath = inspectionCardDetailPath(photo.id);
+            zip.file(path, blob);
+            const originalTarget = excelPhotoLinkTarget(path);
+            exportedPhotoLinks.set(photo.id, {
+              card: inspectionCardLinkTarget(photo.id),
+              original: originalTarget,
+            });
+            inspectionCards.push({
+              id: photo.id,
+              name: record.name || "",
+              code: record.code || "",
+              defect: record.defect || "",
+              photoPath: originalTarget,
+              cardPath,
+            });
+            photoCount++;
+          }
+        }
+
+        zip.file(INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards));
+        inspectionCards.forEach(card => {
+          zip.file(card.cardPath, createInspectionCardDetailHtml(card));
+        });
+        const workbook = createRecordsWorkbook(
+          records,
+          "",
+          (record, photo) => exportedPhotoLinks.get(photo.id) || null
+        );
+        zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
+        zip.file("README.txt", [
+          archiveTitle,
+          `匯出時間：${exportedAt}`,
+          `巡檢紀錄：${records.length} 筆`,
+          `照片檔案：${photoCount} 張`,
+          "請先解壓縮 ZIP，再開啟 records.xlsx。",
+          "Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「原始照片連結」。",
+          `${INSPECTION_CARD_FILE} 是巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的原始圖片，不會額外複製照片檔案。`,
+          "records.json 可用於資料還原。還原前請先確認不會覆蓋現有資料。",
+        ].join("\r\n"));
+
+        return {
+          blob: await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }),
+          photoCount,
+        };
+      }
+
+      async function exportRecordsAsZip(records, folders, fileBaseName) {
+        try {
+          const { blob, photoCount } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出");
+          downloadBlob(blob, `${fileBaseName}.zip`);
+          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。`);
+        } catch (error) {
+          console.error("ZIP 匯出失敗：", error);
+          GlobalModal.alert("ZIP 匯出失敗：" + error.message);
+        }
+      }
+
       async function exportSystemBackup() {
         if (!window.JSZip) {
           GlobalModal.alert("完整備份元件尚未載入，請確認網路後重試。");
@@ -4170,64 +4296,11 @@
         button.textContent = "⏳ 打包中";
         try {
           normalizeInspectionState();
-          const zip = new JSZip();
-          const exportedAt = new Date().toISOString();
-          const backupData = {
-            format: "taipower-inspection-v2-photo-backup",
-            version: 1,
-            exportedAt,
-            folders: state.folders,
-            records: state.records,
-          };
-          zip.file("records.json", JSON.stringify(backupData, null, 2));
-
-          let photoCount = 0;
-          const exportedPhotoLinks = new Map();
-          const inspectionCards = [];
-          for (const record of state.records) {
-            for (const photo of record.photos || []) {
-              const blob = await getPhotoBlob(photo.id, photo);
-              if (!blob) continue;
-              const path = photoArchivePath(record, photo);
-              const cardPath = inspectionCardDetailPath(photo.id);
-              zip.file(path, blob);
-              const originalTarget = excelPhotoLinkTarget(path);
-              exportedPhotoLinks.set(photo.id, {
-                card: inspectionCardLinkTarget(photo.id),
-                original: originalTarget,
-              });
-              inspectionCards.push({
-                id: photo.id,
-                name: record.name || "",
-                code: record.code || "",
-                defect: record.defect || "",
-                photoPath: originalTarget,
-                cardPath,
-              });
-              photoCount++;
-            }
-          }
-          zip.file(INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards));
-          inspectionCards.forEach(card => {
-            zip.file(card.cardPath, createInspectionCardDetailHtml(card));
-          });
-          const workbook = createRecordsWorkbook(
+          const { blob, photoCount } = await createPhotoArchive(
             state.records,
-            "",
-            (record, photo) => exportedPhotoLinks.get(photo.id) || null
+            state.folders,
+            "土木設備分布地圖照片版完整備份"
           );
-          zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
-          zip.file("README.txt", [
-            "土木設備分布地圖照片版完整備份",
-            `匯出時間：${exportedAt}`,
-            `巡檢紀錄：${state.records.length} 筆`,
-            `照片檔案：${photoCount} 張`,
-            "請先解壓縮 ZIP，再開啟 records.xlsx。",
-            `Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「原始照片連結」。`,
-            `${INSPECTION_CARD_FILE} 是巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的原始圖片，不會額外複製照片檔案。`,
-            "records.json 用於完整還原。",
-          ].join("\r\n"));
-          const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
           downloadBlob(blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}.zip`);
           GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${photoCount} 張照片。解壓縮 ZIP 後，records.xlsx 可開啟巡檢卡或原始照片。`);
         } catch (error) {
