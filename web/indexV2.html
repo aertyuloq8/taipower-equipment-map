@@ -2143,8 +2143,8 @@
 
         document.getElementById("photoCaptureBtn").addEventListener("click", () => {
           const input = document.getElementById("photoInput");
-          // Let the phone's native source chooser open its full camera app.
-          input.removeAttribute("capture");
+          // Ask the browser to open the rear-camera capture flow for one photo.
+          input.setAttribute("capture", "environment");
           input.removeAttribute("multiple");
           input.click();
         });
