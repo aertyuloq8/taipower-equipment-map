@@ -5,12 +5,24 @@ const STATIC_ASSETS = [
   "./manifest-v2.json",
   "./icon-192.png",
   "./icon-512.png",
+  "../data/meta.json",
+  "../data/points.json",
+];
+const REMOTE_ASSETS = [
+  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+  "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js",
+  "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(cache => Promise.all(
+        [...STATIC_ASSETS, ...REMOTE_ASSETS].map(asset => cache.add(asset).catch(error => {
+          console.warn("離線資源快取失敗：", asset, error);
+        }))
+      ))
       .then(() => self.skipWaiting())
   );
 });
@@ -34,14 +46,23 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const isV2Navigation = request.mode === "navigate"
     && new URL(request.url).pathname.endsWith("/indexV2.html");
-  if (!isV2Navigation) return;
+  const url = new URL(request.url);
+  const isEquipmentData = /\/data\/(meta|points)\.json$/.test(url.pathname);
+  const isRemoteAsset = REMOTE_ASSETS.some(asset => asset === request.url);
+  if (!isV2Navigation && !isEquipmentData && !isRemoteAsset) return;
 
   event.respondWith(
-    fetch(request, { cache: "no-store" })
-      .then((response) => {
-        if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, response.clone()));
-        return response;
-      })
-      .catch(() => caches.match(APP_SHELL))
+    (isV2Navigation
+      ? fetch(request, { cache: "no-store" })
+          .then((response) => {
+            if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL, response.clone()));
+            return response;
+          })
+          .catch(() => caches.match(APP_SHELL))
+      : caches.match(request).then(cached => cached || fetch(request).then(response => {
+          if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+          return response;
+        })))
+      .catch(() => new Response("", { status: 503, statusText: "Offline" }))
   );
 });

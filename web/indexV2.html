@@ -269,6 +269,17 @@
       .storage-health-value strong { color: var(--text); display: block; font-size: 12px; }
       .storage-persistence { color: var(--muted); font-size: 11px; min-height: 16px; }
       .storage-persistence.is-protected { color: #0f766e; font-weight: 800; }
+      .storage-warning {
+        background: #fff7ed;
+        border: 1px solid #fdba74;
+        border-radius: 5px;
+        color: #9a3412;
+        font-size: 11px;
+        line-height: 1.45;
+        padding: 6px 8px;
+      }
+      .storage-warning.is-critical { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+      .backup-summary { color: var(--muted); font-size: 11px; line-height: 1.45; }
       .storage-refresh-button {
         align-items: center;
         background: #fff;
@@ -399,9 +410,62 @@
         gap: 8px;
         flex-wrap: wrap;
       }
+      .photo-browser-batch-actions {
+        align-items: center;
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--muted);
+        display: flex;
+        font-size: 11px;
+        gap: 8px;
+        justify-content: space-between;
+        padding: 7px 8px;
+      }
+      .photo-browser-batch-actions > div { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+      .photo-browser-batch-actions button {
+        background: #fff;
+        color: var(--accent-dark);
+        font-size: 11px;
+        min-height: 30px;
+        padding: 0 8px;
+      }
+      .photo-browser-batch-actions button:hover { background: #eef8f9; }
+      .photo-browser-batch-actions button:disabled { color: #94a3b8; cursor: not-allowed; }
+      #photoBrowserDeleteSelectedBtn,
+      #photoBrowserDeleteAllBtn { color: #b91c1c; }
       .photo-browser-grid {
         display: grid;
         gap: 10px;
+        grid-template-columns: 1fr;
+      }
+      .photo-folder-group {
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        display: grid;
+        gap: 8px;
+        padding: 8px;
+      }
+      .photo-folder-head {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+      }
+      .photo-folder-head strong { color: var(--accent-dark); font-size: 13px; overflow-wrap: anywhere; }
+      .photo-folder-head span { color: var(--muted); font-size: 11px; margin-left: auto; white-space: nowrap; }
+      .photo-folder-delete {
+        background: #fff;
+        border: 1px solid #fca5a5;
+        color: #b91c1c;
+        font-size: 11px;
+        min-height: 30px;
+        padding: 0 8px;
+      }
+      .photo-folder-records {
+        display: grid;
+        gap: 8px;
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       }
       .photo-record-card {
@@ -425,12 +489,42 @@
         gap: 6px;
         overflow-x: auto;
       }
+      .photo-browser-item {
+        flex: 0 0 82px;
+        margin: 0;
+        position: relative;
+      }
       .photo-record-strip img {
+        background: #e2e8f0;
         border-radius: 4px;
         cursor: pointer;
-        flex: 0 0 72px;
         height: 72px;
         object-fit: cover;
+        width: 72px;
+      }
+      .photo-browser-item input {
+        accent-color: var(--accent);
+        height: 20px;
+        left: 2px;
+        position: absolute;
+        top: 2px;
+        width: 20px;
+        z-index: 2;
+      }
+      .photo-browser-item button {
+        background: #fff;
+        border: 1px solid #fca5a5;
+        border-radius: 999px;
+        color: #b91c1c;
+        font-size: 12px;
+        height: 22px;
+        min-height: 22px;
+        padding: 0;
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 22px;
+        z-index: 2;
       }
       .photo-record-actions {
         display: flex;
@@ -760,6 +854,28 @@
         z-index: 500;
       }
       .status:empty { display: none; }
+      .offline-notice {
+        background: rgba(255, 247, 237, 0.97);
+        border: 1px solid #fdba74;
+        border-radius: 8px;
+        bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        box-shadow: var(--shadow);
+        color: #9a3412;
+        font-size: 12px;
+        left: 14px;
+        line-height: 1.45;
+        max-width: min(92vw, 480px);
+        padding: 8px 10px;
+        position: absolute;
+        z-index: 505;
+      }
+      .offline-notice.is-error { background: rgba(254, 242, 242, 0.97); border-color: #fca5a5; color: #b91c1c; }
+      .edit-unsaved-badge {
+        color: #b45309;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1.4;
+      }
       .popup-title { font-weight: 900; margin-bottom: 4px; }
       .popup-meta { color: var(--muted); font-size: 12px; line-height: 1.5; }
       .popup-actions {
@@ -1808,8 +1924,16 @@
               </select>
             </div>
             <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; align-items:center;">
-              <div style="font-size:12px; color:var(--muted);">可直接點卡片進入編輯，也可點照片看原圖。</div>
-              <div style="font-size:12px; color:var(--accent-dark); font-weight:800;">照片紀錄 <span id="photoBrowserCount">0</span></div>
+              <div style="font-size:12px; color:var(--muted);">點擊照片可開啟原圖，縮圖會在滑到附近時載入。</div>
+              <div style="font-size:12px; color:var(--accent-dark); font-weight:800;">照片 <span id="photoBrowserCount">0</span> 張</div>
+            </div>
+            <div class="photo-browser-batch-actions">
+              <span id="photoBrowserSelectedCount">未選取照片</span>
+              <div>
+                <button id="photoBrowserSelectAllBtn" type="button">選取目前照片</button>
+                <button id="photoBrowserDeleteSelectedBtn" type="button" disabled>刪除所選</button>
+                <button id="photoBrowserDeleteAllBtn" type="button">刪除全部照片</button>
+              </div>
             </div>
             <div id="photoBrowserGrid" class="photo-browser-grid"></div>
           </div>
@@ -1834,7 +1958,7 @@
             <div class="folder-btn-group">
               <button id="exportSystemBtn" class="btn-action btn-export-zip" title="下載紀錄、Excel 與照片的完整 ZIP 備份">💾 完整備份</button>
               <button id="importSystemBtn" class="btn-action btn-import-zip" title="從完整 ZIP 或舊版 JSON 備份還原">📂 資料還原</button>
-              <input type="file" id="importSystemInput" accept=".zip,.json" style="display:none" />
+              <input type="file" id="importSystemInput" accept=".zip,.zip.enc,.json" style="display:none" />
             </div>
             <section class="storage-health" aria-label="裝置儲存狀態">
               <div class="storage-health-head">
@@ -1842,10 +1966,13 @@
                 <button id="storageRefreshBtn" class="storage-refresh-button" type="button" title="更新儲存狀態" aria-label="更新儲存狀態">↻</button>
               </div>
               <div class="storage-health-values">
-                <span class="storage-health-value">照片<strong id="photoStorageUsage">讀取中</strong></span>
-                <span class="storage-health-value">本網站可用<strong id="storageAvailable">讀取中</strong></span>
+                <span class="storage-health-value">照片目前使用<strong id="photoStorageUsage">讀取中</strong></span>
+                <span class="storage-health-value">瀏覽器估算額度<strong id="storageQuota">讀取中</strong></span>
+                <span class="storage-health-value">尚可使用<strong id="storageAvailable">讀取中</strong></span>
               </div>
+              <div id="storageWarning" class="storage-warning" hidden></div>
               <div id="storagePersistenceStatus" class="storage-persistence">資料保護：檢查中</div>
+              <div id="backupSummary" class="backup-summary">最近一次備份：尚未建立</div>
               <div class="storage-health-actions">
                 <button id="requestPersistentStorageBtn" class="storage-persist-button" type="button">保護此裝置資料</button>
               </div>
@@ -1875,6 +2002,7 @@
               <div style="min-width:0; flex-grow:1;">
                 <h2 id="editPanelTitle" style="font-size:16px; color:var(--accent-dark); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">請選擇設備</h2>
                 <div id="editPanelMeta" style="font-size:11px; color:var(--muted);">在地圖點擊進行編輯</div>
+                <div id="editUnsavedBadge" class="edit-unsaved-badge" hidden>尚有未儲存變更</div>
               </div>
               <div id="editPanelActions" style="display:none; flex-direction:row; gap:6px; flex-shrink:0; align-items:center;">
                 <a id="sidebarNavBtn" href="#" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:4px; padding:4px 8px; background:#eef8f9; color:var(--accent-dark); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='var(--accent)'; this.style.color='#fff';" onmouseout="this.style.background='#eef8f9'; this.style.color='var(--accent-dark)';">🗺️ 導航</a>
@@ -1963,6 +2091,7 @@
       <section class="map-shell">
         <div id="map"></div>
         <button id="locateButton" class="map-locate-button" type="button" aria-label="定位目前位置" aria-pressed="false" title="定位目前位置">⌖</button>
+        <div id="offlineNotice" class="offline-notice" hidden></div>
         <div id="status" class="status">載入資料中...</div>
       </section>
     </main>
@@ -1990,16 +2119,22 @@
         cancelBtn:    document.getElementById("gmCancelBtn"),
         confirmBtn:   document.getElementById("gmConfirmBtn"),
 
-        show({ title, content, type = "alert", defaultVal = "", selectHtml = "", onConfirm }) {
+        show({ title, content, type = "alert", defaultVal = "", selectHtml = "", inputType = "text", confirmText = "確定", cancelText = "取消", onConfirm, onCancel }) {
           this.titleEl.textContent  = title;
           this.contentEl.innerHTML  = content;
           this.inputWrapper.style.display = type === "prompt" ? "flex" : "none";
           this.inputEl.value = defaultVal;
+          this.inputEl.type = inputType;
           if (this.dateInputEl) this.dateInputEl.value = "";
           this.selectEl.style.display   = type === "select" ? "block" : "none";
           this.selectEl.innerHTML        = selectHtml;
           this.cancelBtn.style.display   = type === "alert" ? "none" : "block";
-          this.cancelBtn.onclick  = () => { this.overlay.style.display = "none"; };
+          this.cancelBtn.textContent = cancelText;
+          this.confirmBtn.textContent = confirmText;
+          this.cancelBtn.onclick  = () => {
+            this.overlay.style.display = "none";
+            if (onCancel) onCancel();
+          };
           this.confirmBtn.onclick = () => {
             this.overlay.style.display = "none";
             if (onConfirm) {
@@ -2012,8 +2147,8 @@
           if (type === "prompt") setTimeout(() => this.inputEl.focus(), 100);
         },
         alert(msg)                   { this.show({ title: "提示",   content: msg, type: "alert" }); },
-        confirm(msg, onConfirm)      { this.show({ title: "請確認", content: msg, type: "confirm", onConfirm }); },
-        prompt(msg, defaultVal, onConfirm) { this.show({ title: "輸入", content: msg, type: "prompt", defaultVal, onConfirm }); },
+        confirm(msg, onConfirm, onCancel) { this.show({ title: "請確認", content: msg, type: "confirm", onConfirm, onCancel }); },
+        prompt(msg, defaultVal, onConfirm, options = {}) { this.show({ title: "輸入", content: msg, type: "prompt", defaultVal, onConfirm, ...options }); },
         select(title, msg, selectHtml, onConfirm) { this.show({ title, content: msg, type: "select", selectHtml, onConfirm }); },
       };
 
@@ -2033,7 +2168,12 @@
       // ==========================================
       // 分頁切換 (新增了 'edit' 分頁支援)
       // ==========================================
-      function switchTab(tabId) {
+      function switchTab(tabId, options = {}) {
+        const currentTab = document.getElementById("panel")?.dataset.activeTab;
+        if (!options.skipEditGuard && tabId !== "edit" && currentTab === "edit" && hasUnsavedEditChanges()) {
+          confirmBeforeLeavingEdit(() => switchTab(tabId, { skipEditGuard: true }));
+          return false;
+        }
         disableRouteLayerForTools();
         document.getElementById("panel").dataset.activeTab = tabId;
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
@@ -2157,6 +2297,7 @@
         document.getElementById("photoClearPendingBtn").addEventListener("click", () => {
           editPhotoState.pending = [];
           renderEditPhotos();
+          scheduleEditDraftSave(true);
         });
         document.getElementById("photoInput").addEventListener("change", async (event) => {
           const files = [...event.target.files];
@@ -2173,22 +2314,46 @@
             editPhotoState.pending = editPhotoState.pending.filter(photo => photo.meta.id !== removePhoto);
           }
           renderEditPhotos();
+          scheduleEditDraftSave(true);
         });
         document.getElementById("photoBrowserSearch").addEventListener("input", () => renderPhotoBrowser());
         document.getElementById("photoBrowserFolderFilter").addEventListener("change", () => renderPhotoBrowser());
         document.getElementById("photoBrowserGrid").addEventListener("click", (event) => {
+          const deleteSingle = event.target.closest("[data-photo-delete-single]");
+          if (deleteSingle) {
+            event.stopPropagation();
+            const photoId = deleteSingle.dataset.photoDeleteSingle;
+            GlobalModal.confirm("確定要刪除這張照片嗎？巡檢紀錄本身會保留。", async () => {
+              try { await deletePhotoIdsFromRecords([photoId]); }
+              catch (error) { GlobalModal.alert("刪除照片失敗：" + error.message); }
+            });
+            return;
+          }
+          const deleteFolder = event.target.closest("[data-photo-delete-folder]");
+          if (deleteFolder) {
+            event.stopPropagation();
+            deleteBrowserFolderPhotos(deleteFolder.dataset.photoDeleteFolder || "");
+            return;
+          }
           const image = event.target.closest("[data-photo-open]");
           if (image) {
             openStoredPhoto(image.dataset.photoOpen);
             return;
           }
+          if (event.target.closest("[data-photo-select]")) return;
           const card = event.target.closest("[data-photo-record]");
           if (!card) return;
           const record = state.records.find(item => item.id === card.dataset.photoRecord);
           if (record) openEditPanel(record);
         });
+        document.getElementById("photoBrowserGrid").addEventListener("change", event => {
+          if (event.target.matches("[data-photo-select]")) updatePhotoBrowserSelectionUi();
+        });
         document.getElementById("storageRefreshBtn").addEventListener("click", refreshStorageStatus);
         document.getElementById("requestPersistentStorageBtn").addEventListener("click", requestPersistentStorage);
+        document.getElementById("photoBrowserSelectAllBtn").addEventListener("click", selectAllVisibleBrowserPhotos);
+        document.getElementById("photoBrowserDeleteSelectedBtn").addEventListener("click", deleteSelectedBrowserPhotos);
+        document.getElementById("photoBrowserDeleteAllBtn").addEventListener("click", deleteAllBrowserPhotos);
       }
 
       // ==========================================
@@ -2198,27 +2363,47 @@
       function openPhotoDb() {
         if (photoDbPromise) return photoDbPromise;
         photoDbPromise = new Promise((resolve, reject) => {
-          const request = indexedDB.open(PHOTO_DB_NAME, 1);
+          const request = indexedDB.open(PHOTO_DB_NAME, 2);
           request.onupgradeneeded = () => {
-            if (!request.result.objectStoreNames.contains(PHOTO_STORE_NAME)) {
-              request.result.createObjectStore(PHOTO_STORE_NAME, { keyPath: "id" });
-            }
+            const db = request.result;
+            if (!db.objectStoreNames.contains(PHOTO_STORE_NAME)) db.createObjectStore(PHOTO_STORE_NAME, { keyPath: "id" });
+            if (!db.objectStoreNames.contains(DRAFT_STORE_NAME)) db.createObjectStore(DRAFT_STORE_NAME, { keyPath: "id" });
+            if (!db.objectStoreNames.contains(APP_DATA_STORE_NAME)) db.createObjectStore(APP_DATA_STORE_NAME, { keyPath: "id" });
           };
-          request.onsuccess = () => resolve(request.result);
+          request.onsuccess = () => {
+            request.result.onversionchange = () => request.result.close();
+            resolve(request.result);
+          };
           request.onerror = () => reject(request.error || new Error("無法開啟照片資料庫"));
         });
         return photoDbPromise;
       }
 
-      async function photoDbRequest(mode, action) {
+      async function photoDbRequest(mode, action, storeName = PHOTO_STORE_NAME) {
         const db = await openPhotoDb();
         return new Promise((resolve, reject) => {
-          const transaction = db.transaction(PHOTO_STORE_NAME, mode);
-          const request = action(transaction.objectStore(PHOTO_STORE_NAME));
+          const transaction = db.transaction(storeName, mode);
+          const request = action(transaction.objectStore(storeName));
           transaction.oncomplete = () => resolve(request ? request.result : undefined);
           transaction.onerror = () => reject(transaction.error || request?.error || new Error("照片資料庫操作失敗"));
           transaction.onabort = () => reject(transaction.error || new Error("照片資料庫操作已取消"));
         });
+      }
+
+      function getDraftRecord() {
+        return photoDbRequest("readonly", store => store.get(DRAFT_ACTIVE_ID), DRAFT_STORE_NAME);
+      }
+      function putDraftRecord(draft) {
+        return photoDbRequest("readwrite", store => store.put({ ...draft, id: DRAFT_ACTIVE_ID }), DRAFT_STORE_NAME);
+      }
+      function clearDraftRecord() {
+        return photoDbRequest("readwrite", store => store.delete(DRAFT_ACTIVE_ID), DRAFT_STORE_NAME);
+      }
+      function getAppDataRecord(id) {
+        return photoDbRequest("readonly", store => store.get(id), APP_DATA_STORE_NAME);
+      }
+      function putAppDataRecord(id, value) {
+        return photoDbRequest("readwrite", store => store.put({ id, value, updatedAt: Date.now() }), APP_DATA_STORE_NAME);
       }
 
       function putPhotoBlob(photoId, blob) {
@@ -2293,26 +2478,73 @@
         return `${size >= 10 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
       }
 
+      function formatDateTime(value) {
+        const date = value ? new Date(value) : null;
+        if (!date || Number.isNaN(date.getTime())) return "未知時間";
+        return date.toLocaleString("zh-TW", { hour12: false });
+      }
+
+      function readBackupSummary() {
+        try { return JSON.parse(localStorage.getItem(BACKUP_SUMMARY_KEY) || "null"); }
+        catch { return null; }
+      }
+
+      function renderBackupSummary(summary = readBackupSummary()) {
+        const element = document.getElementById("backupSummary");
+        if (!element) return;
+        if (!summary?.exportedAt) {
+          element.textContent = "最近一次備份：尚未建立";
+          return;
+        }
+        const profile = summary.profile === "compressed" ? "壓縮版" : "原圖";
+        const protection = summary.encrypted ? "、已加密" : "";
+        element.textContent = `最近備份：${formatDateTime(summary.exportedAt)}｜${summary.records || 0} 筆、${summary.photos || 0} 張、${profile}${protection}｜格式 v${summary.formatVersion || BACKUP_FORMAT_VERSION}`;
+      }
+
+      function saveBackupSummary(summary) {
+        try {
+          localStorage.setItem(BACKUP_SUMMARY_KEY, JSON.stringify(summary));
+          renderBackupSummary(summary);
+        } catch (error) { console.warn("備份摘要儲存失敗：", error); }
+      }
+
       async function getPhotoStorageUsage() {
-        const entries = await photoDbRequest("readonly", store => store.getAll());
-        return entries.reduce((summary, entry) => {
-          if (!entry?.blob) return summary;
-          summary.count++;
-          summary.bytes += Number(entry.blob.size) || 0;
-          return summary;
-        }, { count: 0, bytes: 0 });
+        const db = await openPhotoDb();
+        return new Promise((resolve, reject) => {
+          const summary = { count: 0, bytes: 0 };
+          const transaction = db.transaction(PHOTO_STORE_NAME, "readonly");
+          const request = transaction.objectStore(PHOTO_STORE_NAME).openCursor();
+          request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) return;
+            if (cursor.value?.blob) {
+              summary.count++;
+              summary.bytes += Number(cursor.value.blob.size) || 0;
+            }
+            cursor.continue();
+          };
+          transaction.oncomplete = () => resolve(summary);
+          transaction.onerror = () => reject(transaction.error || new Error("讀取照片使用量失敗"));
+          transaction.onabort = () => reject(transaction.error || new Error("讀取照片使用量已取消"));
+        });
       }
 
       async function refreshStorageStatus() {
         const photoUsageEl = document.getElementById("photoStorageUsage");
+        const quotaEl = document.getElementById("storageQuota");
         const availableEl = document.getElementById("storageAvailable");
+        const warningEl = document.getElementById("storageWarning");
         const persistenceEl = document.getElementById("storagePersistenceStatus");
         const persistButton = document.getElementById("requestPersistentStorageBtn");
-        if (!photoUsageEl || !availableEl || !persistenceEl || !persistButton) return;
+        if (!photoUsageEl || !quotaEl || !availableEl || !warningEl || !persistenceEl || !persistButton) return;
         photoUsageEl.textContent = "更新中";
+        quotaEl.textContent = "更新中";
         availableEl.textContent = "更新中";
+        warningEl.hidden = true;
+        warningEl.classList.remove("is-critical");
         persistenceEl.classList.remove("is-protected");
         persistenceEl.textContent = "資料保護：檢查中";
+        renderBackupSummary();
         try {
           const storage = navigator.storage;
           const [photos, estimate, persisted] = await Promise.all([
@@ -2321,10 +2553,23 @@
             storage?.persisted ? storage.persisted() : Promise.resolve(null),
           ]);
           photoUsageEl.textContent = `${photos.count} 張 / ${formatStorageBytes(photos.bytes)}`;
+          const quota = Number.isFinite(estimate?.quota) ? estimate.quota : null;
+          quotaEl.textContent = quota === null ? "瀏覽器未提供" : formatStorageBytes(quota);
           const remaining = Number.isFinite(estimate?.quota) && Number.isFinite(estimate?.usage)
             ? Math.max(0, estimate.quota - estimate.usage)
             : null;
           availableEl.textContent = remaining === null ? "瀏覽器未提供" : formatStorageBytes(remaining);
+          if (quota && remaining !== null) {
+            const remainingRatio = remaining / quota;
+            if (remainingRatio < 0.05) {
+              warningEl.textContent = "儲存空間即將不足（低於 5%），請先備份並清理照片。";
+              warningEl.hidden = false;
+              warningEl.classList.add("is-critical");
+            } else if (remainingRatio < 0.2) {
+              warningEl.textContent = "儲存空間偏低（低於 20%），建議先建立完整 ZIP 備份。";
+              warningEl.hidden = false;
+            }
+          }
           if (persisted === true) {
             persistenceEl.textContent = "資料保護：已啟用";
             persistenceEl.classList.add("is-protected");
@@ -2342,7 +2587,10 @@
         } catch (error) {
           console.warn("讀取儲存狀態失敗：", error);
           photoUsageEl.textContent = "無法讀取";
+          quotaEl.textContent = "無法讀取";
           availableEl.textContent = "無法讀取";
+          warningEl.textContent = "無法取得瀏覽器儲存估算，仍請定期建立 ZIP 備份。";
+          warningEl.hidden = false;
           persistenceEl.textContent = "資料保護：無法讀取";
           persistButton.disabled = true;
         }
@@ -2468,6 +2716,7 @@
         }
         editPhotoState.pending.push(...accepted);
         renderEditPhotos();
+        if (accepted.length) await scheduleEditDraftSave(true);
         if (files.length !== accepted.length) GlobalModal.alert("部分檔案不是可用的圖片，已略過。");
       }
 
@@ -2475,7 +2724,180 @@
         clearPhotoPreviewUrls();
         const existing = Array.isArray(record?.photos) ? record.photos.map(photo => ({ ...photo })) : [];
         editPhotoState = { recordId: record?.id || null, existing, originalExisting: existing.map(photo => ({ ...photo })), pending: [] };
+        editDraftState.dirty = false;
+        editDraftState.point = null;
+        editDraftState.restored = false;
+        updateEditDraftUi();
         renderEditPhotos();
+      }
+
+      function getCurrentEditPointSnapshot() {
+        const lat = Number(document.getElementById("editLat")?.value);
+        const lng = Number(document.getElementById("editLng")?.value);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return {
+          id: document.getElementById("editRecordId")?.value || null,
+          lat,
+          lng,
+          code: document.getElementById("editCode")?.value || "",
+          name: document.getElementById("editPanelTitle")?.textContent || "",
+        };
+      }
+
+      function updateEditDraftUi() {
+        const badge = document.getElementById("editUnsavedBadge");
+        const saveButton = document.getElementById("sidebarSaveBtn");
+        if (badge) {
+          badge.hidden = !editDraftState.dirty;
+          badge.textContent = editDraftState.dirty ? "尚有未儲存變更" : "";
+        }
+        if (saveButton && !saveButton.disabled) saveButton.textContent = editDraftState.dirty ? "💾 儲存紀錄（未儲存）" : "💾 儲存紀錄";
+      }
+
+      function captureEditDraft() {
+        const point = getCurrentEditPointSnapshot();
+        if (!point) return null;
+        return {
+          id: DRAFT_ACTIVE_ID,
+          version: 1,
+          savedAt: new Date().toISOString(),
+          point,
+          recordId: editPhotoState.recordId || null,
+          existing: editPhotoState.existing.map(photo => ({ ...photo })),
+          originalExisting: editPhotoState.originalExisting.map(photo => ({ ...photo })),
+          pending: editPhotoState.pending.map(item => ({ meta: { ...item.meta }, blob: item.blob })),
+          values: {
+            name: document.getElementById("sidebar-name-input")?.value || "",
+            folderId: document.getElementById("sidebar-folder")?.value || "",
+            urgency: document.getElementById("sidebar-urgency")?.value || "C",
+            defect: document.getElementById("sidebar-defect-input")?.value || "",
+            needCorrection: !!document.getElementById("sidebar-correction-flag")?.checked,
+            correctCode: document.getElementById("sidebar-correct-code-input")?.value || "",
+            icon: document.getElementById("sidebar-icon-input")?.value || "",
+          },
+          scrollTop: document.getElementById("editFormScrollArea")?.scrollTop || 0,
+        };
+      }
+
+      function markEditDirty() {
+        if (document.getElementById("editFormContainer")?.style.display === "none") return;
+        editDraftState.dirty = true;
+        editDraftState.point = getCurrentEditPointSnapshot();
+        updateEditDraftUi();
+      }
+
+      function scheduleEditDraftSave(immediate = false) {
+        markEditDirty();
+        if (editDraftState.saveTimer) clearTimeout(editDraftState.saveTimer);
+        if (immediate) return saveEditDraftNow();
+        editDraftState.saveTimer = window.setTimeout(() => {
+          editDraftState.saveTimer = null;
+          saveEditDraftNow();
+        }, 350);
+        return editDraftState.saveSequence;
+      }
+
+      function saveEditDraftNow() {
+        if (!editDraftState.dirty) return editDraftState.saveSequence;
+        const draft = captureEditDraft();
+        if (!draft) return editDraftState.saveSequence;
+        editDraftState.saveSequence = editDraftState.saveSequence
+          .catch(() => {})
+          .then(() => putDraftRecord(draft))
+          .then(() => {
+            editDraftState.point = draft.point;
+            updateEditDraftUi();
+          })
+          .catch(error => console.warn("草稿儲存失敗：", error));
+        return editDraftState.saveSequence;
+      }
+
+      async function clearEditDraft() {
+        if (editDraftState.saveTimer) clearTimeout(editDraftState.saveTimer);
+        editDraftState.saveTimer = null;
+        await editDraftState.saveSequence.catch(() => {});
+        try { await clearDraftRecord(); }
+        catch (error) { console.warn("清除草稿失敗：", error); }
+        editDraftState.dirty = false;
+        editDraftState.point = null;
+        editDraftState.restored = false;
+        updateEditDraftUi();
+      }
+
+      function hasUnsavedEditChanges() {
+        return !!editDraftState.dirty && document.getElementById("editFormContainer")?.style.display !== "none";
+      }
+
+      function confirmBeforeLeavingEdit(onProceed) {
+        if (!hasUnsavedEditChanges()) {
+          onProceed();
+          return true;
+        }
+        GlobalModal.show({
+          title: "尚有未儲存變更",
+          content: "目前的欄位或照片已先保存為草稿。要關閉編輯面板並保留草稿嗎？",
+          type: "confirm",
+          confirmText: "關閉並保留草稿",
+          cancelText: "繼續編輯",
+          onConfirm: async () => {
+            await saveEditDraftNow();
+            onProceed();
+          },
+        });
+        return false;
+      }
+
+      async function restoreEditDraft(draft) {
+        const point = draft?.point;
+        if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lng))) {
+          await clearDraftRecord();
+          GlobalModal.alert("上次草稿缺少有效座標，已略過恢復。\n請重新建立巡檢紀錄。");
+          return;
+        }
+        openEditPanel({ ...point, lat: Number(point.lat), lng: Number(point.lng) }, { skipDirtyGuard: true });
+        const values = draft.values || {};
+        document.getElementById("sidebar-name-input").value = values.name || point.name || "手動新增設備";
+        document.getElementById("sidebar-folder").innerHTML = getFolderOptionsHtml(values.folderId || null);
+        document.getElementById("sidebar-urgency").value = values.urgency || "C";
+        document.getElementById("sidebar-defect-input").value = values.defect || "";
+        document.getElementById("sidebar-correction-flag").checked = !!values.needCorrection;
+        document.getElementById("sidebar-correct-code-container").style.display = values.needCorrection ? "flex" : "none";
+        document.getElementById("sidebar-correct-code-input").value = values.correctCode || "";
+        document.getElementById("sidebar-icon-input").value = values.icon || "";
+        document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => btn.classList.toggle("is-selected", btn.dataset.icon === values.icon));
+        updateSidebarIconPreview();
+        editPhotoState = {
+          recordId: draft.recordId || null,
+          existing: Array.isArray(draft.existing) ? draft.existing.map(photo => ({ ...photo })) : [],
+          originalExisting: Array.isArray(draft.originalExisting) ? draft.originalExisting.map(photo => ({ ...photo })) : [],
+          pending: Array.isArray(draft.pending) ? draft.pending.filter(item => item?.meta && item?.blob).map(item => ({ meta: { ...item.meta }, blob: item.blob })) : [],
+        };
+        editDraftState.dirty = true;
+        editDraftState.point = { ...point };
+        editDraftState.restored = true;
+        renderEditPhotos();
+        updateEditDraftUi();
+        const scrollArea = document.getElementById("editFormScrollArea");
+        if (scrollArea) scrollArea.scrollTop = Number(draft.scrollTop) || 0;
+        setStatus("已恢復上次草稿，請確認後儲存");
+        window.setTimeout(() => setStatus(""), 2600);
+      }
+
+      async function checkForSavedDraft() {
+        try {
+          const draft = await getDraftRecord();
+          if (!draft?.point || (!draft.values && !draft.pending?.length)) return;
+          const photoCount = (draft.pending?.length || 0) + (draft.existing?.length || 0);
+          GlobalModal.show({
+            title: "發現上次草稿",
+            content: `上次編輯時間：${formatDateTime(draft.savedAt)}<br>設備：${escapeHtml(draft.values?.name || draft.point.name || "未命名設備")}<br>草稿照片：${photoCount} 張<br><br>可以恢復草稿，或捨棄這份未完成資料。`,
+            type: "confirm",
+            confirmText: "恢復上次草稿",
+            cancelText: "捨棄草稿",
+            onConfirm: () => restoreEditDraft(draft),
+            onCancel: () => clearEditDraft(),
+          });
+        } catch (error) { console.warn("讀取草稿失敗：", error); }
       }
 
       let photoViewerUrl = null;
@@ -2484,6 +2906,10 @@
       let photoViewerPhoto = null;
       let photoViewerRecord = null;
       let photoBrowserPreviewUrls = [];
+      let photoBrowserRenderEpoch = 0;
+      let photoThumbnailObserver = null;
+      let photoThumbnailQueue = [];
+      let photoThumbnailActive = 0;
       let photoViewerScale = 1;
       let photoViewerOffset = { x: 0, y: 0 };
       let photoViewerDrag = null;
@@ -2952,18 +3378,130 @@
         if (event.key === "Escape") closePhotoViewer();
       });
 
+      function updatePhotoBrowserSelectionUi() {
+        const grid = document.getElementById("photoBrowserGrid");
+        const selectedCount = document.getElementById("photoBrowserSelectedCount");
+        const deleteSelected = document.getElementById("photoBrowserDeleteSelectedBtn");
+        if (!grid || !selectedCount || !deleteSelected) return;
+        const count = grid.querySelectorAll("[data-photo-select]:checked").length;
+        selectedCount.textContent = count ? `已選取 ${count} 張照片` : "未選取照片";
+        deleteSelected.disabled = count === 0;
+      }
+
+      function stopPhotoThumbnailLoading() {
+        if (photoThumbnailObserver) photoThumbnailObserver.disconnect();
+        photoThumbnailObserver = null;
+        photoThumbnailQueue = [];
+        photoBrowserRenderEpoch++;
+      }
+
+      function runPhotoThumbnailQueue(epoch) {
+        while (photoThumbnailActive < 3 && photoThumbnailQueue.length) {
+          const task = photoThumbnailQueue.shift();
+          photoThumbnailActive++;
+          (async () => {
+            try {
+              if (epoch !== photoBrowserRenderEpoch || !task.image.isConnected) return;
+              const blob = await getPhotoBlob(task.photo.id, task.photo);
+              if (!blob || epoch !== photoBrowserRenderEpoch || !task.image.isConnected) return;
+              const previewBlob = await createPhotoPreviewBlob(blob);
+              if (epoch !== photoBrowserRenderEpoch || !task.image.isConnected) return;
+              const url = URL.createObjectURL(previewBlob);
+              photoBrowserPreviewUrls.push(url);
+              task.image.src = url;
+              task.image.dataset.loaded = "true";
+            } catch (error) {
+              console.warn("縮圖載入失敗：", error);
+            } finally {
+              photoThumbnailActive--;
+              runPhotoThumbnailQueue(epoch);
+            }
+          })();
+        }
+      }
+
+      function queuePhotoThumbnail(image, photo, epoch) {
+        if (!image || image.dataset.queued === "true" || image.dataset.loaded === "true") return;
+        image.dataset.queued = "true";
+        photoThumbnailQueue.push({ image, photo });
+        runPhotoThumbnailQueue(epoch);
+      }
+
+      function deletePhotoIdsFromRecords(photoIds) {
+        const ids = new Set(photoIds.filter(Boolean));
+        if (!ids.size) return Promise.resolve();
+        const removed = [];
+        state.records.forEach(record => {
+          const photos = Array.isArray(record.photos) ? record.photos : [];
+          const remaining = photos.filter(photo => {
+            if (!ids.has(photo.id)) return true;
+            removed.push(photo.id);
+            return false;
+          });
+          record.photos = remaining;
+        });
+        if (photoViewerPhoto?.id && ids.has(photoViewerPhoto.id)) closePhotoViewer();
+        saveToLocalStorage();
+        return Promise.all(removed.map(deletePhotoBlob)).then(() => {
+          renderPhotoBrowser();
+          refreshStorageStatus();
+        });
+      }
+
+      function selectedBrowserPhotoIds() {
+        return [...document.querySelectorAll("#photoBrowserGrid [data-photo-select]:checked")].map(input => input.dataset.photoSelect);
+      }
+
+      function selectAllVisibleBrowserPhotos() {
+        const inputs = [...document.querySelectorAll("#photoBrowserGrid [data-photo-select]")];
+        const shouldSelect = inputs.some(input => !input.checked);
+        inputs.forEach(input => { input.checked = shouldSelect; });
+        const button = document.getElementById("photoBrowserSelectAllBtn");
+        if (button) button.textContent = shouldSelect ? "取消選取" : "選取目前照片";
+        updatePhotoBrowserSelectionUi();
+      }
+
+      function deleteSelectedBrowserPhotos() {
+        const ids = selectedBrowserPhotoIds();
+        if (!ids.length) return;
+        GlobalModal.confirm(`確定要刪除選取的 ${ids.length} 張照片嗎？此動作無法從瀏覽器內復原，請先確認已有 ZIP 備份。`, async () => {
+          try { await deletePhotoIdsFromRecords(ids); }
+          catch (error) { GlobalModal.alert("刪除照片失敗：" + error.message); }
+        });
+      }
+
+      function deleteAllBrowserPhotos() {
+        const ids = state.records.flatMap(record => (record.photos || []).map(photo => photo.id));
+        if (!ids.length) { GlobalModal.alert("目前沒有可刪除的照片。"); return; }
+        GlobalModal.confirm(`確定要刪除全部 ${ids.length} 張照片嗎？巡檢紀錄本身會保留，但照片無法從瀏覽器內復原。`, async () => {
+          try { await deletePhotoIdsFromRecords(ids); }
+          catch (error) { GlobalModal.alert("刪除照片失敗：" + error.message); }
+        });
+      }
+
+      function deleteBrowserFolderPhotos(folderId) {
+        const ids = state.records
+          .filter(record => (folderId ? record.folderId === folderId : !record.folderId))
+          .flatMap(record => (record.photos || []).map(photo => photo.id));
+        if (!ids.length) return;
+        GlobalModal.confirm(`確定要刪除這個資料夾內的 ${ids.length} 張照片嗎？巡檢紀錄本身會保留。`, async () => {
+          try { await deletePhotoIdsFromRecords(ids); }
+          catch (error) { GlobalModal.alert("刪除照片失敗：" + error.message); }
+        });
+      }
+
       async function renderPhotoBrowser() {
         const grid = document.getElementById("photoBrowserGrid");
         const count = document.getElementById("photoBrowserCount");
         const folderFilter = document.getElementById("photoBrowserFolderFilter");
         if (!grid || !count || !folderFilter) return;
+        stopPhotoThumbnailLoading();
         clearPhotoBrowserPreviewUrls();
+        const epoch = photoBrowserRenderEpoch;
         const selectedFolder = folderFilter.value;
-        const previousOptions = folderFilter.innerHTML;
         folderFilter.innerHTML = '<option value="">全部資料夾</option>' + state.folders.map(folder =>
           `<option value="${escapeHtml(folder.id)}">${escapeHtml(getFullFolderPath(folder.id))}</option>`).join("");
         if ([...folderFilter.options].some(option => option.value === selectedFolder)) folderFilter.value = selectedFolder;
-        else if (previousOptions) folderFilter.value = "";
         const query = document.getElementById("photoBrowserSearch").value.trim().toLowerCase();
         const records = state.records.filter(record => {
           if (!Array.isArray(record.photos) || record.photos.length === 0) return false;
@@ -2971,41 +3509,84 @@
           const haystack = `${record.name || ""} ${record.code || ""} ${getFullFolderPath(record.folderId)} ${record.defect || ""}`.toLowerCase();
           return !query || haystack.includes(query);
         });
-        count.textContent = records.length;
+        const photoCount = records.reduce((total, record) => total + record.photos.length, 0);
+        count.textContent = photoCount;
         if (!records.length) {
           grid.innerHTML = '<div style="font-size:13px; color:var(--muted); padding:18px 0;">尚無符合條件的照片紀錄</div>';
+          const selectButton = document.getElementById("photoBrowserSelectAllBtn");
+          if (selectButton) selectButton.textContent = "選取目前照片";
+          updatePhotoBrowserSelectionUi();
           return;
         }
-        grid.innerHTML = records.map(record => `
-          <article class="photo-record-card" data-photo-record="${escapeHtml(record.id)}" tabindex="0">
-            <div class="photo-record-head">
-              <strong>${escapeHtml(record.name || record.code || "未命名設備")}</strong>
-              <span>${escapeHtml(getFullFolderPath(record.folderId) || "未歸類")}</span>
+
+        const groups = new Map();
+        records.forEach(record => {
+          const key = record.folderId || "__uncategorized__";
+          if (!groups.has(key)) groups.set(key, { folderId: record.folderId || "", label: getFullFolderPath(record.folderId) || "未歸類", records: [] });
+          groups.get(key).records.push(record);
+        });
+        grid.innerHTML = [...groups.values()].map(group => {
+          const groupPhotoCount = group.records.reduce((total, record) => total + record.photos.length, 0);
+          return `<section class="photo-folder-group" data-photo-folder="${escapeHtml(group.folderId || "__uncategorized__")}">
+            <div class="photo-folder-head">
+              <strong>📂 ${escapeHtml(group.label)}</strong>
+              <span>${groupPhotoCount} 張</span>
+              <button type="button" class="photo-folder-delete" data-photo-delete-folder="${escapeHtml(group.folderId)}">刪除此資料夾照片</button>
             </div>
-            <div class="photo-record-strip">${record.photos.map(photo =>
-              `<img data-photo-open="${escapeHtml(photo.id)}" data-browser-image="${escapeHtml(photo.id)}" alt="${escapeHtml(photo.fileName || "巡檢照片")}" title="點擊查看原圖" />`).join("")}</div>
-            <div class="photo-record-defect">
-              <strong>改善事項</strong>
-              <span>${escapeHtml(record.defect || "未填寫")}</span>
-            </div>
-            <div class="photo-record-actions"><span>${escapeHtml(record.code || "未填圖號")}</span><span>${record.photos.length} 張</span></div>
-          </article>`).join("");
-        await Promise.all(records.flatMap(record => record.photos).map(async photo => {
-          const image = grid.querySelector(`[data-browser-image="${CSS.escape(photo.id)}"]`);
-          const blob = await getPhotoBlob(photo.id, photo);
-          if (image && blob) {
-            const previewBlob = await createPhotoPreviewBlob(blob);
-            const url = URL.createObjectURL(previewBlob);
-            photoBrowserPreviewUrls.push(url);
-            image.src = url;
-          }
-        }));
+            <div class="photo-folder-records">${group.records.map(record => `
+              <article class="photo-record-card" data-photo-record="${escapeHtml(record.id)}" tabindex="0">
+                <div class="photo-record-head">
+                  <strong>${escapeHtml(record.name || record.code || "未命名設備")}</strong>
+                  <span>${escapeHtml(record.code || "未填圖號")}</span>
+                </div>
+                <div class="photo-record-strip">${record.photos.map(photo => `
+                  <figure class="photo-browser-item">
+                    <input type="checkbox" data-photo-select="${escapeHtml(photo.id)}" aria-label="選取 ${escapeHtml(photo.fileName || "巡檢照片")}">
+                    <img data-photo-open="${escapeHtml(photo.id)}" data-browser-image="${escapeHtml(photo.id)}" alt="${escapeHtml(photo.fileName || "巡檢照片")}" title="點擊查看原圖" loading="lazy" />
+                    <button type="button" data-photo-delete-single="${escapeHtml(photo.id)}" title="刪除這張照片" aria-label="刪除這張照片">×</button>
+                  </figure>`).join("")}</div>
+                <div class="photo-record-defect"><strong>改善事項</strong><span>${escapeHtml(record.defect || "未填寫")}</span></div>
+                <div class="photo-record-actions"><span>${escapeHtml(record.photos.length + " 張照片")}</span></div>
+              </article>`).join("")}</div>
+          </section>`;
+        }).join("");
+
+        if ("IntersectionObserver" in window) {
+          const scrollRoot = document.querySelector(".photo-browser");
+          photoThumbnailObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+              if (!entry.isIntersecting) return;
+              photoThumbnailObserver.unobserve(entry.target);
+              const photo = findPhotoMetadata(entry.target.dataset.browserImage);
+              if (photo) queuePhotoThumbnail(entry.target, photo, epoch);
+            });
+          }, { root: scrollRoot, rootMargin: "280px 0px" });
+          grid.querySelectorAll("[data-browser-image]").forEach(image => photoThumbnailObserver.observe(image));
+        } else {
+          records.flatMap(record => record.photos).forEach(photo => {
+            const image = grid.querySelector(`[data-browser-image="${CSS.escape(photo.id)}"]`);
+            queuePhotoThumbnail(image, photo, epoch);
+          });
+        }
+        const selectButton = document.getElementById("photoBrowserSelectAllBtn");
+        if (selectButton) selectButton.textContent = "選取目前照片";
+        updatePhotoBrowserSelectionUi();
       }
 
       // ==========================================
       // 將資料帶入側邊欄，並切換分頁
       // ==========================================
-      function openEditPanel(point) {
+      function openEditPanel(point, options = {}) {
+        if (!options.skipDirtyGuard && hasUnsavedEditChanges()) {
+          const currentPoint = editDraftState.point;
+          const isSamePoint = currentPoint
+            && Math.abs(Number(currentPoint.lat) - Number(point.lat)) < 0.0000001
+            && Math.abs(Number(currentPoint.lng) - Number(point.lng)) < 0.0000001;
+          if (!isSamePoint) {
+            confirmBeforeLeavingEdit(() => openEditPanel(point, { skipDirtyGuard: true }));
+            return;
+          }
+        }
         disableRouteLayerForTools();
         document.getElementById("editFormContainer").style.display = "flex";
         document.getElementById("sidebarSaveBtn").disabled = false;
@@ -3171,8 +3752,15 @@
       map.getPane("routePane").style.zIndex = 390;
       map.getPane("routePane").style.pointerEvents = "none";
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      const baseTileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap",
+      }).on("tileerror", () => {
+        const notice = document.getElementById("offlineNotice");
+        if (notice) {
+          notice.hidden = false;
+          notice.classList.add("is-error");
+          notice.textContent = "地圖底圖目前無法載入；設備資料、巡檢紀錄與照片仍可使用。恢復網路後可重新載入地圖。";
+        }
       }).addTo(map);
 
       const SHOW_POINTS_ZOOM   = 15;
@@ -3183,6 +3771,12 @@
       const LEGACY_STORAGE_KEYS = ["taipower_inspection_v7", "taipower_inspection_v6", "taipower_inspection_v5"];
       const PHOTO_DB_NAME      = "taipower_inspection_photos_v2";
       const PHOTO_STORE_NAME   = "photos";
+      const DRAFT_STORE_NAME   = "drafts";
+      const APP_DATA_STORE_NAME = "appData";
+      const DRAFT_ACTIVE_ID    = "active";
+      const EQUIPMENT_CACHE_ID = "equipment-cache";
+      const BACKUP_SUMMARY_KEY = "taipower_inspection_last_backup_v1";
+      const BACKUP_FORMAT_VERSION = 3;
 
       const state = {
         points: [], meta: null, area: "", query: "",
@@ -3197,6 +3791,7 @@
       };
 
       let editPhotoState = { recordId: null, existing: [], originalExisting: [], pending: [] };
+      let editDraftState = { dirty: false, point: null, saveTimer: null, saveSequence: Promise.resolve(), restored: false };
       let photoPreviewUrls = [];
       let photoRenderEpoch = 0;
 
@@ -3347,7 +3942,11 @@
         return currentFolder ? currentFolder.id : null;
       }
 
-      function setPanelCollapsed(collapsed) {
+      function setPanelCollapsed(collapsed, options = {}) {
+        if (collapsed && !options.skipEditGuard && document.getElementById("panel")?.dataset.activeTab === "edit" && hasUnsavedEditChanges()) {
+          confirmBeforeLeavingEdit(() => setPanelCollapsed(true, { skipEditGuard: true }));
+          return false;
+        }
         if (!collapsed) disableRouteLayerForTools();
         document.querySelector("#panel").classList.toggle("is-collapsed", collapsed);
         document.querySelector(".app").classList.toggle("is-panel-collapsed", collapsed);
@@ -4824,14 +5423,97 @@
       render();
     })();
   <\/script>
-</body>
+      </body>
 </html>`;
+      }
+
+      async function archiveDataToBlob(data, type = "application/octet-stream") {
+        if (data instanceof Blob) return data;
+        if (data instanceof ArrayBuffer) return new Blob([data], { type });
+        if (ArrayBuffer.isView(data)) return new Blob([data], { type });
+        return new Blob([String(data)], { type });
+      }
+
+      async function sha256Hex(data) {
+        const blob = await archiveDataToBlob(data);
+        if (!globalThis.crypto?.subtle) return "";
+        const digest = await globalThis.crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+        return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
+      }
+
+      async function addArchiveFile(zip, manifestFiles, path, data, type = "application/octet-stream") {
+        const blob = await archiveDataToBlob(data, type);
+        zip.file(path, blob);
+        manifestFiles.push({
+          path,
+          bytes: blob.size,
+          sha256: await sha256Hex(blob),
+        });
+        return blob;
+      }
+
+      const BACKUP_ENCRYPTION_MAGIC = new Uint8Array([84, 80, 87, 50]);
+
+      async function deriveBackupKey(password, salt, iterations) {
+        if (!globalThis.crypto?.subtle) throw new Error("此瀏覽器不支援備份加密");
+        const material = await globalThis.crypto.subtle.importKey(
+          "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]
+        );
+        return globalThis.crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+          material,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt", "decrypt"]
+        );
+      }
+
+      async function encryptBackupBlob(blob, password) {
+        const trimmedPassword = String(password || "");
+        if (!trimmedPassword) return { blob, encrypted: false };
+        if (!globalThis.crypto?.getRandomValues || !globalThis.crypto?.subtle) throw new Error("此瀏覽器不支援備份加密");
+        const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+        const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+        const iterations = 210000;
+        const key = await deriveBackupKey(trimmedPassword, salt, iterations);
+        const cipherText = new Uint8Array(await globalThis.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, await blob.arrayBuffer()));
+        const header = new Uint8Array(4 + 1 + 4 + salt.length + iv.length);
+        header.set(BACKUP_ENCRYPTION_MAGIC, 0);
+        header[4] = 1;
+        new DataView(header.buffer).setUint32(5, iterations);
+        header.set(salt, 9);
+        header.set(iv, 25);
+        return { blob: new Blob([header, cipherText], { type: "application/octet-stream" }), encrypted: true };
+      }
+
+      async function isEncryptedBackupFile(file) {
+        const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+        return BACKUP_ENCRYPTION_MAGIC.every((value, index) => header[index] === value);
+      }
+
+      async function decryptBackupFile(file, password) {
+        if (!globalThis.crypto?.subtle) throw new Error("此瀏覽器不支援備份解密");
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        if (bytes.length < 37 || !BACKUP_ENCRYPTION_MAGIC.every((value, index) => bytes[index] === value)) {
+          throw new Error("加密備份格式錯誤");
+        }
+        const iterations = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(5);
+        const salt = bytes.slice(9, 25);
+        const iv = bytes.slice(25, 37);
+        try {
+          const key = await deriveBackupKey(password, salt, iterations);
+          const plain = await globalThis.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, bytes.slice(37));
+          return new Blob([plain], { type: "application/zip" });
+        } catch {
+          throw new Error("密碼錯誤或備份檔案已損毀");
+        }
       }
 
       async function createPhotoArchive(records, folders, archiveTitle, photoProfile = "original") {
         if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試。");
 
         const zip = new JSZip();
+        const manifestFiles = [];
         const exportedAt = new Date().toISOString();
         const orderedRecords = sortInspectionRecords(records);
         const archiveRecords = orderedRecords.map(record => ({
@@ -4840,8 +5522,11 @@
         }));
 
         let photoCount = 0;
+        let originalPhotoBytes = 0;
+        let exportedPhotoBytes = 0;
         const exportedPhotoLinks = new Map();
         const inspectionCards = [];
+        const cardFiles = [];
         for (const record of archiveRecords) {
           for (const photo of record.photos || []) {
             const sourcePhoto = { ...photo };
@@ -4850,6 +5535,8 @@
             const blob = photoProfile === "compressed"
               ? await compressPhotoForExport(sourceBlob)
               : sourceBlob;
+            originalPhotoBytes += Number(sourceBlob.size) || 0;
+            exportedPhotoBytes += Number(blob.size) || 0;
             if (photoProfile === "compressed") {
               photo.originalSize = Number(photo.originalSize) || sourceBlob.size;
               photo.originalType = photo.originalType || sourceBlob.type || "image/jpeg";
@@ -4859,7 +5546,7 @@
             }
             const path = photoArchivePath(record, photo, photoProfile);
             const cardPath = inspectionCardDetailPath(photo.id);
-            zip.file(path, blob);
+            await addArchiveFile(zip, manifestFiles, path, blob, blob.type || "image/jpeg");
             const originalTarget = excelPhotoLinkTarget(path);
             exportedPhotoLinks.set(photo.id, {
               card: inspectionCardLinkTarget(photo.id),
@@ -4879,47 +5566,85 @@
           }
         }
 
-        zip.file("records.json", JSON.stringify({
+        const recordsJson = JSON.stringify({
           format: "taipower-inspection-v2-photo-backup",
           version: 2,
+          backupFormatVersion: BACKUP_FORMAT_VERSION,
           exportedAt,
           photoProfile,
           folders,
           records: archiveRecords,
-        }, null, 2));
-        zip.file(INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards, folders));
+        }, null, 2);
+        await addArchiveFile(zip, manifestFiles, "records.json", recordsJson, "application/json");
+        await addArchiveFile(zip, manifestFiles, INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards, folders), "text/html");
         inspectionCards.forEach(card => {
-          zip.file(card.cardPath, createInspectionCardDetailHtml(card));
+          cardFiles.push({ path: card.cardPath, data: createInspectionCardDetailHtml(card) });
         });
+        for (const cardFile of cardFiles) await addArchiveFile(zip, manifestFiles, cardFile.path, cardFile.data, "text/html");
         const workbook = createRecordsWorkbook(
           archiveRecords,
           "",
           (record, photo) => exportedPhotoLinks.get(photo.id) || null,
           photoProfile === "compressed" ? { original: "照片連結" } : null
         );
-        zip.file("records.xlsx", XLSX.write(workbook, { bookType: "xlsx", type: "array" }));
-        zip.file("README.txt", [
+        const workbookData = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+        await addArchiveFile(zip, manifestFiles, "records.xlsx", workbookData, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        const readme = [
           archiveTitle,
           `匯出時間：${exportedAt}`,
+          `備份格式版本：${BACKUP_FORMAT_VERSION}`,
           `巡檢紀錄：${archiveRecords.length} 筆`,
           `照片檔案：${photoCount} 張`,
           `照片版本：${photoProfile === "compressed" ? "匯出壓縮版（適合分享，無法恢復未匯出的原始細節）" : "原圖（可完整還原）"}`,
           "請先解壓縮 ZIP，再開啟 records.xlsx。",
           `Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「${photoProfile === "compressed" ? "照片連結" : "原始照片連結"}」。`,
           `${INSPECTION_CARD_FILE} 是依資料夾分類的巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的圖片，不會額外複製照片檔案。`,
+          "manifest.json 會列出每個檔案的大小與 SHA-256，可在資料還原前重新檢查。",
           "records.json 可用於資料還原。還原前請先確認不會覆蓋現有資料。",
-        ].join("\r\n"));
+        ].join("\r\n");
+        await addArchiveFile(zip, manifestFiles, "README.txt", readme, "text/plain");
 
+        const manifest = {
+          format: "taipower-inspection-backup-manifest",
+          backupFormatVersion: BACKUP_FORMAT_VERSION,
+          exportedAt,
+          photoProfile,
+          folders: folders.length,
+          records: archiveRecords.length,
+          photos: photoCount,
+          originalPhotoBytes,
+          exportedPhotoBytes,
+          checksum: globalThis.crypto?.subtle ? "SHA-256" : "unavailable",
+          files: manifestFiles,
+        };
+        const manifestText = JSON.stringify(manifest, null, 2);
+        await addArchiveFile(zip, [], "manifest.json", manifestText, "application/json");
+
+        const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
         return {
-          blob: await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }),
+          blob,
           photoCount,
+          originalPhotoBytes,
+          exportedPhotoBytes,
+          manifest,
+          manifestHash: await sha256Hex(manifestText),
         };
       }
 
       async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original") {
         try {
-          const { blob, photoCount } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile);
+          const { blob, photoCount, manifestHash } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile);
           downloadBlob(blob, `${fileBaseName}.zip`);
+          saveBackupSummary({
+            exportedAt: new Date().toISOString(),
+            folders: folders.length,
+            records: records.length,
+            photos: photoCount,
+            profile: photoProfile,
+            encrypted: false,
+            formatVersion: BACKUP_FORMAT_VERSION,
+            manifestHash,
+          });
           GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。`);
         } catch (error) {
           console.error("ZIP 匯出失敗：", error);
@@ -4932,19 +5657,40 @@
           GlobalModal.alert("完整備份元件尚未載入，請確認網路後重試。");
           return;
         }
+        GlobalModal.prompt(
+          "輸入備份密碼（可留空）<br><small>填寫後會建立加密的 .zip.enc；忘記密碼將無法還原。留空則建立一般 ZIP。</small>",
+          "",
+          password => runSystemBackup(String(password || "")),
+          { inputType: "password", confirmText: "建立備份", cancelText: "取消" }
+        );
+      }
+
+      async function runSystemBackup(password = "") {
         const button = document.getElementById("exportSystemBtn");
         const originalText = button.textContent;
         button.disabled = true;
-        button.textContent = "⏳ 打包中";
+        button.textContent = password ? "⏳ 加密備份中" : "⏳ 打包中";
         try {
           normalizeInspectionState();
-          const { blob, photoCount } = await createPhotoArchive(
+          const archive = await createPhotoArchive(
             state.records,
             state.folders,
             "土木設備分布地圖照片版完整備份"
           );
-          downloadBlob(blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}.zip`);
-          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${photoCount} 張照片。解壓縮 ZIP 後，records.xlsx 可開啟巡檢卡或原始照片。`);
+          const encryptedArchive = await encryptBackupBlob(archive.blob, password);
+          const fileExtension = encryptedArchive.encrypted ? ".zip.enc" : ".zip";
+          downloadBlob(encryptedArchive.blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}${fileExtension}`);
+          saveBackupSummary({
+            exportedAt: new Date().toISOString(),
+            folders: state.folders.length,
+            records: state.records.length,
+            photos: archive.photoCount,
+            profile: "original",
+            encrypted: encryptedArchive.encrypted,
+            formatVersion: BACKUP_FORMAT_VERSION,
+            manifestHash: archive.manifestHash,
+          });
+          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${archive.photoCount} 張照片。${encryptedArchive.encrypted ? "此檔案已加密，請妥善保存密碼。" : "ZIP 內含 manifest.json，可在還原前檢查完整性。"}`);
         } catch (error) {
           console.error("完整備份失敗：", error);
           GlobalModal.alert("完整備份失敗：" + error.message);
@@ -4954,9 +5700,9 @@
         }
       }
 
-      async function restoreBackupData(parsed, photoEntries = []) {
+      async function restoreBackupData(parsed, photoEntries = [], replacePhotos = true) {
         if (!parsed || !Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("備份格式錯誤");
-        await replacePhotoStore(photoEntries);
+        if (replacePhotos) await replacePhotoStore(photoEntries);
         state.folders = parsed.folders;
         state.records = parsed.records;
         state.lastFolderId = state.records.length > 0 ? state.records[state.records.length - 1].folderId : null;
@@ -4966,12 +5712,36 @@
         state.selectedFolders.clear();
         state.selectedRecords.clear();
         beginEditPhotos(null);
+        await clearEditDraft();
         saveToLocalStorage();
         renderer.redraw();
         renderPhotoBrowser();
         refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
+      }
+
+      async function verifyZipManifest(zip, manifest) {
+        if (!manifest || !Array.isArray(manifest.files)) {
+          return { valid: true, legacy: true, checked: 0, errors: [] };
+        }
+        const errors = [];
+        let checked = 0;
+        for (const expected of manifest.files) {
+          const entry = zip.file(expected.path);
+          if (!entry || entry.dir) {
+            errors.push(`${expected.path} 遺失`);
+            continue;
+          }
+          const blob = await entry.async("blob");
+          checked++;
+          if (Number(expected.bytes) !== blob.size) errors.push(`${expected.path} 大小不符`);
+          if (expected.sha256) {
+            const actual = await sha256Hex(blob);
+            if (actual !== expected.sha256) errors.push(`${expected.path} SHA-256 不符`);
+          }
+        }
+        return { valid: errors.length === 0, legacy: false, checked, errors };
       }
 
       async function importZipBackup(file) {
@@ -4981,20 +5751,133 @@
         if (!recordsEntry) throw new Error("找不到 records.json，這不是照片版完整備份");
         const parsed = JSON.parse(await recordsEntry.async("string"));
         if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("records.json 格式錯誤");
+        const manifestEntry = zip.file("manifest.json");
+        const manifest = manifestEntry ? JSON.parse(await manifestEntry.async("string")) : null;
+        const integrity = await verifyZipManifest(zip, manifest);
+        if (!integrity.valid) throw new Error(`完整性檢查失敗：${integrity.errors.slice(0, 4).join("、")}`);
+
         const metaById = new Map(parsed.records.flatMap(record => (record.photos || []).map(photo => [photo.id, photo])));
+        const photoPrefixes = [...metaById.keys()].map(id => [id + "_", id]).sort((a, b) => b[0].length - a[0].length);
         const photoEntries = [];
         for (const path of Object.keys(zip.files)) {
           const entry = zip.files[path];
           if (entry.dir || !path.startsWith("photos/")) continue;
           const fileName = path.split("/").pop();
-          const photoId = [...metaById.keys()].find(id => fileName.startsWith(`${id}_`));
-          if (photoId) {
-            const photo = metaById.get(photoId);
-            const blob = normalizePhotoBlob(await entry.async("blob"), photo);
-            photoEntries.push({ id: photoId, blob });
-          }
+          const photoId = photoPrefixes.find(([prefix]) => fileName.startsWith(prefix))?.[1];
+          if (!photoId) continue;
+          const photo = metaById.get(photoId);
+          const blob = normalizePhotoBlob(await entry.async("blob"), photo);
+          photoEntries.push({ id: photoId, blob });
         }
-        return { parsed, photoEntries };
+        const metadataPhotos = [...metaById.values()];
+        return {
+          parsed,
+          photoEntries,
+          manifest,
+          integrity,
+          summary: {
+            fileBytes: Number(file.size) || 0,
+            folderCount: parsed.folders.length,
+            recordCount: parsed.records.length,
+            photoCount: photoEntries.length,
+            metadataPhotoCount: metadataPhotos.length,
+            photoBytes: photoEntries.reduce((total, entry) => total + (Number(entry.blob?.size) || 0), 0),
+            profile: parsed.photoProfile || manifest?.photoProfile || "unknown",
+            formatVersion: parsed.backupFormatVersion || manifest?.backupFormatVersion || 2,
+          },
+        };
+      }
+
+      async function getImportCapacitySummary(requiredBytes) {
+        try {
+          const estimate = await navigator.storage?.estimate?.();
+          const remaining = Number.isFinite(estimate?.quota) && Number.isFinite(estimate?.usage)
+            ? Math.max(0, estimate.quota - estimate.usage)
+            : null;
+          return {
+            quota: Number.isFinite(estimate?.quota) ? estimate.quota : null,
+            remaining,
+            enough: remaining === null ? null : requiredBytes <= remaining,
+          };
+        } catch { return { quota: null, remaining: null, enough: null }; }
+      }
+
+      async function confirmBackupRestore(fileName, imported, isZip) {
+        const summary = imported.summary || {
+          fileBytes: 0,
+          folderCount: imported.parsed.folders.length,
+          recordCount: imported.parsed.records.length,
+          photoCount: 0,
+          photoBytes: 0,
+          profile: "records-only",
+          formatVersion: imported.parsed.version || 1,
+        };
+        const capacity = await getImportCapacitySummary(summary.photoBytes || 0);
+        const integrity = imported.integrity;
+        const integrityText = !isZip
+          ? "JSON 紀錄檔：未包含 ZIP 檔案清單"
+          : integrity?.legacy
+            ? "舊版備份：未包含 manifest.json，僅完成基本格式檢查"
+            : integrity?.valid
+              ? `完整性檢查通過（${imported.manifest?.checksum || "檔案清單"}，${integrity.checked} 個檔案）`
+              : "完整性檢查未通過";
+        const capacityText = capacity.remaining === null
+          ? "瀏覽器未提供可用空間估算"
+          : `目前可用：約 ${formatStorageBytes(capacity.remaining)}${capacity.enough === false ? "，可能不足" : ""}`;
+        const warning = capacity.enough === false
+          ? "<br><strong style='color:#b91c1c'>警告：照片預估容量超過目前可用空間，請先清理或改用壓縮版備份。</strong>"
+          : "";
+        const photoProfile = summary.profile === "compressed" ? "壓縮版" : summary.profile === "original" ? "原圖" : "未標示";
+        GlobalModal.show({
+          title: "還原前資料預覽",
+          content: `<strong>${escapeHtml(fileName)}</strong><br><br>
+            資料夾數：${summary.folderCount}<br>
+            紀錄數：${summary.recordCount}<br>
+            照片數：${summary.photoCount}${summary.metadataPhotoCount && summary.metadataPhotoCount !== summary.photoCount ? `（索引 ${summary.metadataPhotoCount} 張）` : ""}<br>
+            照片版本：${photoProfile}<br>
+            ZIP 大小：${formatStorageBytes(summary.fileBytes || 0)}<br>
+            解壓後照片預估：${formatStorageBytes(summary.photoBytes || 0)}<br>
+            ${capacityText}<br>
+            ${integrityText}${warning}<br><br>
+            還原會覆蓋目前的資料夾與紀錄。${isZip ? "照片資料庫也會依 ZIP 內容替換。" : "JSON 不含照片，現有照片檔案會保留。"}`,
+          type: "confirm",
+          confirmText: capacity.enough === false ? "仍要還原" : "確認還原",
+          cancelText: "取消",
+          onConfirm: async () => {
+            try {
+              await restoreBackupData(imported.parsed, imported.photoEntries || [], isZip);
+              GlobalModal.alert(isZip ? "完整備份還原成功！" : "紀錄還原成功！JSON 不含照片，現有照片已保留。");
+            } catch (error) {
+              console.error("還原失敗：", error);
+              GlobalModal.alert("還原失敗：" + error.message);
+            }
+          },
+        });
+      }
+
+      async function processBackupImport(file, password = "") {
+        let source = file;
+        const encrypted = await isEncryptedBackupFile(file);
+        if (encrypted) source = await decryptBackupFile(file, password);
+        if (/\.zip$/i.test(file.name) || encrypted || file.type === "application/zip") {
+          const imported = await importZipBackup(source);
+          await confirmBackupRestore(file.name, imported, true);
+          return;
+        }
+        const parsed = JSON.parse(await file.text());
+        if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("格式錯誤");
+        await confirmBackupRestore(file.name, {
+          parsed,
+          photoEntries: [],
+          summary: {
+            fileBytes: file.size,
+            folderCount: parsed.folders.length,
+            recordCount: parsed.records.length,
+            photoCount: 0,
+            profile: "records-only",
+            formatVersion: parsed.backupFormatVersion || parsed.version || 1,
+          },
+        }, false);
       }
 
       document.getElementById("exportSystemBtn").addEventListener("click", exportSystemBackup);
@@ -5004,24 +5887,19 @@
         event.target.value = "";
         if (!file) return;
         try {
-          let parsed;
-          let photoEntries = [];
-          if (/\.zip$/i.test(file.name)) {
-            ({ parsed, photoEntries } = await importZipBackup(file));
-          } else {
-            parsed = JSON.parse(await file.text());
-            if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("格式錯誤");
+          if (await isEncryptedBackupFile(file)) {
+            GlobalModal.prompt(
+              "此備份已加密，請輸入密碼",
+              "",
+              async password => {
+                try { await processBackupImport(file, password); }
+                catch (error) { GlobalModal.alert("讀取加密備份失敗：" + error.message); }
+              },
+              { inputType: "password", confirmText: "解密並檢查", cancelText: "取消" }
+            );
+            return;
           }
-          const photoText = photoEntries.length ? `，並包含 ${photoEntries.length} 張照片` : "";
-          GlobalModal.confirm(`⚠️ 確定要還原備份嗎？現有資料與照片將被覆蓋${photoText}。`, async () => {
-            try {
-              await restoreBackupData(parsed, photoEntries);
-              GlobalModal.alert(photoEntries.length ? "完整備份還原成功！" : "紀錄還原成功！此備份不含照片檔。");
-            } catch (error) {
-              console.error("還原失敗：", error);
-              GlobalModal.alert("還原失敗：" + error.message);
-            }
-          });
+          await processBackupImport(file);
         } catch (error) {
           GlobalModal.alert("讀取備份失敗：" + error.message);
         }
@@ -5122,6 +6000,7 @@
           if (inputEl) {
             inputEl.value = defectChipBtn.dataset.val;
             updateSidebarIconPreview();
+            scheduleEditDraftSave();
             const originalBg = defectChipBtn.style.background;
             defectChipBtn.style.background = "#bae6fd";
             setTimeout(() => { defectChipBtn.style.background = originalBg; }, 150);
@@ -5142,6 +6021,7 @@
           });
 
           updateSidebarIconPreview();
+          scheduleEditDraftSave();
           return;
         }
 
@@ -5149,6 +6029,7 @@
           document.getElementById("sidebar-icon-input").value = "";
           document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => btn.classList.remove("is-selected"));
           updateSidebarIconPreview();
+          scheduleEditDraftSave();
           return;
         }
 
@@ -5276,6 +6157,7 @@
             });
 
             saveToLocalStorage();
+            await clearEditDraft();
             refreshStorageStatus();
             deleteRecordPhotos([{ photos: removedPhotoIds.map(id => ({ id })) }]).catch(error => console.warn("移除舊照片失敗：", error));
             beginEditPhotos(state.records.find(record => record.id === finalRecordId));
@@ -5316,6 +6198,14 @@
       document.addEventListener("input", (e) => {
         if (e.target.id === "sidebar-defect-input") {
           updateSidebarIconPreview();
+        }
+        if (e.target.closest("#tabEdit") && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) {
+          scheduleEditDraftSave();
+        }
+      });
+      document.addEventListener("change", (e) => {
+        if (e.target.closest("#tabEdit") && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) {
+          scheduleEditDraftSave();
         }
       });
 
@@ -6030,6 +6920,40 @@ function renderDefectStats() {
           points: "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json" },
       ];
 
+      async function cacheEquipmentData(meta, points) {
+        try {
+          await putAppDataRecord(EQUIPMENT_CACHE_ID, { meta, points, cachedAt: new Date().toISOString() });
+        } catch (error) { console.warn("設備資料快取失敗：", error); }
+      }
+
+      async function getCachedEquipmentData() {
+        const cached = await getAppDataRecord(EQUIPMENT_CACHE_ID);
+        return cached?.value?.meta && Array.isArray(cached.value.points) ? cached.value : null;
+      }
+
+      function setOfflineNotice(message = "") {
+        const notice = document.getElementById("offlineNotice");
+        if (!notice) return;
+        notice.hidden = !message;
+        notice.classList.toggle("is-error", message.includes("無法"));
+        notice.textContent = message;
+      }
+
+      function updateNetworkNotice() {
+        if (navigator.onLine === false) {
+          setOfflineNotice("離線降級模式：設備資料、巡檢紀錄、照片與備份仍可使用；地圖底圖可能無法載入。\n恢復網路後可重新載入底圖。" );
+        } else if (!document.getElementById("offlineNotice")?.classList.contains("is-error")) {
+          setOfflineNotice("");
+        }
+      }
+
+      window.addEventListener("offline", () => updateNetworkNotice());
+      window.addEventListener("online", () => {
+        updateNetworkNotice();
+        setStatus("網路已恢復；可重新整理地圖底圖");
+        window.setTimeout(() => setStatus(""), 2200);
+      });
+
       async function tryFetchData() {
         for (const urls of DATA_URLS) {
           try {
@@ -6048,11 +6972,30 @@ function renderDefectStats() {
         try {
           const { meta, points } = await tryFetchData();
           state.meta = meta; state.points = points;
+          await cacheEquipmentData(meta, points);
           fillAreas(); renderResults([]);
           map.setView([23.7, 120.95], 8);
           if (state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
-          renderer.redraw(); setStatus("");
-        } catch (e) { console.error(e); setStatus("⚠️ 設備資料載入失敗：" + e.message); }
+          renderer.redraw();
+          updateNetworkNotice();
+          setStatus("");
+        } catch (e) {
+          console.error(e);
+          try {
+            const cached = await getCachedEquipmentData();
+            if (!cached) throw e;
+            state.meta = cached.meta; state.points = cached.points;
+            fillAreas(); renderResults([]);
+            map.setView([23.7, 120.95], 8);
+            if (state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
+            renderer.redraw();
+            setOfflineNotice(`離線降級模式：已使用 ${formatDateTime(cached.cachedAt)} 的設備資料。紀錄、照片與備份仍可使用；地圖底圖可能無法載入。`);
+            setStatus("");
+          } catch (cacheError) {
+            setStatus("⚠️ 設備資料載入失敗：" + e.message);
+          }
+        }
+        await checkForSavedDraft();
       }
 
       init();
@@ -6066,7 +7009,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker-v2.js', { scope: './indexV2.html' })
+          navigator.serviceWorker.register('./service-worker-v2.js', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
               registration.update();
