@@ -1001,6 +1001,37 @@
         max-width: 400px;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
       }
+      .gm-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .gm-actions button {
+        min-height: 40px;
+      }
+      .gm-discard-btn {
+        display: none;
+        margin-right: auto;
+        background: #fff1f2;
+        color: #b91c1c;
+        border: 1px solid #fda4af;
+      }
+      @media (max-width: 520px) {
+        .gm-actions {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+        .gm-actions button {
+          width: 100%;
+          padding: 10px 8px !important;
+        }
+        .gm-discard-btn {
+          grid-column: 1 / -1;
+          margin-right: 0;
+          order: 3;
+        }
+      }
       .top-controls {
         position: fixed;
         top: calc(12px + env(safe-area-inset-top, 0px));
@@ -1825,7 +1856,10 @@
         </div>
         <select id="gmSelect"
           style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:6px; display:none;"></select>
-        <div style="display:flex; justify-content:flex-end; gap:10px">
+        <div id="gmActions" class="gm-actions">
+          <button id="gmDiscardBtn" class="gm-discard-btn" type="button">
+            捨棄草稿
+          </button>
           <button id="gmCancelBtn"
             style="padding:8px 16px; background:#e2e8f0; color:#333; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">
             取消
@@ -2116,10 +2150,11 @@
         inputEl:      document.getElementById("gmInput"),
         dateInputEl:  document.getElementById("gmDateInput"),
         selectEl:     document.getElementById("gmSelect"),
+        discardBtn:   document.getElementById("gmDiscardBtn"),
         cancelBtn:    document.getElementById("gmCancelBtn"),
         confirmBtn:   document.getElementById("gmConfirmBtn"),
 
-        show({ title, content, type = "alert", defaultVal = "", selectHtml = "", inputType = "text", confirmText = "確定", cancelText = "取消", onConfirm, onCancel }) {
+        show({ title, content, type = "alert", defaultVal = "", selectHtml = "", inputType = "text", confirmText = "確定", cancelText = "取消", discardText = "", onConfirm, onCancel, onDiscard }) {
           this.titleEl.textContent  = title;
           this.contentEl.innerHTML  = content;
           this.inputWrapper.style.display = type === "prompt" ? "flex" : "none";
@@ -2131,9 +2166,15 @@
           this.cancelBtn.style.display   = type === "alert" ? "none" : "block";
           this.cancelBtn.textContent = cancelText;
           this.confirmBtn.textContent = confirmText;
+          this.discardBtn.style.display = discardText ? "block" : "none";
+          this.discardBtn.textContent = discardText;
           this.cancelBtn.onclick  = () => {
             this.overlay.style.display = "none";
             if (onCancel) onCancel();
+          };
+          this.discardBtn.onclick = () => {
+            this.overlay.style.display = "none";
+            if (onDiscard) onDiscard();
           };
           this.confirmBtn.onclick = () => {
             this.overlay.style.display = "none";
@@ -2824,6 +2865,45 @@
         updateEditDraftUi();
       }
 
+      function getActiveEditRecord() {
+        const recordId = editPhotoState.recordId || document.getElementById("editRecordId")?.value;
+        if (recordId) return state.records.find(record => record.id === recordId) || null;
+        const point = editDraftState.point;
+        return point ? state.records.find(record => isSameMapPoint(record, point)) || null : null;
+      }
+
+      function resetEditPanelAfterDiscard() {
+        document.getElementById("editFormContainer").style.display = "none";
+        document.getElementById("sidebarSaveBtn").disabled = true;
+        document.getElementById("editRecordId").value = "";
+        document.getElementById("editLat").value = "";
+        document.getElementById("editLng").value = "";
+        document.getElementById("editCode").value = "";
+        document.getElementById("editPanelTitle").textContent = "請選擇設備";
+        document.getElementById("editPanelMeta").textContent = "在地圖點擊進行編輯";
+        document.getElementById("editPanelWarning").innerHTML = "";
+        document.getElementById("editPanelActions").style.display = "none";
+        document.getElementById("sidebar-name-input").value = "";
+        document.getElementById("sidebar-folder").innerHTML = getFolderOptionsHtml(state.lastFolderId);
+        document.getElementById("sidebar-urgency").value = "C";
+        document.getElementById("sidebar-defect-input").value = "";
+        document.getElementById("sidebar-correction-flag").checked = false;
+        document.getElementById("sidebar-correct-code-container").style.display = "none";
+        document.getElementById("sidebar-correct-code-input").value = "";
+        document.getElementById("sidebar-icon-input").value = "";
+        document.querySelectorAll("#tabEdit .icon-chip-btn").forEach(btn => btn.classList.remove("is-selected"));
+        beginEditPhotos(null);
+        updateSidebarIconPreview();
+      }
+
+      async function discardEditChanges(onProceed) {
+        const activeRecord = getActiveEditRecord();
+        await clearEditDraft();
+        if (activeRecord) openEditPanel(activeRecord, { skipDirtyGuard: true });
+        else resetEditPanelAfterDiscard();
+        if (onProceed) onProceed();
+      }
+
       function hasUnsavedEditChanges() {
         return !!editDraftState.dirty && document.getElementById("editFormContainer")?.style.display !== "none";
       }
@@ -2833,16 +2913,26 @@
           onProceed();
           return true;
         }
+        // A saved draft may leave the edit panel collapsed while its dirty state
+        // is intentionally retained. Reopen the draft before showing another guard.
+        const panel = document.getElementById("panel");
+        if (panel?.classList.contains("is-collapsed")) {
+          setPanelCollapsed(false, { skipEditGuard: true });
+          switchTab("edit", { skipEditGuard: true });
+          return false;
+        }
         GlobalModal.show({
           title: "尚有未儲存變更",
-          content: "目前的欄位或照片已先保存為草稿。要關閉編輯面板並保留草稿嗎？",
+          content: "目前有尚未儲存的欄位或照片變更。請選擇繼續編輯、關閉並保留草稿，或捨棄草稿。",
           type: "confirm",
           confirmText: "關閉並保留草稿",
           cancelText: "繼續編輯",
+          discardText: "捨棄草稿",
           onConfirm: async () => {
             await saveEditDraftNow();
             onProceed();
           },
+          onDiscard: () => discardEditChanges(onProceed),
         });
         return false;
       }
