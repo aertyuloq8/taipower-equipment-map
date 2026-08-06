@@ -838,61 +838,6 @@
       }
       .map-locate-button:hover { background: #eef8f9; }
       .map-locate-button.is-active { background: var(--blue); border-color: var(--blue); color: #fff; }
-      .location-info-panel {
-        background: rgba(255, 255, 255, 0.97);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        bottom: 76px;
-        box-shadow: var(--shadow);
-        color: var(--text);
-        max-width: min(280px, calc(100vw - 88px));
-        min-width: 228px;
-        padding: 8px 10px;
-        position: absolute;
-        right: 14px;
-        z-index: calc(var(--control-z) + 1);
-      }
-      .location-info-panel[hidden] { display: none; }
-      .location-info-head,
-      .location-info-row {
-        align-items: center;
-        display: flex;
-        gap: 8px;
-        justify-content: space-between;
-      }
-      .location-info-head { margin-bottom: 6px; }
-      .location-info-title { color: var(--accent-dark); font-size: 12px; font-weight: 900; }
-      .location-accuracy { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-      .location-info-row + .location-info-row { margin-top: 4px; }
-      .location-info-label { color: var(--muted); flex: 0 0 auto; font-size: 11px; }
-      .location-info-value {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px;
-        font-variant-numeric: tabular-nums;
-        min-width: 0;
-        overflow: hidden;
-        text-align: right;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .location-code { color: var(--accent-dark); font-size: 13px; font-weight: 900; }
-      .location-follow-btn {
-        align-items: center;
-        background: #f8fafc;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        color: var(--accent-dark);
-        cursor: pointer;
-        display: inline-flex;
-        font-size: 12px;
-        font-weight: 800;
-        justify-content: center;
-        margin-top: 8px;
-        min-height: 34px;
-        padding: 0 10px;
-        width: 100%;
-      }
-      .location-follow-btn.is-active { background: #e0f2fe; border-color: #7dd3fc; color: #075985; }
       .leaflet-control-zoom { display: none !important; }
       #map { background: #edf3f5; height: 100%; width: 100%; }
       .status {
@@ -1301,12 +1246,6 @@
           right: calc(12px + env(safe-area-inset-right, 0px));
           top: auto;
           width: 48px;
-        }
-
-        .location-info-panel {
-          bottom: calc(132px + env(safe-area-inset-bottom, 0px));
-          max-width: min(280px, calc(100vw - 24px));
-          right: calc(12px + env(safe-area-inset-right, 0px));
         }
 
         .panel {
@@ -1889,15 +1828,6 @@
           right: calc(min(430px, 52vw) + 14px + env(safe-area-inset-right, 0px));
         }
 
-        .location-info-panel {
-          bottom: calc(120px + env(safe-area-inset-bottom, 0px));
-          right: calc(14px + env(safe-area-inset-right, 0px));
-        }
-
-        body.is-panel-open .location-info-panel {
-          right: calc(min(430px, 52vw) + 14px + env(safe-area-inset-right, 0px));
-        }
-
         .leaflet-control-zoom {
           display: none !important;
         }
@@ -2195,21 +2125,6 @@
       <section class="map-shell">
         <div id="map"></div>
         <button id="locateButton" class="map-locate-button" type="button" aria-label="定位目前位置" aria-pressed="false" title="定位目前位置">⌖</button>
-        <section id="locationInfoPanel" class="location-info-panel" aria-live="polite" hidden>
-          <div class="location-info-head">
-            <strong class="location-info-title">即時定位</strong>
-            <span id="locationAccuracy" class="location-accuracy">精度 --</span>
-          </div>
-          <div class="location-info-row">
-            <span class="location-info-label">圖號座標</span>
-            <strong id="locationTpcCode" class="location-info-value location-code">--</strong>
-          </div>
-          <div class="location-info-row">
-            <span class="location-info-label">經緯度</span>
-            <span id="locationLatLng" class="location-info-value">--</span>
-          </div>
-          <button id="locationFollowBtn" class="location-follow-btn is-active" type="button" aria-pressed="true" title="地圖跟隨目前定位">⌖ 跟隨地圖</button>
-        </section>
         <div id="offlineNotice" class="offline-notice" hidden></div>
         <div id="status" class="status">載入資料中...</div>
       </section>
@@ -7028,7 +6943,6 @@ function renderDefectStats() {
 
       map.on("dragstart zoomstart", () => {
         collapseFloatingControls();
-        pauseLocationFollowForMapInteraction();
       });
 
       map.on("contextmenu", (e) => {
@@ -7043,72 +6957,6 @@ function renderDefectStats() {
       // 定位功能
       // ==========================================
       let locationMarker = null, locationCircle = null, locationWatchId = null;
-      const locationTracking = {
-        follow: true,
-        lastLatLng: null,
-        programmaticMoveUntil: 0,
-      };
-
-      function formatLocationCode(lat, lng) {
-        const code = String(latLngToTpcCode(lat, lng) || "").trim().toUpperCase();
-        return /^[A-Z]\d{4}[A-Z]{2}\d{4}$/.test(code) ? code : "--";
-      }
-
-      function updateLocationFollowButton() {
-        const button = document.getElementById("locationFollowBtn");
-        if (!button) return;
-        const following = locationTracking.follow;
-        button.classList.toggle("is-active", following);
-        button.setAttribute("aria-pressed", following ? "true" : "false");
-        button.textContent = following ? "⌖ 跟隨地圖" : "↻ 回到定位";
-        button.title = following ? "地圖跟隨目前定位" : "恢復地圖跟隨目前定位";
-      }
-
-      function updateLocationInfo(position) {
-        const panel = document.getElementById("locationInfoPanel");
-        if (!panel) return;
-        const { latitude, longitude, accuracy } = position.coords;
-        document.getElementById("locationTpcCode").textContent = formatLocationCode(latitude, longitude);
-        document.getElementById("locationLatLng").textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-        const numericAccuracy = Number(accuracy);
-        document.getElementById("locationAccuracy").textContent = Number.isFinite(numericAccuracy) && numericAccuracy > 0
-          ? `精度 ±${Math.max(1, Math.round(numericAccuracy))}m`
-          : "精度 --";
-        panel.hidden = false;
-        updateLocationFollowButton();
-      }
-
-      function centerMapOnLocation(initialFix = false) {
-        if (!locationTracking.lastLatLng || !locationTracking.follow) return;
-        const zoom = initialFix ? Math.max(map.getZoom(), 18) : map.getZoom();
-        locationTracking.programmaticMoveUntil = Date.now() + (initialFix ? 1400 : 700);
-        if (initialFix) map.flyTo(locationTracking.lastLatLng, zoom, { duration: 0.45 });
-        else map.panTo(locationTracking.lastLatLng, { animate: true, duration: 0.35 });
-      }
-
-      function pauseLocationFollowForMapInteraction() {
-        if (locationWatchId === null || !locationTracking.follow) return;
-        if (Date.now() < locationTracking.programmaticMoveUntil) return;
-        locationTracking.follow = false;
-        updateLocationFollowButton();
-      }
-
-      function stopLocationTracking(button) {
-        if (locationWatchId !== null) {
-          navigator.geolocation.clearWatch(locationWatchId);
-          locationWatchId = null;
-        }
-        if (locationMarker) { map.removeLayer(locationMarker); locationMarker = null; }
-        if (locationCircle) { map.removeLayer(locationCircle); locationCircle = null; }
-        locationTracking.follow = true;
-        locationTracking.lastLatLng = null;
-        locationTracking.programmaticMoveUntil = 0;
-        const panel = document.getElementById("locationInfoPanel");
-        if (panel) panel.hidden = true;
-        button.classList.remove("is-active");
-        setLocateButtonState(button, "idle");
-      }
-
       function setLocateButtonState(button, stateName) {
         const labels = {
           idle: "⌖",
@@ -7130,47 +6978,26 @@ function renderDefectStats() {
       document.getElementById("locateButton").addEventListener("click", (e) => {
         disableRouteLayerForTools();
         if (locationWatchId !== null) {
-          stopLocationTracking(e.target);
-          return;
+          navigator.geolocation.clearWatch(locationWatchId); locationWatchId = null;
+          if (locationMarker) { map.removeLayer(locationMarker); locationMarker = null; }
+          if (locationCircle) { map.removeLayer(locationCircle); locationCircle = null; }
+          e.target.classList.remove("is-active"); setLocateButtonState(e.target, "idle"); return;
         }
         if (!navigator.geolocation) { GlobalModal.alert("此瀏覽器不支援定位功能。"); return; }
-        locationTracking.follow = true;
-        locationTracking.lastLatLng = null;
-        updateLocationFollowButton();
         setLocateButtonState(e.target, "loading");
         locationWatchId = navigator.geolocation.watchPosition(
           (pos) => {
-            const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-            const initialFix = !locationMarker;
-            locationTracking.lastLatLng = latlng;
-            if (initialFix) {
+            const latlng = [pos.coords.latitude, pos.coords.longitude];
+            if (!locationMarker) {
               locationMarker = L.circleMarker(latlng, { radius: 7, color: "#fff", weight: 2, fillColor: "#2563eb", fillOpacity: 0.95 }).addTo(map);
               locationCircle = L.circle(latlng, { radius: pos.coords.accuracy || 30, color: "#2563eb", weight: 1, fillColor: "#2563eb", fillOpacity: 0.12 }).addTo(map);
-            } else {
-              locationMarker.setLatLng(latlng);
-              locationCircle.setLatLng(latlng).setRadius(pos.coords.accuracy || 30);
-            }
-            updateLocationInfo(pos);
-            centerMapOnLocation(initialFix);
+              map.flyTo(latlng, map.getMaxZoom(), { duration: 0.45 });
+            } else { locationMarker.setLatLng(latlng); locationCircle.setLatLng(latlng).setRadius(pos.coords.accuracy || 30); }
             e.target.classList.add("is-active"); setLocateButtonState(e.target, "active");
           },
-          (err) => {
-            setLocateButtonState(e.target, "error");
-            const reason = err.code === 1 ? "定位權限被拒絕" : err.code === 2 ? "目前無法取得位置" : "定位逾時";
-            setStatus(`⚠️ ${reason}`);
-            window.setTimeout(() => setStatus(""), 2600);
-            console.error("定位錯誤:", err);
-          },
-          { enableHighAccuracy: true, maximumAge: 2000, timeout: 12000 }
+          (err) => { setLocateButtonState(e.target, "error"); console.error("定位錯誤:", err); },
+          { enableHighAccuracy: true }
         );
-      });
-
-      document.getElementById("locationFollowBtn").addEventListener("click", () => {
-        if (locationWatchId === null || !locationTracking.lastLatLng) return;
-        const shouldFollow = !locationTracking.follow;
-        locationTracking.follow = shouldFollow;
-        updateLocationFollowButton();
-        if (shouldFollow) centerMapOnLocation(false);
       });
 
       // ==========================================
