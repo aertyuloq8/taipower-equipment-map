@@ -1132,6 +1132,135 @@
         cursor: pointer;
       }
       .map-search-btn:hover { background: #eef8f9; color: var(--accent); }
+      .map-search-btn.is-active {
+        background: var(--accent);
+        border-color: var(--accent-dark);
+        color: #fff;
+      }
+      .tpc-grid-label {
+        align-items: center;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(8, 127, 140, 0.55);
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(22, 36, 52, 0.18);
+        color: var(--accent-dark);
+        display: inline-flex;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1;
+        padding: 2px 4px;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        white-space: nowrap;
+      }
+      .tpc-grid-label-wrap {
+        background: transparent !important;
+        border: 0 !important;
+        overflow: visible !important;
+        pointer-events: none !important;
+        z-index: 1000 !important;
+      }
+      .tpc-grid-label-prefix {
+        border-color: rgba(216, 137, 34, 0.7);
+        color: #8a4f0b;
+        font-size: 11px;
+      }
+      .tpc-grid-label-sub {
+        background: rgba(238, 248, 249, 0.96);
+        border-color: rgba(8, 127, 140, 0.72);
+        color: var(--accent-dark);
+        font-size: 11px;
+      }
+      .tpc-grid-label-detail {
+        background: rgba(255, 255, 255, 0.97);
+        border-color: rgba(8, 127, 140, 0.86);
+        box-shadow: 0 2px 7px rgba(22, 36, 52, 0.28);
+        color: var(--accent-dark);
+        font-size: 12px;
+        letter-spacing: 0.1px;
+        padding: 3px 5px;
+      }
+      .tpc-grid-base-label {
+        align-items: center;
+        background: var(--amber);
+        border: 2px solid rgba(255, 255, 255, 0.95);
+        border-radius: 50%;
+        box-shadow: 0 3px 8px rgba(22, 36, 52, 0.35);
+        color: #fff;
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 900;
+        height: 24px;
+        justify-content: center;
+        transform: translate(-50%, -50%);
+        width: 24px;
+      }
+      .tpc-grid-readout {
+        align-items: flex-start;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(8, 127, 140, 0.5);
+        border-left: 4px solid var(--accent);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        left: 14px;
+        max-width: min(300px, calc(100vw - 28px));
+        padding: 7px 10px;
+        pointer-events: none;
+        position: absolute;
+        top: 72px;
+        z-index: calc(var(--control-z) + 10);
+      }
+      .tpc-grid-readout[hidden] { display: none; }
+      .tpc-grid-readout-head {
+        align-items: baseline;
+        display: flex;
+        gap: 7px;
+      }
+      .tpc-grid-readout-label {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .tpc-grid-readout-code {
+        color: var(--accent-dark);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 16px;
+        font-weight: 900;
+        letter-spacing: 0.2px;
+        line-height: 1.1;
+      }
+      .tpc-grid-readout-meta {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.25;
+      }
+      @media (max-width: 768px) {
+        .tpc-grid-readout {
+          left: 10px;
+          max-width: min(245px, calc(100vw - 20px));
+          padding: 6px 8px;
+          top: calc(154px + env(safe-area-inset-top, 0px));
+        }
+        .tpc-grid-readout-code { font-size: 13px; }
+        .tpc-grid-label { font-size: 9px; padding: 2px 3px; }
+        .tpc-grid-label-prefix,
+        .tpc-grid-label-sub { font-size: 10px; }
+        .tpc-grid-label-detail { font-size: 10px; padding: 2px 3px; }
+      }
+      @media (max-height: 520px) and (orientation: landscape) {
+        .tpc-grid-readout {
+          left: 10px;
+          max-width: min(230px, calc(100vw - 20px));
+          top: calc(62px + env(safe-area-inset-top, 0px));
+        }
+        .tpc-grid-label { font-size: 8px; padding: 1px 2px; }
+        .tpc-grid-label-prefix,
+        .tpc-grid-label-sub { font-size: 9px; }
+        .tpc-grid-label-detail { font-size: 9px; padding: 2px; }
+      }
       .route-layer-toggle {
         background: #f8fafc;
         border: 1px solid var(--line);
@@ -1763,6 +1892,11 @@
           grid-row: 2;
           justify-self: end;
         }
+        #tpcGridToggle {
+          grid-column: 1 / span 2;
+          grid-row: 3;
+          justify-self: end;
+        }
 
         body.is-panel-open .top-controls {
           right: calc(min(430px, 52vw) + 10px + env(safe-area-inset-right, 0px));
@@ -1997,6 +2131,7 @@
         aria-expanded="false" title="展開面板"
         style="box-shadow:0 8px 20px rgba(22,36,52,0.18)">≡</button>
       <button id="mapSearchToggle" class="map-search-btn" title="搜尋設備">🔍 搜尋</button>
+      <button id="tpcGridToggle" class="map-search-btn" type="button" aria-pressed="false" title="顯示／隱藏圖號分割線與分級標籤">⊞ 圖號網格</button>
     </div>
 
     <div id="mapSearchPanel" class="map-search-panel">
@@ -2217,6 +2352,13 @@
 
       <section class="map-shell">
         <div id="map"></div>
+        <section id="tpcGridReadout" class="tpc-grid-readout" aria-live="polite" aria-label="圖號座標" hidden>
+          <div class="tpc-grid-readout-head">
+            <span class="tpc-grid-readout-label">目前圖號</span>
+            <strong id="tpcGridReadoutCode" class="tpc-grid-readout-code">--</strong>
+          </div>
+          <span id="tpcGridReadoutMeta" class="tpc-grid-readout-meta">開啟圖號網格後，放大地圖查看分割線</span>
+        </section>
         <button id="locateButton" class="map-locate-button" type="button" aria-label="定位目前位置" aria-pressed="false" title="定位目前位置">⌖</button>
         <section id="locationInfoPanel" class="location-info-panel" aria-live="off" data-state="idle" hidden>
           <div class="location-info-head">
@@ -3913,6 +4055,28 @@
         catch (e) { return `GPS_${lat.toFixed(4)}_${lng.toFixed(4)}`; }
       }
 
+      function twd67Tm2ToWgs84(tm2X, tm2Y) {
+        const a67 = 6378160.0, b67 = 6356774.7192, e2_67 = 1 - (b67 * b67) / (a67 * a67), e_p2 = e2_67 / (1 - e2_67);
+        const k0 = 0.9999, lng0 = (121.0 * PI) / 180.0;
+        const A = a67 * (1 - e2_67 / 4 - (3 * e2_67 ** 2) / 64 - (5 * e2_67 ** 3) / 256);
+        const M0 = tm2Y / k0, mu = M0 / A;
+        const e1 = (1 - Math.sqrt(1 - e2_67)) / (1 + Math.sqrt(1 - e2_67));
+        const lat1 = mu + ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu) + ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu) + ((151 * e1 ** 3) / 96) * Math.sin(6 * mu) + ((1097 * e1 ** 4) / 512) * Math.sin(8 * mu);
+        const sinL1 = Math.sin(lat1), cosL1 = Math.cos(lat1), tanL1 = Math.tan(lat1);
+        const N1 = a67 / Math.sqrt(1 - e2_67 * sinL1 ** 2), R1 = (a67 * (1 - e2_67)) / Math.pow(1 - e2_67 * sinL1 ** 2, 1.5);
+        const T1 = tanL1 ** 2, C1 = e_p2 * cosL1 ** 2, D2 = (tm2X - 250000) / (N1 * k0);
+        const lat67 = lat1 - ((N1 * tanL1) / R1) * (D2 ** 2 / 2 - ((5 + 3 * T1 + 10 * C1 - 4 * C1 ** 2 - 9 * e_p2) * D2 ** 4) / 24 + ((61 + 90 * T1 + 298 * C1 + 45 * T1 ** 2 - 252 * e_p2 - 3 * C1 ** 2) * D2 ** 6) / 720);
+        const lng67 = lng0 + (D2 - ((1 + 2 * T1 + C1) * D2 ** 3) / 6 + ((5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * e_p2 + 24 * T1 ** 2) * D2 ** 5) / 120) / cosL1;
+        const N67 = a67 / Math.sqrt(1 - e2_67 * Math.sin(lat67) ** 2);
+        const x67 = N67 * Math.cos(lat67) * Math.cos(lng67), y67 = N67 * Math.cos(lat67) * Math.sin(lng67), z67 = N67 * (1 - e2_67) * Math.sin(lat67);
+        const dxH = -752.0, dyH = -358.0, dzH = -179.0, rx = -0.0000011698, ry = 0.0000018398, rz = 0.0000009822, s = 0.00002329;
+        const x84 = x67 + dxH + s * x67 - rz * y67 + ry * z67, y84 = y67 + dyH + rz * x67 + s * y67 - rx * z67, z84 = z67 + dzH - ry * x67 + rx * y67 + s * z67;
+        const a84 = 6378137.0, b84 = 6356752.314245, e2_84 = 1 - (b84 * b84) / (a84 * a84), ep2_84 = (a84 * a84 - b84 * b84) / (b84 * b84);
+        const p = Math.sqrt(x84 ** 2 + y84 ** 2), theta = Math.atan2(z84 * a84, p * b84);
+        const lat84 = Math.atan2(z84 + ep2_84 * b84 * Math.sin(theta) ** 3, p - e2_84 * a84 * Math.cos(theta) ** 3), lng84 = Math.atan2(y84, x84);
+        return { lat: (lat84 * 180) / PI, lng: (lng84 * 180) / PI };
+      }
+
       function tpcCodeToLatLng(code) {
         try {
           const c = code.trim().toUpperCase().replace(/\s+/g, "");
@@ -3956,6 +4120,12 @@
       map.createPane("routePane");
       map.getPane("routePane").style.zIndex = 390;
       map.getPane("routePane").style.pointerEvents = "none";
+      map.createPane("tpcGridPane");
+      map.getPane("tpcGridPane").style.zIndex = 405;
+      map.getPane("tpcGridPane").style.pointerEvents = "none";
+      map.createPane("tpcGridLabelPane");
+      map.getPane("tpcGridLabelPane").style.zIndex = 660;
+      map.getPane("tpcGridLabelPane").style.pointerEvents = "none";
       L.control.zoom({ position: "bottomright" }).addTo(map);
       const baseTileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap",
@@ -3967,6 +4137,207 @@
           notice.textContent = "地圖底圖目前無法載入；設備資料、巡檢紀錄與照片仍可使用。恢復網路後可重新載入地圖。";
         }
       }).addTo(map);
+
+      // ==========================================
+      // 圖號座標網格圖層（顯示圖號座標對應網格）
+      // ==========================================
+      const tpcGrid = { visible: false, layer: null, buildTimer: null };
+      const pad2 = (n) => String(n).padStart(2, "0");
+
+      function tpcGridVisibleRange(paddingMeters = 2000) {
+        const b = map.getBounds();
+        const corners = [
+          wgs84ToTwd67Tm2(b.getNorth(), b.getWest()),
+          wgs84ToTwd67Tm2(b.getNorth(), b.getEast()),
+          wgs84ToTwd67Tm2(b.getSouth(), b.getWest()),
+          wgs84ToTwd67Tm2(b.getSouth(), b.getEast()),
+        ];
+        return {
+          minX: Math.min(...corners.map(c => c.x)) - paddingMeters,
+          maxX: Math.max(...corners.map(c => c.x)) + paddingMeters,
+          minY: Math.min(...corners.map(c => c.y)) - paddingMeters,
+          maxY: Math.max(...corners.map(c => c.y)) + paddingMeters,
+        };
+      }
+
+      const tpcGridReadout = document.getElementById("tpcGridReadout");
+      const tpcGridReadoutCode = document.getElementById("tpcGridReadoutCode");
+      const tpcGridReadoutMeta = document.getElementById("tpcGridReadoutMeta");
+      function updateTpcGridReadout() {
+        if (!tpcGridReadout || !tpcGridReadoutCode || !tpcGridReadoutMeta) return;
+        if (!tpcGrid.visible) {
+          tpcGridReadout.hidden = true;
+          return;
+        }
+        const zoom = Math.round(map.getZoom());
+        const center = map.getCenter();
+        const rawCode = String(latLngToTpcCode(center.lat, center.lng) || "").trim().toUpperCase();
+        const fullMatch = rawCode.match(/^([A-Z]\d{4}[A-Z]{2}\d{2})/);
+        const fullCode = fullMatch ? fullMatch[1] : rawCode;
+        let displayCode = fullCode || "--";
+        if (fullMatch) {
+          if (zoom >= 18) displayCode = fullCode.slice(-4);
+          else if (zoom >= 16) displayCode = fullCode.slice(5, 7);
+          else if (zoom >= 12) displayCode = fullCode.slice(0, 5);
+          else displayCode = fullCode.slice(0, 1);
+        }
+        const level = zoom >= 20 ? "10m 分割格" : zoom >= 18 ? "10m 圖號" : zoom >= 16 ? "100m 細格" : zoom >= 12 ? "800m 區塊" : "圖組範圍";
+        tpcGridReadoutCode.textContent = displayCode;
+        tpcGridReadoutMeta.textContent = `Zoom ${zoom} · ${level}（地圖中心）`;
+        tpcGridReadout.hidden = false;
+      }
+
+      function buildTpcGridLayer() {
+        if (tpcGrid.layer) { map.removeLayer(tpcGrid.layer); tpcGrid.layer = null; }
+        updateTpcGridReadout();
+        if (!tpcGrid.visible) return;
+        const range = tpcGridVisibleRange();
+        const labelRange = tpcGridVisibleRange(0);
+        const zoom = map.getZoom();
+        const mapSize = map.getSize();
+        const isCompactViewport = mapSize.x < 700 || mapSize.y < 560;
+        const layer = L.layerGroup();
+        const labels = L.layerGroup();
+        layer.addLayer(labels);
+        const showT2 = zoom >= 12;             // 800m × 500m 網格
+        const showT3 = zoom >= 16;             // 100m × 100m 次網格
+        const showPrefixLabels = zoom >= 12 && zoom < 16; // 區塊碼，例如 M8614
+        const showT3Labels = zoom >= 16 && zoom < 18;     // 細格碼，例如 BD
+        const showT5Labels = zoom >= 18;                  // 最後 4 碼，例如 BA47
+        const MAX_GRID_LABELS = isCompactViewport ? 360 : 900;
+        let labelCount = 0;
+        const toLatLng = (x, y) => { const p = twd67Tm2ToWgs84(x, y); return [p.lat, p.lng]; };
+        const addLabel = (latlng, html, className) => {
+          if (labelCount >= MAX_GRID_LABELS) return;
+          labelCount++;
+          L.marker(latlng, {
+            icon: L.divIcon({ className: "tpc-grid-label-wrap", html: `<span class="${className}">${html}</span>`, iconSize: [0, 0] }),
+            interactive: false,
+            pane: "tpcGridLabelPane",
+            zIndexOffset: 1000,
+          }).addTo(labels);
+        };
+
+        for (const [baseChar, [bx, by]] of Object.entries(GRID_BASES)) {
+          const baseX0 = bx, baseX1 = bx + 80000, baseY0 = by, baseY1 = by + 50000;
+          if (baseX1 < range.minX || baseX0 > range.maxX || baseY1 < range.minY || baseY0 > range.maxY) continue;
+
+          // 圖組邊界（80km × 50km）
+          L.polyline([
+            toLatLng(baseX0, baseY0), toLatLng(baseX1, baseY0),
+            toLatLng(baseX1, baseY1), toLatLng(baseX0, baseY1), toLatLng(baseX0, baseY0),
+          ], { color: "#d88922", weight: 3, opacity: 0.95, interactive: false }).addTo(layer);
+          addLabel(toLatLng(baseX0 + 2000, baseY1 - 2000), baseChar, "tpc-grid-base-label");
+          if (!showT2) continue;
+
+          // 800m 垂直線
+          const vStart = Math.max(baseX0, Math.floor((range.minX - bx) / 800) * 800 + bx);
+          for (let x = vStart; x <= Math.min(baseX1, range.maxX); x += 800) {
+            if (x < baseX0 || x > baseX1) continue;
+            L.polyline([toLatLng(x, baseY0), toLatLng(x, baseY1)], {
+              color: "#087f8c", weight: 1.3, opacity: 0.55, dashArray: "5 5", interactive: false,
+            }).addTo(layer);
+          }
+          // 500m 水平線
+          const hStart = Math.max(baseY0, Math.floor((range.minY - by) / 500) * 500 + by);
+          for (let y = hStart; y <= Math.min(baseY1, range.maxY); y += 500) {
+            if (y < baseY0 || y > baseY1) continue;
+            L.polyline([toLatLng(baseX0, y), toLatLng(baseX1, y)], {
+              color: "#087f8c", weight: 1.3, opacity: 0.55, dashArray: "5 5", interactive: false,
+            }).addTo(layer);
+          }
+          const vLabelStart = Math.max(baseX0, Math.floor((labelRange.minX - bx) / 800) * 800 + bx);
+          const hLabelStart = Math.max(baseY0, Math.floor((labelRange.minY - by) / 500) * 500 + by);
+          // 800m × 500m 格子標籤（前 5 碼，如 L3128）
+          if (showPrefixLabels) {
+            for (let x = vLabelStart; x <= Math.min(baseX1, labelRange.maxX); x += 800) {
+              if (x < baseX0) continue;
+              const t2x = Math.round((x - bx) / 800);
+              if (zoom < 17 && t2x % 2 !== 0) continue;
+              for (let y = hLabelStart; y <= Math.min(baseY1, labelRange.maxY); y += 500) {
+                if (y < baseY0) continue;
+                const t2y = Math.round((y - by) / 500);
+                addLabel(toLatLng(x + 400, y + 250), `${baseChar}${pad2(t2x)}${pad2(t2y)}`, "tpc-grid-label tpc-grid-label-prefix");
+              }
+            }
+          }
+          if (!showT3) continue;
+
+          // 10m 分割線：放大後形成參考圖中的 10 × 10 細格。
+          if (zoom >= 18) {
+            const fineStep = 10;
+            const fineMinX = Math.max(baseX0, range.minX), fineMaxX = Math.min(baseX1, range.maxX);
+            const fineMinY = Math.max(baseY0, range.minY), fineMaxY = Math.min(baseY1, range.maxY);
+            const fineXStart = Math.max(baseX0, Math.floor((range.minX - bx) / fineStep) * fineStep + bx);
+            const fineYStart = Math.max(baseY0, Math.floor((range.minY - by) / fineStep) * fineStep + by);
+            for (let x = fineXStart; x <= fineMaxX; x += fineStep) {
+              L.polyline([toLatLng(x, fineMinY), toLatLng(x, fineMaxY)], {
+                color: "#0f766e", weight: 0.8, opacity: 0.34, pane: "tpcGridPane", interactive: false,
+              }).addTo(layer);
+            }
+            for (let y = fineYStart; y <= fineMaxY; y += fineStep) {
+              L.polyline([toLatLng(fineMinX, y), toLatLng(fineMaxX, y)], {
+                color: "#0f766e", weight: 0.8, opacity: 0.34, pane: "tpcGridPane", interactive: false,
+              }).addTo(layer);
+            }
+          }
+
+          // 100m 垂直次網格
+          const v3Start = Math.max(baseX0, Math.floor((range.minX - bx) / 100) * 100 + bx);
+          for (let x = v3Start; x <= Math.min(baseX1, range.maxX); x += 100) {
+            if (x < baseX0 || x > baseX1) continue;
+            L.polyline([toLatLng(x, baseY0), toLatLng(x, baseY1)], {
+              color: "#087f8c", weight: 1.15, opacity: 0.55, pane: "tpcGridPane", interactive: false,
+            }).addTo(layer);
+          }
+          // 100m 水平次網格
+          const h3Start = Math.max(baseY0, Math.floor((range.minY - by) / 100) * 100 + by);
+          for (let y = h3Start; y <= Math.min(baseY1, range.maxY); y += 100) {
+            if (y < baseY0 || y > baseY1) continue;
+            L.polyline([toLatLng(baseX0, y), toLatLng(baseX1, y)], {
+              color: "#087f8c", weight: 1.15, opacity: 0.55, pane: "tpcGridPane", interactive: false,
+            }).addTo(layer);
+          }
+          const v3LabelStart = Math.max(baseX0, Math.floor((labelRange.minX - bx) / 100) * 100 + bx);
+          const h3LabelStart = Math.max(baseY0, Math.floor((labelRange.minY - by) / 100) * 100 + by);
+          // 100m 格子標籤：放大後只顯示局部細格碼，避免長圖號遮住地圖。
+          if (showT3Labels) {
+            for (let x = v3LabelStart; x <= Math.min(baseX1, labelRange.maxX); x += 100) {
+              if (x < baseX0) continue;
+              const t3x = Math.floor(((x - bx) % 800) / 100);
+              for (let y = h3LabelStart; y <= Math.min(baseY1, labelRange.maxY); y += 100) {
+                if (y < baseY0) continue;
+                const t3y = Math.floor(((y - by) % 500) / 100);
+                addLabel(toLatLng(x + 50, y + 50), `${String.fromCharCode(65 + t3x)}${String.fromCharCode(65 + t3y)}`, "tpc-grid-label tpc-grid-label-sub");
+              }
+            }
+          }
+
+          // 10m 格子標籤：最高倍率只顯示最後 4 碼，例如 BA47，不重複顯示 P9788。
+          // 低於 zoom 20 時以 20m 間距取樣，避免短時間建立過多 DOM 標籤。
+          if (showT5Labels) {
+            const labelStep = zoom >= 20 ? 10 : 20;
+            const v5Start = Math.max(baseX0, Math.floor((labelRange.minX - bx) / labelStep) * labelStep + bx);
+            const h5Start = Math.max(baseY0, Math.floor((labelRange.minY - by) / labelStep) * labelStep + by);
+            for (let x = v5Start; x <= Math.min(baseX1, labelRange.maxX); x += labelStep) {
+              if (x < baseX0) continue;
+              const dx = x - bx;
+              const t3x = Math.floor((dx % 800) / 100), t5x = Math.floor((dx % 100) / 10);
+              for (let y = h5Start; y <= Math.min(baseY1, labelRange.maxY); y += labelStep) {
+                if (y < baseY0) continue;
+                const dy = y - by;
+                const t3y = Math.floor((dy % 500) / 100), t5y = Math.floor((dy % 100) / 10);
+                const localCode = `${String.fromCharCode(65 + t3x)}${String.fromCharCode(65 + t3y)}${t5x}${t5y}`;
+                addLabel(toLatLng(x + labelStep / 2, y + labelStep / 2), localCode, "tpc-grid-label tpc-grid-label-detail");
+                if (labelCount >= MAX_GRID_LABELS) break;
+              }
+              if (labelCount >= MAX_GRID_LABELS) break;
+            }
+          }
+        }
+        layer.addTo(map);
+        tpcGrid.layer = layer;
+      }
 
       const SHOW_POINTS_ZOOM   = 15;
       const MAX_POINT_LABELS   = 1200;
@@ -4015,6 +4386,11 @@
         if (typeof map !== "undefined") {
           map.invalidateSize({ pan: false });
           window.setTimeout(() => map.invalidateSize({ pan: false }), 180);
+          updateTpcGridReadout();
+          if (tpcGrid.visible) {
+            if (tpcGrid.buildTimer) clearTimeout(tpcGrid.buildTimer);
+            tpcGrid.buildTimer = setTimeout(buildTpcGridLayer, 80);
+          }
         }
       }
       const debouncedRefreshViewportLayout = debounce(refreshViewportLayout, 120);
@@ -6897,6 +7273,23 @@
         }
         if (state.routeLayerVisible) setStatus("已顯示設備開頭推估路線");
         window.setTimeout(() => setStatus(""), 1800);
+      });
+
+      document.getElementById("tpcGridToggle").addEventListener("click", () => {
+        tpcGrid.visible = !tpcGrid.visible;
+        const btn = document.getElementById("tpcGridToggle");
+        btn.classList.toggle("is-active", tpcGrid.visible);
+        btn.setAttribute("aria-pressed", String(tpcGrid.visible));
+        buildTpcGridLayer();
+        updateTpcGridReadout();
+        setStatus(tpcGrid.visible ? "已顯示圖號分割線與分級標籤；放大可看最後 4 碼，例如 BA47" : "已隱藏圖號分割線");
+        window.setTimeout(() => setStatus(""), 1800);
+      });
+      map.on("moveend zoomend", () => {
+        updateTpcGridReadout();
+        if (!tpcGrid.visible) return;
+        if (tpcGrid.buildTimer) clearTimeout(tpcGrid.buildTimer);
+        tpcGrid.buildTimer = setTimeout(buildTpcGridLayer, 60);
       });
 
       areaSelect.addEventListener("change", applyFilter);
