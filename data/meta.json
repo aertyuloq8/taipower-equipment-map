@@ -1,9 +1,9 @@
 {
   "source": "完整設備大表_20260602.xlsx",
-  "sourceModified": "2026-06-03T09:03:24",
-  "sourceSize": 6169301,
-  "totalRows": 238297,
-  "converted": 238297,
+  "sourceModified": "2026-08-08T22:22:38",
+  "sourceSize": 6185471,
+  "totalRows": 238522,
+  "converted": 238522,
   "skipped": 0,
   "bounds": [
     [
@@ -18,103 +18,103 @@
   "areas": [
     {
       "name": "安南區",
-      "count": 26124
+      "count": 26151
     },
     {
       "name": "永康區",
-      "count": 16470
+      "count": 16487
     },
     {
       "name": "七股區",
-      "count": 14129
+      "count": 14149
     },
     {
       "name": "南化區",
-      "count": 13451
+      "count": 13462
     },
     {
       "name": "仁德區",
-      "count": 13412
+      "count": 13417
     },
     {
       "name": "楠西區",
-      "count": 13314
+      "count": 13320
     },
     {
       "name": "歸仁區",
-      "count": 13161
+      "count": 13172
     },
     {
       "name": "佳里區",
-      "count": 11613
+      "count": 11627
     },
     {
       "name": "新化區",
-      "count": 11574
+      "count": 11584
     },
     {
       "name": "善化區",
-      "count": 11305
+      "count": 11325
     },
     {
       "name": "玉井區",
-      "count": 10782
+      "count": 10787
     },
     {
       "name": "關廟區",
-      "count": 9953
+      "count": 9968
     },
     {
       "name": "新市區",
-      "count": 9324
+      "count": 9340
     },
     {
       "name": "將軍區",
-      "count": 7665
+      "count": 7685
     },
     {
       "name": "西港區",
-      "count": 7630
+      "count": 7631
     },
     {
       "name": "安定區",
-      "count": 7534
+      "count": 7540
     },
     {
       "name": "左鎮區",
-      "count": 7434
+      "count": 7415
     },
     {
       "name": "龍崎區",
-      "count": 7136
+      "count": 7142
     },
     {
       "name": "南區",
-      "count": 6872
+      "count": 6878
     },
     {
       "name": "東區",
-      "count": 4749
+      "count": 4757
     },
     {
       "name": "北區",
-      "count": 4115
+      "count": 4116
     },
     {
       "name": "山上區",
-      "count": 3692
+      "count": 3698
     },
     {
       "name": "中西區",
-      "count": 3238
+      "count": 3240
     },
     {
       "name": "安平區",
-      "count": 1956
+      "count": 1962
     },
     {
       "name": "東山區",
-      "count": 562
+      "count": 563
     },
     {
       "name": "大埔鄉",
@@ -149,6 +149,10 @@
       "count": 5
     },
     {
+      "name": "",
+      "count": 4
+    },
+    {
       "name": "六甲區",
       "count": 3
     },
@@ -173,4 +177,4 @@
       "count": 1
     }
   ]
-} 
+}

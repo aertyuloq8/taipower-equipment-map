@@ -1251,17 +1251,18 @@
       }
       .tpc-grid-label {
         align-items: center;
-        background: rgba(255, 255, 255, 0.92);
-        border: 1px solid rgba(8, 127, 140, 0.55);
-        border-radius: 4px;
-        box-shadow: 0 2px 6px rgba(22, 36, 52, 0.18);
+        background: rgba(255, 255, 255, 0.62);
+        border: 0;
+        border-radius: 3px;
+        box-shadow: none;
         color: var(--accent-dark);
         display: inline-flex;
         font-size: 10px;
         font-weight: 800;
         line-height: 1;
-        padding: 2px 4px;
+        padding: 1px 2px;
         pointer-events: none;
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.95), 0 0 3px rgba(255, 255, 255, 0.95);
         transform: translate(-50%, -50%);
         white-space: nowrap;
       }
@@ -1273,24 +1274,22 @@
         z-index: 1000 !important;
       }
       .tpc-grid-label-prefix {
-        border-color: rgba(216, 137, 34, 0.7);
+        background: rgba(255, 250, 240, 0.62);
         color: #8a4f0b;
-        font-size: 11px;
+        font-size: 10px;
       }
       .tpc-grid-label-sub {
-        background: rgba(238, 248, 249, 0.96);
-        border-color: rgba(8, 127, 140, 0.72);
+        background: rgba(238, 248, 249, 0.62);
         color: var(--accent-dark);
-        font-size: 11px;
+        font-size: 10px;
       }
       .tpc-grid-label-detail {
-        background: rgba(255, 255, 255, 0.97);
-        border-color: rgba(8, 127, 140, 0.86);
-        box-shadow: 0 2px 7px rgba(22, 36, 52, 0.28);
+        background: rgba(255, 255, 255, 0.52);
         color: var(--accent-dark);
-        font-size: 12px;
-        letter-spacing: 0.1px;
-        padding: 3px 5px;
+        font-size: 11px;
+        letter-spacing: 0;
+        opacity: 0.78;
+        padding: 1px 2px;
       }
       .tpc-grid-base-label {
         align-items: center;
@@ -2217,7 +2216,8 @@
       <button id="panelToggle" class="icon-button" type="button"
         aria-expanded="false" title="展開面板"
         style="box-shadow:0 8px 20px rgba(22,36,52,0.18)">≡</button>
-      <button id="mapSearchToggle" class="map-search-btn" title="搜尋設備">🔍 搜尋</button>
+      <button id="mapSearchToggle" class="map-search-btn" type="button"
+        aria-expanded="false" aria-controls="mapSearchPanel" title="搜尋設備">🔍 搜尋</button>
       <div class="layer-menu">
         <button id="layerMenuToggle" class="layer-menu-toggle" type="button" aria-expanded="false" aria-controls="layerMenuPanel" title="更多圖層控制">
           <span class="layer-menu-glyph" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -2229,8 +2229,8 @@
             <span class="layer-menu-item-name">標籤圖層</span>
             <span id="labelsLayerState" class="layer-menu-item-state">顯示</span>
           </button>
-          <button id="tpcGridToggle" class="layer-menu-item" type="button" aria-pressed="false" title="顯示或隱藏圖號圖層">
-            <span class="layer-menu-item-name">圖號圖層</span>
+          <button id="tpcGridToggle" class="layer-menu-item" type="button" aria-pressed="false" title="顯示或隱藏圖號網格">
+            <span class="layer-menu-item-name">圖號網格</span>
             <span id="tpcGridLayerState" class="layer-menu-item-state">隱藏</span>
           </button>
           <button id="routeLayerToggle" class="layer-menu-item" type="button" aria-pressed="false" title="顯示或隱藏路線圖層">
@@ -2615,13 +2615,40 @@
       document.getElementById('tabEditBtn').addEventListener('click',    () => switchTab('edit'));
 
       const mapSearchPanel = document.getElementById("mapSearchPanel");
+      const mapSearchToggle = document.getElementById("mapSearchToggle");
       const layerMenu = document.querySelector(".layer-menu");
       const layerMenuToggle = document.getElementById("layerMenuToggle");
       const layerMenuPanel = document.getElementById("layerMenuPanel");
+      const panelToggle = document.getElementById("panelToggle");
+      const inspectionPanel = document.getElementById("panel");
+
+      function syncPanelToggleState() {
+        if (!panelToggle || !inspectionPanel) return;
+        const isOpen = !inspectionPanel.classList.contains("is-collapsed");
+        panelToggle.setAttribute("aria-expanded", String(isOpen));
+        panelToggle.classList.toggle("is-active", isOpen);
+        panelToggle.title = isOpen ? "收合面板" : "展開面板";
+      }
+
+      function syncMapSearchState() {
+        if (!mapSearchToggle || !mapSearchPanel) return;
+        const isOpen = mapSearchPanel.classList.contains("is-open");
+        mapSearchToggle.setAttribute("aria-expanded", String(isOpen));
+        mapSearchToggle.classList.toggle("is-active", isOpen);
+        mapSearchToggle.title = isOpen ? "關閉搜尋" : "搜尋設備";
+      }
+
+      function closeMapSearchPanel() {
+        if (!mapSearchPanel) return;
+        mapSearchPanel.classList.remove("is-open");
+        syncMapSearchState();
+      }
+
       function closeLayerMenu() {
         if (!layerMenuToggle || !layerMenuPanel) return;
         layerMenuPanel.hidden = true;
         layerMenuToggle.setAttribute("aria-expanded", "false");
+        layerMenuToggle.classList.remove("is-active");
       }
       function syncLayerMenuState() {
         const labelsBtn = document.getElementById("toggleLabelsBtn");
@@ -2651,8 +2678,13 @@
       layerMenuToggle?.addEventListener("click", () => {
         const willOpen = layerMenuPanel?.hidden !== false;
         if (!layerMenuPanel || !layerMenuToggle) return;
+        if (willOpen) {
+          closeMapSearchPanel();
+          if (!collapsePanelControl()) return;
+        }
         layerMenuPanel.hidden = !willOpen;
         layerMenuToggle.setAttribute("aria-expanded", String(willOpen));
+        layerMenuToggle.classList.toggle("is-active", willOpen);
         syncLayerMenuState();
       });
       document.addEventListener("click", event => {
@@ -2666,25 +2698,27 @@
         syncLayerMenuState();
       }
       function collapsePanelControl() {
-        setPanelCollapsed(true);
-        const panelToggle = document.getElementById("panelToggle");
-        panelToggle.setAttribute("aria-expanded", "false");
-        panelToggle.title = "展開面板";
+        const didCollapse = setPanelCollapsed(true);
+        syncPanelToggleState();
+        return didCollapse;
       }
       function collapseFloatingControls() {
-        mapSearchPanel.classList.remove("is-open");
+        closeMapSearchPanel();
         closeLayerMenu();
         collapsePanelControl();
       }
-      document.getElementById("mapSearchToggle").addEventListener("click", () => {
+      mapSearchToggle.addEventListener("click", () => {
         disableRouteLayerForTools();
-        closeLayerMenu();
         const willOpen = !mapSearchPanel.classList.contains("is-open");
-        if (willOpen) collapsePanelControl();
+        if (willOpen) {
+          closeLayerMenu();
+          if (!collapsePanelControl()) return;
+        }
         mapSearchPanel.classList.toggle("is-open", willOpen);
+        syncMapSearchState();
       });
       document.getElementById("mapSearchClose").addEventListener("click", () => {
-        mapSearchPanel.classList.remove("is-open");
+        closeMapSearchPanel();
       });
 
       // ==========================================
@@ -4344,7 +4378,10 @@
         const showPrefixLabels = zoom >= 12 && zoom < 16; // 區塊碼，例如 M8614
         const showT3Labels = zoom >= 16 && zoom < 18;     // 細格碼，例如 BD
         const showT5Labels = zoom >= 18;                  // 最後 4 碼，例如 BA47
-        const MAX_GRID_LABELS = isCompactViewport ? 360 : 900;
+        // Zoom 20 以上需要每個 10m 細格都有圖號；其餘倍率仍限制標籤數量維持畫面乾淨。
+        const MAX_GRID_LABELS = zoom >= 20
+          ? (isCompactViewport ? 600 : 2400)
+          : (isCompactViewport ? 180 : 360);
         let labelCount = 0;
         const toLatLng = (x, y) => { const p = twd67Tm2ToWgs84(x, y); return [p.lat, p.lng]; };
         const addLabel = (latlng, html, className) => {
@@ -4453,10 +4490,11 @@
             }
           }
 
-          // 10m 格子標籤：最高倍率只顯示最後 4 碼，例如 BA47，不重複顯示 P9788。
-          // 低於 zoom 20 時以 20m 間距取樣，避免短時間建立過多 DOM 標籤。
+          // 10m 格子標籤：最高倍率顯示每一格的最後 4 碼，例如 BA47。
+          // Zoom 20／21 對應每個 10m 細格；Zoom 18／19 仍採稀疏取樣，避免過多 DOM 標籤。
           if (showT5Labels) {
-            const labelStep = zoom >= 20 ? 10 : 20;
+            const labelStep = zoom >= 20 ? 10 : 40;
+            const labelOffsetY = zoom >= 20 ? labelStep * 0.24 : labelStep / 2;
             const v5Start = Math.max(baseX0, Math.floor((labelRange.minX - bx) / labelStep) * labelStep + bx);
             const h5Start = Math.max(baseY0, Math.floor((labelRange.minY - by) / labelStep) * labelStep + by);
             for (let x = v5Start; x <= Math.min(baseX1, labelRange.maxX); x += labelStep) {
@@ -4468,7 +4506,7 @@
                 const dy = y - by;
                 const t3y = Math.floor((dy % 500) / 100), t5y = Math.floor((dy % 100) / 10);
                 const localCode = `${String.fromCharCode(65 + t3x)}${String.fromCharCode(65 + t3y)}${t5x}${t5y}`;
-                addLabel(toLatLng(x + labelStep / 2, y + labelStep / 2), localCode, "tpc-grid-label tpc-grid-label-detail");
+                addLabel(toLatLng(x + labelStep / 2, y + labelOffsetY), localCode, "tpc-grid-label tpc-grid-label-detail");
                 if (labelCount >= MAX_GRID_LABELS) break;
               }
               if (labelCount >= MAX_GRID_LABELS) break;
@@ -4669,20 +4707,53 @@
           return false;
         }
         if (!collapsed) disableRouteLayerForTools();
-        document.querySelector("#panel").classList.toggle("is-collapsed", collapsed);
+        inspectionPanel.classList.toggle("is-collapsed", collapsed);
         document.querySelector(".app").classList.toggle("is-panel-collapsed", collapsed);
         document.body.classList.toggle("is-panel-open", !collapsed);
-        if (!collapsed) mapSearchPanel.classList.remove("is-open");
+        if (!collapsed) {
+          closeMapSearchPanel();
+          closeLayerMenu();
+        }
+        syncPanelToggleState();
         window.setTimeout(() => map.invalidateSize(), 220);
+        return true;
       }
 
-      document.getElementById("panelToggle").addEventListener("click", () => {
-        const panel = document.querySelector("#panel");
-        const collapsed = !panel.classList.contains("is-collapsed");
+      panelToggle.addEventListener("click", () => {
+        const collapsed = !inspectionPanel.classList.contains("is-collapsed");
         setPanelCollapsed(collapsed);
-        document.getElementById("panelToggle").setAttribute("aria-expanded", String(!collapsed));
-        document.getElementById("panelToggle").title = collapsed ? "展開面板" : "收合面板";
       });
+
+      // 手機底部面板可從頂端把手向下滑動收合，避免必須精準點擊按鈕。
+      const panelSwipe = { pointerId: null, startX: 0, startY: 0 };
+      const isPortraitPanelGesture = () => isMobileLayout() && window.innerHeight >= window.innerWidth;
+      const resetPanelSwipe = (event) => {
+        if (panelSwipe.pointerId === null || (event && event.pointerId !== panelSwipe.pointerId)) return;
+        if (event && inspectionPanel.hasPointerCapture?.(event.pointerId)) {
+          inspectionPanel.releasePointerCapture(event.pointerId);
+        }
+        panelSwipe.pointerId = null;
+      };
+      inspectionPanel.addEventListener("pointerdown", (event) => {
+        if (!isPortraitPanelGesture() || inspectionPanel.classList.contains("is-collapsed")) return;
+        const rect = inspectionPanel.getBoundingClientRect();
+        const target = event.target instanceof Element ? event.target : null;
+        if (event.clientY > rect.top + 76 || target?.closest("button, a, input, select, textarea")) return;
+        panelSwipe.pointerId = event.pointerId;
+        panelSwipe.startX = event.clientX;
+        panelSwipe.startY = event.clientY;
+        inspectionPanel.setPointerCapture?.(event.pointerId);
+      });
+      inspectionPanel.addEventListener("pointerup", (event) => {
+        if (panelSwipe.pointerId !== event.pointerId) return;
+        const deltaX = event.clientX - panelSwipe.startX;
+        const deltaY = event.clientY - panelSwipe.startY;
+        const isDownSwipe = deltaY >= 56 && Math.abs(deltaX) <= Math.max(90, deltaY * 0.72);
+        resetPanelSwipe(event);
+        if (isDownSwipe) setPanelCollapsed(true);
+      });
+      inspectionPanel.addEventListener("pointercancel", resetPanelSwipe);
+      inspectionPanel.addEventListener("lostpointercapture", resetPanelSwipe);
 
       // ==========================================
       // ★ jumpToRecord：支援孤兒記錄與正常記錄的完美跳轉
@@ -7405,7 +7476,7 @@
       document.getElementById("routeLayerToggle").addEventListener("click", () => {
         state.routeLayerVisible = !state.routeLayerVisible;
         if (state.routeLayerVisible) {
-          mapSearchPanel.classList.remove("is-open");
+          closeMapSearchPanel();
           collapsePanelControl();
           state.labelsHidden = true;
           document.getElementById("toggleLabelsBtn").classList.add("is-hidden");
@@ -7427,7 +7498,7 @@
         buildTpcGridLayer();
         updateTpcGridReadout();
         syncLayerMenuState();
-        setStatus(tpcGrid.visible ? "已顯示圖號分割線與分級標籤；放大可看最後 4 碼，例如 BA47" : "已隱藏圖號分割線");
+        setStatus(tpcGrid.visible ? "已顯示圖號網格；精確圖號請看地圖上方中心讀值" : "已隱藏圖號網格");
         window.setTimeout(() => setStatus(""), 1800);
       });
       map.on("moveend zoomend", () => {

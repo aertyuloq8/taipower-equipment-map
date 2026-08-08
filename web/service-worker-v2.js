@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2";
+const CACHE_NAME = "equipment-map-photo-edition-v2-r2";
 const APP_SHELL = "./indexV2.html";
 const STATIC_ASSETS = [
   APP_SHELL,
@@ -59,6 +59,13 @@ self.addEventListener("fetch", (event) => {
             return response;
           })
           .catch(() => caches.match(APP_SHELL))
+      : isEquipmentData
+        ? fetch(request, { cache: "no-store" })
+            .then((response) => {
+              if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+              return response;
+            })
+            .catch(() => caches.match(request))
       : caches.match(request).then(cached => cached || fetch(request).then(response => {
           if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
           return response;
