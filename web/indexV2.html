@@ -7563,6 +7563,15 @@
         return `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
       }
 
+      function finishTpcSearchLocation(code) {
+        if (activeTpcSearchCode !== code) return;
+        closeMapSearchPanel();
+        searchInput.value = "";
+        applyFilter({ preserveTpcLocation: true });
+        // 保留定位標記與 popup，但清除 active code，讓下次輸入同一圖號仍會重新飛行。
+        activeTpcSearchCode = "";
+      }
+
       function focusTpcSearchLocation(location, options = {}) {
         const shouldFly = options.force || activeTpcSearchCode !== location.code || !tpcSearchMarker;
         activeTpcSearchCode = location.code;
@@ -7583,9 +7592,15 @@
         if (!shouldFly) return;
 
         map.closePopup();
-        map.once("moveend", () => {
-          if (activeTpcSearchCode === location.code) tpcSearchMarker?.openPopup();
-        });
+        let completed = false;
+        const complete = () => {
+          if (completed || activeTpcSearchCode !== location.code) return;
+          completed = true;
+          tpcSearchMarker?.openPopup();
+          finishTpcSearchLocation(location.code);
+        };
+        map.once("moveend", complete);
+        window.setTimeout(complete, 900);
         map.flyTo([location.lat, location.lng], Math.max(map.getZoom(), 20), { duration: 0.45 });
       }
 
@@ -7608,7 +7623,7 @@
         results.append(button);
       }
 
-      function applyFilter() {
+      function applyFilter(options = {}) {
         disableRouteLayerForTools();
         state.area = areaSelect.value; state.query = searchInput.value.trim(); state.search = parseSearchQuery(state.query);
         const matches = searchMatches(state.search);
@@ -7619,7 +7634,7 @@
           focusTpcSearchLocation(location);
           renderTpcCoordinateResult(location);
         } else {
-          clearTpcSearchLocation();
+          if (!options.preserveTpcLocation) clearTpcSearchLocation();
           renderResults(matches);
         }
         renderer.redraw();
