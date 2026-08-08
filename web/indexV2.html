@@ -1100,9 +1100,17 @@
       .popup-layout { display: flex; flex-direction: column; }
       .popup-left { margin-bottom: 2px; }
       .popup-right { max-height: 55vh; overflow-y: auto; padding-right: 2px; }
+      .popup-action-row {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: center;
+        margin-top: 8px;
+      }
       .popup-navigation-link {
         align-items: center;
-        align-self: center;
+        align-self: auto;
         background: #eef8f9;
         border: 1px solid var(--line);
         border-radius: 5px;
@@ -1112,12 +1120,23 @@
         font-weight: 800;
         gap: 4px;
         justify-content: center;
-        margin-top: 8px;
+        margin-top: 0;
         min-height: 30px;
         padding: 4px 10px;
         text-decoration: none;
       }
       .popup-navigation-link:hover { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+      .popup-clear-location-button {
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        min-height: 30px;
+        padding: 4px 10px;
+      }
+      .popup-clear-location-button:hover { background: #eef2f5; border-color: #94a3b8; color: var(--text); }
       .leaflet-popup-content {
         min-width: 225px !important;
         max-width: 70vw !important;
@@ -7553,11 +7572,19 @@
 
       function clearTpcSearchLocation() {
         if (tpcSearchMarker) {
+          tpcSearchMarker.closePopup();
           map.removeLayer(tpcSearchMarker);
           tpcSearchMarker = null;
         }
         activeTpcSearchCode = "";
       }
+
+      document.addEventListener("click", event => {
+        const clearButton = event.target instanceof Element ? event.target.closest("[data-clear-tpc-location]") : null;
+        if (!clearButton) return;
+        event.preventDefault();
+        clearTpcSearchLocation();
+      });
 
       function tpcSearchCoordinateText(location) {
         return `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
@@ -7588,7 +7615,7 @@
         }
 
         const coordinateText = tpcSearchCoordinateText(location);
-        tpcSearchMarker.bindPopup(`<div class="popup-layout" style="min-width:180px; text-align:center;"><div class="popup-title">📍 圖號座標定位</div><div class="popup-meta" style="font-weight:800; margin-bottom:3px;">${escapeHtml(location.code)}</div><div class="popup-meta">${escapeHtml(coordinateText)}</div><a class="popup-navigation-link" href="${googleNavUrl(location)}" target="_blank" rel="noopener">🗺️ 導航</a></div>`);
+        tpcSearchMarker.bindPopup(`<div class="popup-layout" style="min-width:180px; text-align:center;"><div class="popup-title">📍 圖號座標定位</div><div class="popup-meta" style="font-weight:800; margin-bottom:3px;">${escapeHtml(location.code)}</div><div class="popup-meta">${escapeHtml(coordinateText)}</div><div class="popup-action-row"><a class="popup-navigation-link" href="${googleNavUrl(location)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" data-clear-tpc-location>✕ 清除定位</button></div></div>`);
         if (!shouldFly) return;
 
         map.closePopup();
