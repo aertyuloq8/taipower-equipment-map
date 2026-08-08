@@ -198,6 +198,17 @@
         width: 100%;
       }
       .result-item:hover { background: #eef8f9; color: var(--text); }
+      .result-item.tpc-coordinate-result {
+        background: #fffbeb;
+        border-color: #f6c453;
+        border-left: 4px solid var(--amber);
+      }
+      .result-item.tpc-coordinate-result:hover { background: #fff6d8; }
+      .tpc-coordinate-result-meta {
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
+      }
       .folders-section {
         display: flex;
         flex-direction: column;
@@ -1089,6 +1100,24 @@
       .popup-layout { display: flex; flex-direction: column; }
       .popup-left { margin-bottom: 2px; }
       .popup-right { max-height: 55vh; overflow-y: auto; padding-right: 2px; }
+      .popup-navigation-link {
+        align-items: center;
+        align-self: center;
+        background: #eef8f9;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: var(--accent-dark);
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 800;
+        gap: 4px;
+        justify-content: center;
+        margin-top: 8px;
+        min-height: 30px;
+        padding: 4px 10px;
+        text-decoration: none;
+      }
+      .popup-navigation-link:hover { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
       .leaflet-popup-content {
         min-width: 225px !important;
         max-width: 70vw !important;
@@ -2275,8 +2304,8 @@
             style="background:transparent; color:var(--muted); border:none; min-height:unset; padding:4px 8px; font-size:16px; cursor:pointer;">✕</button>
         </div>
         <select id="areaSelect"><option value="">全部區域</option></select>
-        <input id="searchInput" type="search" placeholder="例如 Q1295.Q1395.尖峰" autocomplete="off" />
-        <p style="font-size:11px; color:var(--muted); margin:0">💡 右鍵地圖可反推圖號座標並手動新增設備</p>
+        <input id="searchInput" type="search" placeholder="設備或圖號座標，例如 M9993HC1197" autocomplete="off" />
+        <p style="font-size:11px; color:var(--muted); margin:0">💡 找不到設備時，輸入完整圖號座標會直接定位該格中心</p>
       </div>
       <div class="map-search-stats">
         <span>總點位 <strong id="totalCount">--</strong></span>
@@ -4283,10 +4312,16 @@
         return { lat: (lat84 * 180) / PI, lng: (lng84 * 180) / PI };
       }
 
+      const TPC_CODE_PATTERN = /^[A-Z]\d{4}[A-H][A-E]\d{2}(?:\d{2})?$/;
+      function normalizeTpcCode(rawCode) {
+        const code = String(rawCode ?? "").trim().toUpperCase().replace(/[\s._\-．－]+/g, "");
+        return TPC_CODE_PATTERN.test(code) && GRID_BASES[code[0]] ? code : null;
+      }
+
       function tpcCodeToLatLng(code) {
         try {
-          const c = code.trim().toUpperCase().replace(/\s+/g, "");
-          if (c.length < 9) return null;
+          const c = normalizeTpcCode(code);
+          if (!c) return null;
           const base = c[0]; const baseCoords = GRID_BASES[base]; if (!baseCoords) return null;
           const [bx, by] = baseCoords;
           const t2x = parseInt(c.slice(1, 3)), t2y = parseInt(c.slice(3, 5));
@@ -7513,10 +7548,81 @@
       areaSelect.addEventListener("change", applyFilter);
       searchInput.addEventListener("input", debounce(applyFilter, 180));
 
+      let tpcSearchMarker = null;
+      let activeTpcSearchCode = "";
+
+      function clearTpcSearchLocation() {
+        if (tpcSearchMarker) {
+          map.removeLayer(tpcSearchMarker);
+          tpcSearchMarker = null;
+        }
+        activeTpcSearchCode = "";
+      }
+
+      function tpcSearchCoordinateText(location) {
+        return `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
+      }
+
+      function focusTpcSearchLocation(location, options = {}) {
+        const shouldFly = options.force || activeTpcSearchCode !== location.code || !tpcSearchMarker;
+        activeTpcSearchCode = location.code;
+        if (!tpcSearchMarker) {
+          tpcSearchMarker = L.circleMarker([location.lat, location.lng], {
+            color: "#b45309",
+            fillColor: "#f59e0b",
+            fillOpacity: 0.9,
+            radius: 9,
+            weight: 3,
+          }).addTo(map);
+        } else {
+          tpcSearchMarker.setLatLng([location.lat, location.lng]);
+        }
+
+        const coordinateText = tpcSearchCoordinateText(location);
+        tpcSearchMarker.bindPopup(`<div class="popup-layout" style="min-width:180px; text-align:center;"><div class="popup-title">📍 圖號座標定位</div><div class="popup-meta" style="font-weight:800; margin-bottom:3px;">${escapeHtml(location.code)}</div><div class="popup-meta">${escapeHtml(coordinateText)}</div><a class="popup-navigation-link" href="${googleNavUrl(location)}" target="_blank" rel="noopener">🗺️ 導航</a></div>`);
+        if (!shouldFly) return;
+
+        map.closePopup();
+        map.once("moveend", () => {
+          if (activeTpcSearchCode === location.code) tpcSearchMarker?.openPopup();
+        });
+        map.flyTo([location.lat, location.lng], Math.max(map.getZoom(), 20), { duration: 0.45 });
+      }
+
+      function renderTpcCoordinateResult(location) {
+        results.replaceChildren();
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "result-item tpc-coordinate-result";
+        const title = document.createElement("strong");
+        title.textContent = "📍 已依圖號座標定位";
+        const code = document.createElement("span");
+        code.textContent = location.code;
+        const coordinate = document.createElement("span");
+        coordinate.className = "tpc-coordinate-result-meta";
+        coordinate.textContent = `經緯度 ${tpcSearchCoordinateText(location)}`;
+        const note = document.createElement("span");
+        note.textContent = "此位置沒有相符的設備清單資料";
+        button.append(title, code, coordinate, note);
+        button.addEventListener("click", () => focusTpcSearchLocation(location, { force: true }));
+        results.append(button);
+      }
+
       function applyFilter() {
         disableRouteLayerForTools();
         state.area = areaSelect.value; state.query = searchInput.value.trim(); state.search = parseSearchQuery(state.query);
-        renderResults(searchMatches(state.search)); renderer.redraw();
+        const matches = searchMatches(state.search);
+        const code = matches.length ? null : normalizeTpcCode(state.query);
+        const coordinates = code ? tpcCodeToLatLng(code) : null;
+        if (coordinates) {
+          const location = { ...coordinates, code };
+          focusTpcSearchLocation(location);
+          renderTpcCoordinateResult(location);
+        } else {
+          clearTpcSearchLocation();
+          renderResults(matches);
+        }
+        renderer.redraw();
       }
 
       // ★ 修改後的 searchMatches：支援僅區域無關鍵字時列出點位，巡視紀錄不受區域過濾
@@ -7634,7 +7740,13 @@ function renderDefectStats() {
 
       function renderResults(items) {
         results.innerHTML = "";
-        if (!items.length) { results.innerHTML = '<p class="popup-meta">請輸入設備關鍵字。</p>'; return; }
+        if (!items.length) {
+          const message = state.query
+            ? "找不到相符設備。可輸入完整圖號座標，例如 M9993HC1197。"
+            : "請輸入設備關鍵字或圖號座標。";
+          results.innerHTML = `<p class="popup-meta">${message}</p>`;
+          return;
+        }
         for (const point of items) {
           const fragment = resultTemplate.content.cloneNode(true);
           fragment.querySelector("strong").textContent = point.name || "未命名";
