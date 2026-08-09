@@ -1301,6 +1301,40 @@
         font-weight: 900;
         padding: 2px 5px 4px;
       }
+      .layer-menu-base-map {
+        align-items: center;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        min-height: 38px;
+        padding: 6px 8px;
+      }
+      .layer-menu-base-map label {
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 800;
+        min-width: 0;
+      }
+      .layer-menu-base-map select {
+        background: #eef8f9;
+        border: 1px solid rgba(8, 127, 140, 0.55);
+        border-radius: 6px;
+        color: var(--accent-dark);
+        cursor: pointer;
+        flex: 0 1 146px;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 800;
+        min-width: 0;
+        padding: 4px 22px 4px 6px;
+      }
+      .layer-menu-base-map select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
       .layer-menu-item {
         align-items: center;
         background: #fff;
@@ -2321,6 +2355,13 @@
         </button>
         <div id="layerMenuPanel" class="layer-menu-panel" hidden>
           <div class="layer-menu-heading">圖層控制</div>
+          <div class="layer-menu-base-map">
+            <label for="baseMapSelect">底圖</label>
+            <select id="baseMapSelect" title="選擇底圖；同一時間只顯示一種底圖">
+              <option value="emap">臺灣通用電子地圖</option>
+              <option value="osm">OpenStreetMap</option>
+            </select>
+          </div>
           <button id="toggleLabelsBtn" class="layer-menu-item" type="button" aria-pressed="true" title="顯示或隱藏標籤圖層">
             <span class="layer-menu-item-name">標籤圖層</span>
             <span id="labelsLayerState" class="layer-menu-item-state">顯示</span>
@@ -4412,11 +4453,54 @@
       map.getPane("tpcGridLabelPane").style.zIndex = 660;
       map.getPane("tpcGridLabelPane").style.pointerEvents = "none";
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      const baseTileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap",
-      }).on("tileerror", () => {
-        setOfflineNotice("地圖底圖目前無法載入；設備資料、巡檢紀錄與照片仍可使用。恢復網路後可重新載入地圖。" );
-      }).addTo(map);
+      const BASE_MAP_STORAGE_KEY = "taipower_equipment_v2_base_map";
+      const baseMapSelect = document.getElementById("baseMapSelect");
+      const baseMapConfigs = {
+        emap: {
+          label: "臺灣通用電子地圖",
+          url: "https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}",
+          options: {
+            maxZoom: 21,
+            maxNativeZoom: 19,
+            attribution: "© 內政部國土測繪中心",
+            crossOrigin: true,
+          },
+        },
+        osm: {
+          label: "OpenStreetMap",
+          url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          options: {
+            maxZoom: 21,
+            maxNativeZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" aria-label="OpenStreetMap contributors">OpenStreetMap</a>',
+          },
+        },
+      };
+      let baseTileLayer = null;
+      let activeBaseMapKey = "";
+
+      function setBaseMap(baseMapKey, { persist = true } = {}) {
+        const key = baseMapConfigs[baseMapKey] ? baseMapKey : "emap";
+        const config = baseMapConfigs[key];
+        if (baseTileLayer) map.removeLayer(baseTileLayer);
+
+        const nextTileLayer = L.tileLayer(config.url, config.options).on("tileerror", () => {
+          if (baseTileLayer !== nextTileLayer) return;
+          setOfflineNotice(`「${config.label}」目前無法載入；可在「更多」→「底圖」切換備用底圖。設備資料、巡檢紀錄與照片仍可使用。`);
+        }).addTo(map);
+
+        baseTileLayer = nextTileLayer;
+        activeBaseMapKey = key;
+        if (baseMapSelect) baseMapSelect.value = key;
+        if (persist) {
+          try { localStorage.setItem(BASE_MAP_STORAGE_KEY, key); } catch (_) { /* 瀏覽器禁止儲存時維持本次選擇。 */ }
+        }
+      }
+
+      let savedBaseMapKey = "emap";
+      try { savedBaseMapKey = localStorage.getItem(BASE_MAP_STORAGE_KEY) || "emap"; } catch (_) { /* 使用預設底圖。 */ }
+      setBaseMap(savedBaseMapKey, { persist: false });
+      baseMapSelect?.addEventListener("change", event => setBaseMap(event.target.value));
 
       // ==========================================
       // 圖號座標網格圖層（顯示圖號座標對應網格）
