@@ -4453,7 +4453,6 @@
       map.getPane("tpcGridLabelPane").style.zIndex = 660;
       map.getPane("tpcGridLabelPane").style.pointerEvents = "none";
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      const BASE_MAP_STORAGE_KEY = "taipower_equipment_v2_base_map";
       const baseMapSelect = document.getElementById("baseMapSelect");
       const baseMapConfigs = {
         emap: {
@@ -4477,9 +4476,8 @@
         },
       };
       let baseTileLayer = null;
-      let activeBaseMapKey = "";
 
-      function setBaseMap(baseMapKey, { persist = true } = {}) {
+      function setBaseMap(baseMapKey) {
         const key = baseMapConfigs[baseMapKey] ? baseMapKey : "emap";
         const config = baseMapConfigs[key];
         if (baseTileLayer) map.removeLayer(baseTileLayer);
@@ -4490,16 +4488,11 @@
         }).addTo(map);
 
         baseTileLayer = nextTileLayer;
-        activeBaseMapKey = key;
         if (baseMapSelect) baseMapSelect.value = key;
-        if (persist) {
-          try { localStorage.setItem(BASE_MAP_STORAGE_KEY, key); } catch (_) { /* 瀏覽器禁止儲存時維持本次選擇。 */ }
-        }
       }
 
-      let savedBaseMapKey = "emap";
-      try { savedBaseMapKey = localStorage.getItem(BASE_MAP_STORAGE_KEY) || "emap"; } catch (_) { /* 使用預設底圖。 */ }
-      setBaseMap(savedBaseMapKey, { persist: false });
+      // 每次開啟 V2 都以臺灣通用電子地圖為預設；OSM 僅供本次操作手動切換。
+      setBaseMap("emap");
       baseMapSelect?.addEventListener("change", event => setBaseMap(event.target.value));
 
       // ==========================================
