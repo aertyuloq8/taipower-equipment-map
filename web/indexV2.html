@@ -1439,6 +1439,22 @@
         opacity: 0.78;
         padding: 1px 2px;
       }
+      .tpc-grid-label-block {
+        background: rgba(15, 118, 110, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.88);
+        box-shadow: 0 1px 3px rgba(15, 52, 62, 0.25);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        opacity: 0.94;
+        padding: 2px 4px;
+        text-shadow: none;
+        transform: translate(0, 0);
+      }
+      .tpc-grid-label-block-alt {
+        background: rgba(29, 78, 137, 0.9);
+      }
       .tpc-grid-base-label {
         align-items: center;
         background: var(--amber);
@@ -4564,21 +4580,23 @@
         const showPrefixLabels = zoom >= 12 && zoom < 16; // 區塊碼，例如 M8614
         const showT3Labels = zoom >= 16 && zoom < 18;     // 細格碼，例如 BD
         const showT5Labels = zoom >= 18;                  // 最後 4 碼，例如 BA47
+        const showFineBlockLabels = zoom >= 20;            // 100m 區塊角標，例如 EC、FC
         // Zoom 20 以上需要每個 10m 細格都有圖號；其餘倍率仍限制標籤數量維持畫面乾淨。
         const MAX_GRID_LABELS = zoom >= 20
           ? (isCompactViewport ? 600 : 2400)
           : (isCompactViewport ? 180 : 360);
         let labelCount = 0;
         const toLatLng = (x, y) => { const p = twd67Tm2ToWgs84(x, y); return [p.lat, p.lng]; };
-        const addLabel = (latlng, html, className) => {
-          if (labelCount >= MAX_GRID_LABELS) return;
-          labelCount++;
+        const addLabel = (latlng, html, className, countTowardLimit = true) => {
+          if (countTowardLimit && labelCount >= MAX_GRID_LABELS) return false;
+          if (countTowardLimit) labelCount++;
           L.marker(latlng, {
             icon: L.divIcon({ className: "tpc-grid-label-wrap", html: `<span class="${className}">${html}</span>`, iconSize: [0, 0] }),
             interactive: false,
             pane: "tpcGridLabelPane",
             zIndexOffset: 1000,
           }).addTo(labels);
+          return true;
         };
 
         for (const [baseChar, [bx, by]] of Object.entries(GRID_BASES)) {
@@ -4634,19 +4652,52 @@
           // 10m 分割線：放大後形成參考圖中的 10 × 10 細格。
           if (showFineGrid) {
             const fineStep = 10;
+            const blockStep = 100;
             const fineMinX = Math.max(baseX0, range.minX), fineMaxX = Math.min(baseX1, range.maxX);
             const fineMinY = Math.max(baseY0, range.minY), fineMaxY = Math.min(baseY1, range.maxY);
             const fineXStart = Math.max(baseX0, Math.floor((range.minX - bx) / fineStep) * fineStep + bx);
             const fineYStart = Math.max(baseY0, Math.floor((range.minY - by) / fineStep) * fineStep + by);
             for (let x = fineXStart; x <= fineMaxX; x += fineStep) {
+              if ((x - bx) % blockStep === 0) continue;
               L.polyline([toLatLng(x, fineMinY), toLatLng(x, fineMaxY)], {
                 color: "#0f766e", weight: 0.8, opacity: 0.34, pane: "tpcGridPane", interactive: false,
               }).addTo(layer);
             }
             for (let y = fineYStart; y <= fineMaxY; y += fineStep) {
+              if ((y - by) % blockStep === 0) continue;
               L.polyline([toLatLng(fineMinX, y), toLatLng(fineMaxX, y)], {
                 color: "#0f766e", weight: 0.8, opacity: 0.34, pane: "tpcGridPane", interactive: false,
               }).addTo(layer);
+            }
+
+            // 100m 圖組邊界取代同位置的 10m 細線，讓前兩碼改變的位置一眼可辨且不會疊線。
+            const blockXStart = Math.max(baseX0, Math.floor((range.minX - bx) / blockStep) * blockStep + bx);
+            const blockYStart = Math.max(baseY0, Math.floor((range.minY - by) / blockStep) * blockStep + by);
+            for (let x = blockXStart; x <= fineMaxX; x += blockStep) {
+              L.polyline([toLatLng(x, fineMinY), toLatLng(x, fineMaxY)], {
+                color: "#075985", weight: 1.5, opacity: 0.82, pane: "tpcGridPane", interactive: false,
+              }).addTo(layer);
+            }
+            for (let y = blockYStart; y <= fineMaxY; y += blockStep) {
+              L.polyline([toLatLng(fineMinX, y), toLatLng(fineMaxX, y)], {
+                color: "#075985", weight: 1.5, opacity: 0.82, pane: "tpcGridPane", interactive: false,
+              }).addTo(layer);
+            }
+
+            if (showFineBlockLabels) {
+              const blockLabelXStart = Math.max(baseX0, Math.floor((labelRange.minX - bx) / blockStep) * blockStep + bx);
+              const blockLabelYStart = Math.max(baseY0, Math.floor((labelRange.minY - by) / blockStep) * blockStep + by);
+              for (let x = blockLabelXStart; x <= Math.min(baseX1, labelRange.maxX); x += blockStep) {
+                if (x < baseX0) continue;
+                const t3x = Math.floor(((x - bx) % 800) / blockStep);
+                for (let y = blockLabelYStart; y <= Math.min(baseY1, labelRange.maxY); y += blockStep) {
+                  if (y < baseY0) continue;
+                  const t3y = Math.floor(((y - by) % 500) / blockStep);
+                  const blockCode = `${String.fromCharCode(65 + t3x)}${String.fromCharCode(65 + t3y)}`;
+                  const toneClass = (t3x + t3y) % 2 === 0 ? "" : " tpc-grid-label-block-alt";
+                  addLabel(toLatLng(x + 4, y + 96), blockCode, `tpc-grid-label tpc-grid-label-block${toneClass}`, false);
+                }
+              }
             }
           }
 
