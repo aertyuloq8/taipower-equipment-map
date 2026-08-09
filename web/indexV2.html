@@ -251,25 +251,25 @@
       .edition-switch-link-compact { display: none; }
       .panel-collapse-button {
         align-items: center;
-        background: #eef8f9;
-        border: 1px solid #9bd4d9;
-        border-radius: 7px;
+        background: #f1f5f9;
+        border: 1px solid var(--line);
+        border-radius: 20px;
         color: var(--accent-dark);
         display: none;
         flex: 0 0 auto;
-        font-size: 20px;
+        font-size: 13px;
         font-weight: 800;
-        height: 34px;
+        height: 32px;
         justify-content: center;
         line-height: 1;
-        min-height: 34px;
-        padding: 0;
-        width: 34px;
+        min-height: 32px;
+        padding: 0 14px;
+        width: auto;
       }
       .panel-collapse-button:hover,
       .panel-collapse-button:focus-visible {
-        background: #dff3f5;
-        border-color: var(--accent);
+        background: #e3eef2;
+        border-color: var(--line);
         color: var(--accent-dark);
       }
       .storage-health {
@@ -988,13 +988,16 @@
       }
       .status:empty { display: none; }
       .offline-notice {
+        align-items: flex-start;
         background: rgba(255, 247, 237, 0.97);
         border: 1px solid #fdba74;
         border-radius: 8px;
         bottom: calc(18px + env(safe-area-inset-bottom, 0px));
         box-shadow: var(--shadow);
         color: #9a3412;
+        display: flex;
         font-size: 12px;
+        gap: 8px;
         left: 14px;
         line-height: 1.45;
         max-width: min(92vw, 480px);
@@ -1002,6 +1005,25 @@
         position: absolute;
         z-index: 505;
       }
+      .offline-notice-message { flex: 1 1 auto; min-width: 0; white-space: pre-line; }
+      .offline-notice-close {
+        align-items: center;
+        background: transparent !important;
+        border: 0;
+        color: inherit;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: 17px;
+        font-weight: 900;
+        justify-content: center;
+        line-height: 1;
+        min-height: 24px;
+        min-width: 24px;
+        padding: 0 2px;
+      }
+      .offline-notice-close:hover,
+      .offline-notice-close:focus-visible { background: rgba(154, 52, 18, 0.1) !important; border-radius: 4px; }
+      .offline-notice[hidden] { display: none !important; }
       .offline-notice.is-error { background: rgba(254, 242, 242, 0.97); border-color: #fca5a5; color: #b91c1c; }
       .edit-unsaved-badge {
         color: #b45309;
@@ -2338,7 +2360,7 @@
       <aside id="panel" class="panel is-collapsed">
         <header class="panel-head">
           <div class="panel-title"><h1>土木設備分布地圖照片版</h1></div>
-          <button id="panelCloseButton" class="panel-collapse-button" type="button" aria-label="收合巡檢紀錄面板" title="收合巡檢紀錄面板">⌄</button>
+          <button id="panelCloseButton" class="panel-collapse-button" type="button" aria-label="收合巡檢紀錄面板" title="收合巡檢紀錄面板">▼</button>
           <a class="edition-switch-link edition-switch-link-compact" href="./index.html" title="切換至不含照片功能的基本地圖版">切換基本版</a>
         </header>
         <a class="edition-switch-link edition-switch-link-full" href="./index.html" title="切換至不含照片功能的基本地圖版">↩ 開啟基本版</a>
@@ -2566,7 +2588,10 @@
           </div>
           <button id="locationFollowBtn" class="location-follow-btn is-active" type="button" aria-pressed="true" title="地圖跟隨目前定位" disabled>⌖ 跟隨地圖</button>
         </section>
-        <div id="offlineNotice" class="offline-notice" hidden></div>
+        <div id="offlineNotice" class="offline-notice" hidden>
+          <span id="offlineNoticeMessage" class="offline-notice-message"></span>
+          <button id="offlineNoticeClose" class="offline-notice-close" type="button" aria-label="關閉離線提示" title="關閉離線提示">×</button>
+        </div>
         <div id="status" class="status">載入資料中...</div>
       </section>
     </main>
@@ -4390,12 +4415,7 @@
       const baseTileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap",
       }).on("tileerror", () => {
-        const notice = document.getElementById("offlineNotice");
-        if (notice) {
-          notice.hidden = false;
-          notice.classList.add("is-error");
-          notice.textContent = "地圖底圖目前無法載入；設備資料、巡檢紀錄與照片仍可使用。恢復網路後可重新載入地圖。";
-        }
+        setOfflineNotice("地圖底圖目前無法載入；設備資料、巡檢紀錄與照片仍可使用。恢復網路後可重新載入地圖。" );
       }).addTo(map);
 
       // ==========================================
@@ -8234,15 +8254,20 @@ function renderDefectStats() {
       function setOfflineNotice(message = "") {
         const notice = document.getElementById("offlineNotice");
         if (!notice) return;
-        notice.hidden = !message;
-        notice.classList.toggle("is-error", message.includes("無法"));
-        notice.textContent = message;
+        const normalizedMessage = String(message || "");
+        const messageElement = document.getElementById("offlineNoticeMessage");
+        notice.hidden = !normalizedMessage;
+        notice.classList.toggle("is-error", normalizedMessage.includes("無法"));
+        if (messageElement) messageElement.textContent = normalizedMessage;
+        else notice.textContent = normalizedMessage;
       }
+
+      document.getElementById("offlineNoticeClose")?.addEventListener("click", () => setOfflineNotice(""));
 
       function updateNetworkNotice() {
         if (navigator.onLine === false) {
           setOfflineNotice("離線降級模式：設備資料、巡檢紀錄、照片與備份仍可使用；地圖底圖可能無法載入。\n恢復網路後可重新載入底圖。" );
-        } else if (!document.getElementById("offlineNotice")?.classList.contains("is-error")) {
+        } else {
           setOfflineNotice("");
         }
       }
