@@ -4350,7 +4350,8 @@
         P: [90000,  2500000], Q: [170000, 2500000], R: [250000, 2500000],
         T: [170000, 2450000], U: [250000, 2450000],
         V: [170000, 2400000], W: [250000, 2400000],
-        X: [275000, 2614000], Y: [275000, 2564000],
+        // X、Y 位於左下方（西側）的兩個圖組。
+        X: [90000, 2450000], Y: [90000, 2400000],
       };
 
       function tm2ToTpc(x, y) {
@@ -4556,8 +4557,10 @@
         const layer = L.layerGroup();
         const labels = L.layerGroup();
         layer.addLayer(labels);
-        const showT2 = zoom >= 12;             // 800m × 500m 網格
-        const showT3 = zoom >= 16;             // 100m × 100m 次網格
+        // 各倍率只畫一個尺度，避免邊界重複疊畫成雙線或錯位的視覺感。
+        const showT2 = zoom >= 12 && zoom < 16; // 800m × 500m 網格
+        const showT3 = zoom >= 16 && zoom < 18; // 100m × 100m 次網格
+        const showFineGrid = zoom >= 18;        // 10m × 10m 細格
         const showPrefixLabels = zoom >= 12 && zoom < 16; // 區塊碼，例如 M8614
         const showT3Labels = zoom >= 16 && zoom < 18;     // 細格碼，例如 BD
         const showT5Labels = zoom >= 18;                  // 最後 4 碼，例如 BA47
@@ -4583,13 +4586,17 @@
           if (baseX1 < range.minX || baseX0 > range.maxX || baseY1 < range.minY || baseY0 > range.maxY) continue;
 
           // 圖組邊界（80km × 50km）
-          L.polyline([
-            toLatLng(baseX0, baseY0), toLatLng(baseX1, baseY0),
-            toLatLng(baseX1, baseY1), toLatLng(baseX0, baseY1), toLatLng(baseX0, baseY0),
-          ], { color: "#d88922", weight: 3, opacity: 0.95, interactive: false }).addTo(layer);
-          addLabel(toLatLng(baseX0 + 2000, baseY1 - 2000), baseChar, "tpc-grid-base-label");
-          if (!showT2) continue;
+          // 縮小時顯示圖組邊界；其餘倍率由各自格線畫邊界，避免同一條線重複堆疊。
+          if (!showT2 && !showT3 && !showFineGrid) {
+            L.polyline([
+              toLatLng(baseX0, baseY0), toLatLng(baseX1, baseY0),
+              toLatLng(baseX1, baseY1), toLatLng(baseX0, baseY1), toLatLng(baseX0, baseY0),
+            ], { color: "#d88922", weight: 3, opacity: 0.95, interactive: false }).addTo(layer);
+            addLabel(toLatLng(baseX0 + 2000, baseY1 - 2000), baseChar, "tpc-grid-base-label");
+            continue;
+          }
 
+          if (showT2) {
           // 800m 垂直線
           const vStart = Math.max(baseX0, Math.floor((range.minX - bx) / 800) * 800 + bx);
           for (let x = vStart; x <= Math.min(baseX1, range.maxX); x += 800) {
@@ -4621,10 +4628,11 @@
               }
             }
           }
-          if (!showT3) continue;
+          }
+          if (!showT3 && !showFineGrid) continue;
 
           // 10m 分割線：放大後形成參考圖中的 10 × 10 細格。
-          if (zoom >= 18) {
+          if (showFineGrid) {
             const fineStep = 10;
             const fineMinX = Math.max(baseX0, range.minX), fineMaxX = Math.min(baseX1, range.maxX);
             const fineMinY = Math.max(baseY0, range.minY), fineMaxY = Math.min(baseY1, range.maxY);
@@ -4641,6 +4649,8 @@
               }).addTo(layer);
             }
           }
+
+          if (showT3) {
 
           // 100m 垂直次網格
           const v3Start = Math.max(baseX0, Math.floor((range.minX - bx) / 100) * 100 + bx);
@@ -4671,6 +4681,7 @@
                 addLabel(toLatLng(x + 50, y + 50), `${String.fromCharCode(65 + t3x)}${String.fromCharCode(65 + t3y)}`, "tpc-grid-label tpc-grid-label-sub");
               }
             }
+          }
           }
 
           // 10m 格子標籤：最高倍率顯示每一格的最後 4 碼，例如 BA47。
