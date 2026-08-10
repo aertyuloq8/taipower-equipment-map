@@ -8553,7 +8553,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker-v2.js', { scope: './' })
+          navigator.serviceWorker.register('./service-worker-v2.js?rev=5', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
               registration.update();
