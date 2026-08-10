@@ -10,6 +10,7 @@
     <link rel="manifest" href="manifest-v2.json" />
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="cadastre-v2.css" />
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
@@ -2364,6 +2365,8 @@
         style="box-shadow:0 8px 20px rgba(22,36,52,0.18)">≡</button>
       <button id="mapSearchToggle" class="map-search-btn" type="button"
         aria-expanded="false" aria-controls="mapSearchPanel" title="搜尋設備">🔍 搜尋</button>
+      <button id="v2CadastreToggle" class="map-search-btn" type="button"
+        aria-expanded="false" aria-controls="v2CadastrePanel" title="查詢地籍圖">🗺️ 地籍</button>
       <div class="layer-menu">
         <button id="layerMenuToggle" class="layer-menu-toggle" type="button" aria-expanded="false" aria-controls="layerMenuPanel" title="更多圖層控制">
           <span class="layer-menu-glyph" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -2403,7 +2406,7 @@
         </div>
         <select id="areaSelect"><option value="">全部區域</option></select>
         <input id="searchInput" type="search" placeholder="設備或圖號座標，例如 M9993HC1197" autocomplete="off" />
-        <p style="font-size:11px; color:var(--muted); margin:0">💡 找不到設備時，輸入完整圖號座標會直接定位該格中心</p>
+        <p style="font-size:11px; color:var(--muted); margin:0">💡 找不到設備時，可輸入 9 或 11 碼圖號座標定位該格中心；9 碼停止輸入約 1 秒後定位，若要使用 11 碼可直接繼續輸入後兩碼。</p>
       </div>
       <div class="map-search-stats">
         <span>總點位 <strong id="totalCount">--</strong></span>
@@ -2412,6 +2415,51 @@
       </div>
       <div id="results" class="map-search-results"></div>
     </div>
+
+    <section id="v2CadastrePanel" class="v2-cadastre-panel" aria-hidden="true" aria-label="地籍圖查詢">
+      <div class="v2-cadastre-inner">
+        <header class="v2-cadastre-head">
+          <span class="v2-cadastre-title">🗺️ 地籍圖查詢</span>
+          <button id="v2CadastreClose" class="v2-cadastre-close" type="button" title="關閉地籍圖查詢" aria-label="關閉地籍圖查詢">×</button>
+        </header>
+        <p class="v2-cadastre-description">固定查詢臺南市。地段可輸入關鍵字或從清單選取，再輸入地號即可套繪地籍範圍。</p>
+        <form id="v2CadastreForm" class="v2-cadastre-form" novalidate>
+          <div class="v2-cadastre-field">
+            <span class="v2-cadastre-fixed-label">縣市</span>
+            <div class="v2-cadastre-fixed-value" aria-label="固定縣市：臺南市">臺南市 <span>固定</span></div>
+          </div>
+          <div class="v2-cadastre-field">
+            <label for="v2CadastreTown">鄉鎮市區</label>
+            <select id="v2CadastreTown" disabled>
+              <option value="">載入行政區中…</option>
+            </select>
+          </div>
+          <div class="v2-cadastre-field">
+            <label for="v2CadastreSectionSearch">地段關鍵字</label>
+            <input id="v2CadastreSectionSearch" type="search" placeholder="請先選擇行政區" autocomplete="off" disabled aria-controls="v2CadastreMatches" aria-expanded="false" />
+            <input id="v2CadastreSection" type="hidden" value="" />
+            <div id="v2CadastreMatches" class="v2-cadastre-matches" role="listbox" hidden></div>
+            <p id="v2CadastreHint" class="v2-cadastre-hint">請先選擇行政區。</p>
+            <label class="v2-cadastre-choice-label" for="v2CadastreSectionSelect">地段清單選取</label>
+            <select id="v2CadastreSectionSelect" disabled>
+              <option value="">請先選擇行政區</option>
+            </select>
+          </div>
+          <div class="v2-cadastre-field">
+            <label for="v2CadastreParcel">地號</label>
+            <input id="v2CadastreParcel" type="text" inputmode="text" placeholder="例如 10、10-1 或 00000010" autocomplete="off" />
+            <p class="v2-cadastre-help">輸入母號或母號－子號；系統會轉為官方八碼地號。</p>
+          </div>
+          <div class="v2-cadastre-actions">
+            <button id="v2CadastreSubmit" class="v2-cadastre-action" type="submit">定位並套繪地籍範圍</button>
+            <button id="v2CadastreClear" class="v2-cadastre-action is-secondary" type="button">清除地籍圖層</button>
+          </div>
+        </form>
+        <p id="v2CadastreStatus" class="v2-cadastre-status" aria-live="polite"></p>
+        <div id="v2CadastreResult" class="v2-cadastre-result" hidden></div>
+        <p class="v2-cadastre-disclaimer">地籍圖資僅供參考，實際權利範圍與登記資料應以主管機關正式文件為準。</p>
+      </div>
+    </section>
 
     <main class="app is-panel-collapsed">
       <aside id="panel" class="panel is-collapsed">
@@ -4460,6 +4508,7 @@
       // Leaflet 地圖初始化
       // ==========================================
       const map = L.map("map", { preferCanvas: true, zoomControl: false, attributionControl: true });
+      window.__v2LeafletMap = map;
       map.createPane("routePane");
       map.getPane("routePane").style.zIndex = 390;
       map.getPane("routePane").style.pointerEvents = "none";
@@ -4958,11 +5007,19 @@
         if (!collapsed) {
           closeMapSearchPanel();
           closeLayerMenu();
+          document.dispatchEvent(new CustomEvent("v2-inspection-open"));
         }
         syncPanelToggleState();
         window.setTimeout(() => map.invalidateSize(), 220);
         return true;
       }
+
+      // The inspection sidebar and the V2 cadastre window occupy the same
+      // mobile workspace.  Opening one must close the other.
+      document.addEventListener("v2-cadastre-open", event => {
+        if (!inspectionPanel || inspectionPanel.classList.contains("is-collapsed")) return;
+        if (!setPanelCollapsed(true)) event.preventDefault();
+      });
 
       panelToggle.addEventListener("click", () => {
         const collapsed = !inspectionPanel.classList.contains("is-collapsed");
@@ -7724,7 +7781,30 @@
       });
 
       areaSelect.addEventListener("change", applyFilter);
-      searchInput.addEventListener("input", debounce(applyFilter, 180));
+      const TPC_NINE_DIGIT_IDLE_MS = 1000;
+      let searchInputTimer = 0;
+      function scheduleSearchInput() {
+        window.clearTimeout(searchInputTimer);
+        const code = normalizeTpcCode(searchInput.value);
+        const delay = code && code.length === 9
+          ? TPC_NINE_DIGIT_IDLE_MS
+          : (code && code.length === 11 ? 0 : 180);
+        searchInputTimer = window.setTimeout(() => {
+          searchInputTimer = 0;
+          applyFilter();
+        }, delay);
+      }
+      function applySearchInputImmediately() {
+        window.clearTimeout(searchInputTimer);
+        searchInputTimer = 0;
+        applyFilter();
+      }
+      searchInput.addEventListener("input", scheduleSearchInput);
+      searchInput.addEventListener("keydown", event => {
+        if (event.key !== "Enter" || !normalizeTpcCode(searchInput.value)) return;
+        event.preventDefault();
+        applySearchInputImmediately();
+      });
 
       let tpcSearchMarker = null;
       let activeTpcSearchCode = "";
@@ -8496,5 +8576,7 @@ function renderDefectStats() {
         });
       }
     </script>
+    <script src="cadastre-config-v2.js"></script>
+    <script src="cadastre-v2.js"></script>
   </body>
 </html>
