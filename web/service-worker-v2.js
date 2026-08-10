@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2-r4";
+const CACHE_NAME = "equipment-map-photo-edition-v2-r5";
 const APP_SHELL = "./indexV2.html";
 const STATIC_ASSETS = [
   APP_SHELL,
