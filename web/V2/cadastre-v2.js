@@ -205,7 +205,7 @@
     if (state.dropdownPromise) return state.dropdownPromise;
     state.dropdownPromise = (async () => {
       try {
-        const dataUrl = String(window.CADASTRE_DROPDOWN_DATA_URL || "../data/cadastral-dropdowns-tw.json").trim();
+        const dataUrl = String(window.CADASTRE_DROPDOWN_DATA_URL || "../../data/cadastral-dropdowns-tw.json").trim();
         const response = await fetch(new URL(dataUrl, window.location.href), { cache: "force-cache", headers: { Accept: "application/json" } });
         if (!response.ok) throw new Error(`地籍下拉資料無法載入（HTTP ${response.status}）。`);
         state.cities = normalizeCatalog(await response.json());

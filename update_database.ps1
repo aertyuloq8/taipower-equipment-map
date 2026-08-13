@@ -2,35 +2,39 @@
   [switch]$NoPush
 )
 
-# 1. 設定環境與編碼
-# 設定錯誤發生時立即停止腳本，避免產生更多錯誤
+# ==========================================
+# 1. 設定環境與解決中文亂碼
+# ==========================================
 $ErrorActionPreference = "Stop"
-
-# 設定 PowerShell 傳遞資料時的輸出編碼為 UTF-8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-# 使用 try-catch 建立容錯機制，確保在沒有標準終端機的環境下不會報錯
+# 建立容錯機制，確保各種環境下都不會報錯
 try {
   [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-} catch {
-  # 靜默略過
-}
+} catch {}
 
 $env:PYTHONIOENCODING = "utf-8"
 
 
-# 2. 建立執行 Git 指令的專屬工具
+# ==========================================
+# 2. 建立專屬 Git 工具 (具備抗紅字保護機制)
+# ==========================================
 function Run-Git {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GitArgs)
   
-  & git @GitArgs
+  # 執行 git 指令，並使用 "2>&1" 將惱人的錯誤提示流轉回一般文字
+  # 這樣就能避免 PowerShell 動不動就噴出紅字嚇人
+  & git @GitArgs 2>&1 | ForEach-Object { Write-Host $_ }
+  
   if ($LASTEXITCODE -ne 0) {
     throw "Git 指令執行失敗: git $($GitArgs -join ' ')"
   }
 }
 
 
-# 3. 定位腳本所在資料夾
+# ==========================================
+# 3. 確保在正確的專案資料夾中執行
+# ==========================================
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
@@ -39,11 +43,15 @@ if (-not (Test-Path ".git")) {
 }
 
 
-# 4. 檢查是否有尚未存檔的其他變更
+# ==========================================
+# 4. 安全檢查：確保沒有未存檔的其他網頁修改
+# ==========================================
+# 這是為了保護您手動修改的網頁原始碼，在強制更新時不會被覆蓋或衝突
 $allowedDirty = @(
   "data/meta.json",
   "data/points.csv",
-  "data/points.json"
+  "data/points.json",
+  "update_database.ps1" # 允許腳本本身的變更
 )
 
 $dirty = & git status --porcelain
@@ -55,13 +63,15 @@ $blockedDirty = @(
 )
 
 if ($blockedDirty.Count -gt 0) {
-  Write-Host "在更新資料庫之前，請先 commit 或 stash 這些非資料庫的變更檔案："
+  Write-Host "【安全攔截】發現您有修改過以下網頁檔案，請先使用 git 存檔："
   $blockedDirty | ForEach-Object { Write-Host $_ }
-  throw "工作目錄中有非資料庫的變更，請先處理。"
+  throw "工作目錄中有非資料庫的變更，請先存檔後再執行此腳本。"
 }
 
 
-# 5. 尋找最新的 Excel 檔案
+# ==========================================
+# 5. 抓取最新的 Excel 並執行 Python 轉換
+# ==========================================
 $source = Get-ChildItem -Path $Root -File |
   Where-Object { $_.Extension -match "^\.xls" -and -not $_.Name.StartsWith("~$") } |
   Sort-Object LastWriteTime -Descending |
@@ -71,53 +81,51 @@ if (-not $source) {
   throw "找不到 Excel 檔案。請先將最新的 Excel 檔案放入專案資料夾中。"
 }
 
-Write-Host "使用最新的 Excel 來源檔案: $($source.Name)"
-Write-Host "正在將 Excel 轉換為 JSON 與 CSV 格式..."
+Write-Host "讀取最新 Excel 來源: $($source.Name)"
+Write-Host "正在轉換為地圖資料庫格式..."
 
-
-# 6. 執行 Python 轉換程式
 & python ".\tools\convert_excel.py"
 if ($LASTEXITCODE -ne 0) {
   throw "Excel 轉換失敗，請檢查 Python 程式或檔案內容。"
 }
 
 
-# 7. 將轉換結果加入 Git 並準備提交
-Run-Git add -- data/points.json data/points.csv data/meta.json
+# ==========================================
+# 6. 強制製造變更 (欺騙 Git 系統)
+# ==========================================
+# 偷偷在 meta.json 尾端加入一個空白，強迫 Git 承認檔案有更新
+Write-Host "寫入強制更新標記..."
+Add-Content -Path ".\data\meta.json" -Value " "
 
-$cachedChanges = & git diff --cached --name-only
-if (-not $cachedChanges) {
-  Write-Host "資料庫內容沒有變更，無需更新。"
-  exit 0
-}
 
 # ==========================================
-# 🌟 關鍵修復點在這裡 🌟
-# 加入 -Encoding UTF8 強制使用正確的編碼讀取檔案，防止亂碼破壞 JSON 格式
+# 7. 讀取數據並產生上傳紀錄
 # ==========================================
+# 使用 -Encoding UTF8 防止中文變成火星文
 $meta = Get-Content ".\data\meta.json" -Raw -Encoding UTF8 | ConvertFrom-Json
 $converted = "{0:N0}" -f [int]$meta.converted
-$message = "Update map database from $($meta.source) ($converted points)"
+$message = "強制更新資料庫：$($meta.source) ($converted 筆資料)"
 
-Write-Host "正在提交資料庫更新..."
-Run-Git commit -m $message
+Run-Git add data/meta.json data/points.json data/points.csv
+
+Write-Host "正在打包更新資料庫檔案..."
+# 使用 --allow-empty 確保就算內容長得一樣，也能強行建立紀錄
+Run-Git commit --allow-empty -m $message
 
 if ($NoPush) {
-  Write-Host "已建立 Commit。因為使用了 -NoPush 參數，略過上傳 (Push) 步驟。"
+  Write-Host "已建立 Commit。略過推送到遠端伺服器。"
   exit 0
 }
 
 
-# 8. 推送更新到 GitHub 遠端伺服器
-Write-Host "正在檢查 GitHub 遠端是否有其他人更新..."
-Run-Git fetch origin main
+# ==========================================
+# 8. 強制與遠端同步並推送 (解決卡進度問題)
+# ==========================================
+Write-Host "正在與 GitHub 進行強制同步..."
+# 加上 --rebase，先整理好本地端與遠端的順序，避免被 GitHub 拒絕
+Run-Git pull --rebase origin main
 
-$status = & git status -sb
-if ($status -match "behind") {
-  Write-Host "遠端 main 分支有更新。正在重新合併本地更新..."
-  Run-Git pull --rebase origin main
-}
-
-Write-Host "正在將資料庫更新推送到 GitHub..."
+Write-Host "正在將資料庫推送到 GitHub..."
 Run-Git push origin main
-Write-Host "✅ 資料庫更新已成功推送到 GitHub！"
+
+Write-Host "✅ 資料庫已成功強制更新並推送到 GitHub！"

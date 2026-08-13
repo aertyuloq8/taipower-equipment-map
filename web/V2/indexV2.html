@@ -8,7 +8,7 @@
     <meta http-equiv="Expires" content="0" />
     <title>土木設備分布地圖照片版</title>
     <link rel="manifest" href="manifest-v2.json" />
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="../icon-192.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="cadastre-v2.css" />
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -955,7 +955,13 @@
         white-space: nowrap;
       }
       .location-code { color: var(--accent-dark); font-size: 13px; font-weight: 900; }
-      .location-follow-btn {
+      .location-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .location-follow-btn,
+      .location-add-record-btn {
         align-items: center;
         background: #f8fafc;
         border: 1px solid var(--line);
@@ -963,15 +969,20 @@
         color: var(--accent-dark);
         cursor: pointer;
         display: inline-flex;
+        flex: 1 1 0;
         font-size: 12px;
         font-weight: 800;
         justify-content: center;
-        margin-top: 8px;
         min-height: 34px;
-        padding: 0 10px;
-        width: 100%;
+        min-width: 0;
+        padding: 0 6px;
+        white-space: nowrap;
       }
       .location-follow-btn.is-active { background: #e0f2fe; border-color: #7dd3fc; color: #075985; }
+      .location-add-record-btn { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+      .location-add-record-btn:hover:not(:disabled) { background: #d1fae5; border-color: #6ee7b7; }
+      .location-follow-btn:disabled,
+      .location-add-record-btn:disabled { cursor: not-allowed; opacity: 0.5; }
       .leaflet-control-zoom { display: none !important; }
       #map { background: #edf3f5; height: 100%; width: 100%; }
       .status {
@@ -2466,9 +2477,9 @@
         <header class="panel-head">
           <div class="panel-title"><h1>土木設備分布地圖照片版</h1></div>
           <button id="panelCloseButton" class="panel-collapse-button" type="button" aria-label="收合巡檢紀錄面板" title="收合巡檢紀錄面板">▼</button>
-          <a class="edition-switch-link edition-switch-link-compact" href="./index.html" title="切換至不含照片功能的基本地圖版">切換基本版</a>
+          <a class="edition-switch-link edition-switch-link-compact" href="../index.html" title="切換至不含照片功能的基本地圖版">切換基本版</a>
         </header>
-        <a class="edition-switch-link edition-switch-link-full" href="./index.html" title="切換至不含照片功能的基本地圖版">↩ 開啟基本版</a>
+        <a class="edition-switch-link edition-switch-link-full" href="../index.html" title="切換至不含照片功能的基本地圖版">↩ 開啟基本版</a>
         <nav class="tab-nav">
           <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
           <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
@@ -2691,7 +2702,10 @@
             <span class="location-info-label">最後更新</span>
             <span id="locationUpdatedAt" class="location-info-value">--</span>
           </div>
-          <button id="locationFollowBtn" class="location-follow-btn is-active" type="button" aria-pressed="true" title="地圖跟隨目前定位" disabled>⌖ 跟隨地圖</button>
+          <div class="location-actions">
+            <button id="locationFollowBtn" class="location-follow-btn is-active" type="button" aria-pressed="true" title="地圖跟隨目前定位" disabled>⌖ 跟隨地圖</button>
+            <button id="locationAddRecordBtn" class="location-add-record-btn" type="button" title="將目前定位加入巡檢紀錄" disabled>＋ 加入巡檢</button>
+          </div>
         </section>
         <div id="offlineNotice" class="offline-notice" hidden>
           <span id="offlineNoticeMessage" class="offline-notice-message"></span>
@@ -8108,6 +8122,7 @@ function renderDefectStats() {
         latLng: document.getElementById("locationLatLng"),
         updatedAt: document.getElementById("locationUpdatedAt"),
         followButton: document.getElementById("locationFollowBtn"),
+        addRecordButton: document.getElementById("locationAddRecordBtn"),
         locateButton: document.getElementById("locateButton"),
       };
 
@@ -8169,6 +8184,7 @@ function renderDefectStats() {
         button.textContent = following ? "⌖ 跟隨地圖" : "↻ 回到定位";
         button.title = following ? "地圖跟隨目前定位" : "恢復地圖跟隨目前定位";
         button.disabled = !locationTracking.lastLatLng;
+        if (locationElements.addRecordButton) locationElements.addRecordButton.disabled = !locationTracking.lastLatLng;
       }
 
       function updateLocationInfo(position) {
@@ -8449,12 +8465,23 @@ function renderDefectStats() {
         }
       });
 
+      locationElements.addRecordButton.addEventListener("click", () => {
+        const latlng = locationTracking.lastLatLng;
+        if (!latlng) return;
+        disableRouteLayerForTools();
+        const lat = latlng.lat, lng = latlng.lng;
+        const code = latLngToTpcCode(lat, lng);
+        const currentPoint = { lat, lng, name: "手動新增設備", code, area: "自訂" };
+        L.popup({ autoPanPadding: [10, 10] }).setLatLng([lat, lng]).setContent(miniPopupHtml(currentPoint)).openOn(map);
+        openEditPanel(currentPoint);
+      });
+
       // ==========================================
       // 資料載入
       // ==========================================
       const DATA_URLS = [
-        { meta: "../data/meta.json",  points: "../data/points.json" },
-        { meta: "data/meta.json",     points: "data/points.json" },
+        { meta: "../../data/meta.json", points: "../../data/points.json" },
+
         { meta: "https://aertyuloq8.github.io/taipower-equipment-map/data/meta.json",
           points: "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json" },
       ];
@@ -8553,7 +8580,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker-v2.js?rev=5', { scope: './' })
+          navigator.serviceWorker.register('./service-worker-v2.js?rev=6', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
               registration.update();
