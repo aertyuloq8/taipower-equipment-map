@@ -3,14 +3,14 @@ const APP_SHELL = "./indexV2.html";
 const STATIC_ASSETS = [
   APP_SHELL,
   "./manifest-v2.json",
-  "../icon-192.png",
-  "../icon-512.png",
+  "./icon-192.png",
+  "./icon-512.png",
   "./cadastre-config-v2.js",
   "./cadastre-v2.js",
   "./cadastre-v2.css",
-  "../../data/meta.json",
-  "../../data/points.json",
-  "../../data/cadastral-dropdowns-tw.json",
+  "../data/meta.json",
+  "../data/points.json",
+  "../data/cadastral-dropdowns-tw.json",
 ];
 const REMOTE_ASSETS = [
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
@@ -49,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const isV2Navigation = request.mode === "navigate"
-    && new URL(request.url).pathname.endsWith("/V2/indexV2.html");
+    && new URL(request.url).pathname.endsWith("/indexV2.html");
   const url = new URL(request.url);
   const isEquipmentData = /\/data\/(meta|points|cadastral-dropdowns-tw)\.json$/.test(url.pathname);
   const isCadastreAsset = /\/cadastre-(config-v2|v2)\.(js|css)$/.test(url.pathname);

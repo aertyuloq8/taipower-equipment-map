@@ -8,7 +8,7 @@
     <meta http-equiv="Expires" content="0" />
     <title>土木設備分布地圖照片版</title>
     <link rel="manifest" href="manifest-v2.json" />
-    <link rel="apple-touch-icon" href="../icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="cadastre-v2.css" />
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -2477,9 +2477,9 @@
         <header class="panel-head">
           <div class="panel-title"><h1>土木設備分布地圖照片版</h1></div>
           <button id="panelCloseButton" class="panel-collapse-button" type="button" aria-label="收合巡檢紀錄面板" title="收合巡檢紀錄面板">▼</button>
-          <a class="edition-switch-link edition-switch-link-compact" href="../index.html" title="切換至不含照片功能的基本地圖版">切換基本版</a>
+          <a class="edition-switch-link edition-switch-link-compact" href="./index.html" title="切換至不含照片功能的基本地圖版">切換基本版</a>
         </header>
-        <a class="edition-switch-link edition-switch-link-full" href="../index.html" title="切換至不含照片功能的基本地圖版">↩ 開啟基本版</a>
+        <a class="edition-switch-link edition-switch-link-full" href="./index.html" title="切換至不含照片功能的基本地圖版">↩ 開啟基本版</a>
         <nav class="tab-nav">
           <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
           <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
@@ -8480,8 +8480,8 @@ function renderDefectStats() {
       // 資料載入
       // ==========================================
       const DATA_URLS = [
-        { meta: "../../data/meta.json", points: "../../data/points.json" },
-
+        { meta: "../data/meta.json",  points: "../data/points.json" },
+        { meta: "data/meta.json",     points: "data/points.json" },
         { meta: "https://aertyuloq8.github.io/taipower-equipment-map/data/meta.json",
           points: "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json" },
       ];

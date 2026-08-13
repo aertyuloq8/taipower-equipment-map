@@ -6,4 +6,4 @@
 window.CADASTRE_GAS_URL = "https://script.google.com/macros/s/AKfycbw5rYwcEBKZcvqQJS4OZtHtu3gDBsoH7pCD8H2N4_ZWl7F6E1oovg881EQhvUNuqXXbPA/exec";
 window.CADASTRE_GAS_SUPPORTED_CITY_CODES = ["D"];
 window.CADASTRE_GAS_MODE = "geojson";
-window.CADASTRE_DROPDOWN_DATA_URL = "../../data/cadastral-dropdowns-tw.json";
+window.CADASTRE_DROPDOWN_DATA_URL = "../data/cadastral-dropdowns-tw.json";
