@@ -4,6 +4,36 @@
   const INDEX_URL = "../data/addr-index.json";
   const VARIANTS_URL = "../data/addr-variants.json";
   const DISTRICT_DIR = "../data/addr";
+  const ADDR_VERSION_KEY = "tp_addr_version_v1";
+
+  function readAddrVersion() {
+    try { return JSON.parse(localStorage.getItem(ADDR_VERSION_KEY) || "null"); }
+    catch (e) { return null; }
+  }
+
+  function writeAddrVersion(meta) {
+    try { localStorage.setItem(ADDR_VERSION_KEY, JSON.stringify({ addrUpdated: meta.addrUpdated || "" })); }
+    catch (e) { /* ignore */ }
+  }
+
+  function sameAddrVersion(meta) {
+    const version = readAddrVersion();
+    return !!(meta.addrUpdated && version && version.addrUpdated === meta.addrUpdated);
+  }
+
+  async function loadMeta() {
+    const resp = await fetch("../data/meta.json", { cache: "no-cache" });
+    if (!resp.ok) throw new Error(`meta ${resp.status}`);
+    return resp.json();
+  }
+
+  async function fetchOrCache(url) {
+    const cached = await caches.match(new URL(url, window.location.href)).catch(() => null);
+    if (cached?.ok) return cached.json();
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`${url} ${resp.status}`);
+    return resp.json();
+  }
 
   const controls = {
     panel: document.getElementById("v2AddressPanel"),
@@ -50,50 +80,67 @@
   // ---------------- 資料載入 ----------------
   function loadIndex() {
     if (state.indexPromise) return state.indexPromise;
-    state.indexPromise = Promise.all([
-      fetch(INDEX_URL).then(resp => {
-        if (!resp.ok) throw new Error(`index ${resp.status}`);
-        return resp.json();
-      }),
-      fetch(VARIANTS_URL).then(resp => {
-        if (!resp.ok) throw new Error(`variants ${resp.status}`);
-        return resp.json();
-      }),
-    ]).then(([index, variantData]) => {
-      state.index = index;
-      state.normTable = variantData.variants || {};
-      return state.index;
-    }).catch(error => {
-      state.indexPromise = null;
-      throw error;
-    });
+    state.indexPromise = loadMeta()
+      .then(meta => {
+        writeAddrVersion(meta);
+        const fresh = !sameAddrVersion(meta);
+        return Promise.all([
+          (fresh ? fetch(INDEX_URL).then(resp => {
+            if (!resp.ok) throw new Error(`index ${resp.status}`);
+            return resp.json();
+          }) : fetchOrCache(INDEX_URL)),
+          (fresh ? fetch(VARIANTS_URL).then(resp => {
+            if (!resp.ok) throw new Error(`variants ${resp.status}`);
+            return resp.json();
+          }) : fetchOrCache(VARIANTS_URL)),
+        ]);
+      })
+      .then(([index, variantData]) => {
+        state.index = index;
+        state.normTable = variantData.variants || {};
+        return state.index;
+      })
+      .catch(error => {
+        state.indexPromise = null;
+        throw error;
+      });
     return state.indexPromise;
   }
 
   function loadDistrict(code) {
     let promise = state.districtCache.get(code);
     if (!promise) {
-      promise = fetch(`${DISTRICT_DIR}/${code}.json`).then(resp => {
-        if (!resp.ok) throw new Error(`${code} ${resp.status}`);
-        return resp.json();
-      }).then(plates => {
-        const districtName = state.index?.districts?.[code] || "";
-        const prefix = normalize(`臺南市${districtName}`);
-        return plates.map(plate => {
-          const p = {
-            r: plate.r,
-            d: districtName,
-            la: plate.la,
-            ln: plate.ln,
-            k: prefix + normalize(plate.r),
-          };
-          state.platesByKey.set(p.k, p);
-          return p;
+      promise = loadMeta()
+        .then(meta => {
+          writeAddrVersion(meta);
+          const fresh = !sameAddrVersion(meta);
+          if (fresh) {
+            return fetch(`${DISTRICT_DIR}/${code}.json`).then(resp => {
+              if (!resp.ok) throw new Error(`${code} ${resp.status}`);
+              return resp.json();
+            });
+          }
+          return fetchOrCache(`${DISTRICT_DIR}/${code}.json`);
+        })
+        .then(plates => {
+          const districtName = state.index?.districts?.[code] || "";
+          const prefix = normalize(`臺南市${districtName}`);
+          return plates.map(plate => {
+            const p = {
+              r: plate.r,
+              d: districtName,
+              la: plate.la,
+              ln: plate.ln,
+              k: prefix + normalize(plate.r),
+            };
+            state.platesByKey.set(p.k, p);
+            return p;
+          });
+        })
+        .catch(error => {
+          state.districtCache.delete(code);
+          throw error;
         });
-      }).catch(error => {
-        state.districtCache.delete(code);
-        throw error;
-      });
       state.districtCache.set(code, promise);
     }
     return promise;

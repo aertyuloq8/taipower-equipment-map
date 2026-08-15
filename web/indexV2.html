@@ -8746,6 +8746,32 @@ function renderDefectStats() {
         { meta: "https://aertyuloq8.github.io/taipower-equipment-map/data/meta.json",
           points: "https://aertyuloq8.github.io/taipower-equipment-map/data/points.json" },
       ];
+      const DATA_VERSION_KEY = "tp_data_version_v1";
+
+      function readDataVersion() {
+        try { return JSON.parse(localStorage.getItem(DATA_VERSION_KEY) || "null"); }
+        catch (e) { return null; }
+      }
+
+      function writeDataVersion(meta) {
+        try {
+          localStorage.setItem(DATA_VERSION_KEY, JSON.stringify({
+            pointsHash: meta.pointsHash || "",
+            addrUpdated: meta.addrUpdated || "",
+          }));
+        } catch (e) { /* ignore */ }
+      }
+
+      async function loadPointsWithVersion(meta, urls) {
+        const version = readDataVersion();
+        if (version && meta.pointsHash && version.pointsHash === meta.pointsHash) {
+          const cached = await caches.match(new URL(urls.points, window.location.href)).catch(() => null);
+          if (cached?.ok) return cached.json();
+        }
+        const pointsRes = await fetch(urls.points, { cache: "no-store" });
+        if (!pointsRes.ok) throw new Error(`points ${pointsRes.status}`);
+        return pointsRes.json();
+      }
 
       async function cacheEquipmentData(meta, points) {
         try {
@@ -8787,13 +8813,18 @@ function renderDefectStats() {
       });
 
       async function tryFetchData() {
+        let lastError = null;
         for (const urls of DATA_URLS) {
           try {
-            const [metaRes, pointsRes] = await Promise.all([fetch(urls.meta, { cache: "no-cache" }), fetch(urls.points, { cache: "no-cache" })]);
-            if (metaRes.ok && pointsRes.ok) return { meta: await metaRes.json(), points: await pointsRes.json() };
-          } catch (e) { console.warn("資料來源嘗試失敗，切換備用：", urls.meta, e.message); }
+            const metaRes = await fetch(urls.meta, { cache: "no-cache" });
+            if (!metaRes.ok) throw new Error(`meta ${metaRes.status}`);
+            const meta = await metaRes.json();
+            const points = await loadPointsWithVersion(meta, urls);
+            writeDataVersion(meta);
+            return { meta, points };
+          } catch (e) { console.warn("資料來源嘗試失敗，切換備用：", urls.meta, e.message); lastError = e; }
         }
-        throw new Error("所有資料來源皆無法連線，請檢查網路或資料目錄是否存在。");
+        throw lastError || new Error("所有資料來源皆無法連線，請檢查網路或資料目錄是否存在。");
       }
 
       async function init() {

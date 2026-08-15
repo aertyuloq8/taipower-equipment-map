@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 from collections import Counter
@@ -187,6 +188,22 @@ def find_headers(headers: Iterable[object]) -> dict[str, int]:
     return found
 
 
+def sha256_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def read_addr_updated(meta_path: Path) -> str:
+    try:
+        existing = json.loads(meta_path.read_text(encoding="utf-8"))
+        return existing.get("addrUpdated") or ""
+    except (OSError, ValueError):
+        return ""
+
+
 def main() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     source = find_excel_file()
@@ -265,6 +282,8 @@ def main() -> None:
         "skipped": skipped,
         "bounds": [[min_lat, min_lng], [max_lat, max_lng]],
         "areas": [{"name": name, "count": count} for name, count in area_counter.most_common()],
+        "pointsHash": sha256_of(points_path),
+        "addrUpdated": read_addr_updated(meta_path),
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(meta, ensure_ascii=False, indent=2))

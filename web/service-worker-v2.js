@@ -1,4 +1,7 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2-r8";
+const CACHE_NAME = "equipment-map-photo-edition-v2-r9";
+const TILE_CACHE_NAME = "equipment-map-tiles-v1";
+const TILE_CACHE_MAX = 6000;
+const TILE_CACHE_TRIM = 2000;
 const APP_SHELL = "./indexV2.html";
 const STATIC_ASSETS = [
   APP_SHELL,
@@ -19,6 +22,9 @@ const STATIC_ASSETS = [
 const REMOTE_ASSETS = [
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+  "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js",
   "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
   "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js",
@@ -61,7 +67,8 @@ self.addEventListener("fetch", (event) => {
   const isCadastreAsset = /\/cadastre-(config-v2|v2)\.(js|css)$/.test(url.pathname);
   const isSyncAsset = /\/sync-v2\.js$/.test(url.pathname);
   const isRemoteAsset = REMOTE_ASSETS.some(asset => asset === request.url);
-  if (!isV2Navigation && !isEquipmentData && !isCadastreAsset && !isSyncAsset && !isRemoteAsset) return;
+  const isTileRequest = /^(https:\/\/wmts\.nlsc\.gov\.tw\/|https:\/\/[a-z]\.tile\.openstreetmap\.org\/)/.test(url.href);
+  if (!isV2Navigation && !isEquipmentData && !isCadastreAsset && !isSyncAsset && !isRemoteAsset && !isTileRequest) return;
 
   event.respondWith(
     (isV2Navigation
@@ -74,14 +81,40 @@ self.addEventListener("fetch", (event) => {
       : (isEquipmentData || isCadastreAsset || isSyncAsset)
         ? fetch(request, { cache: "no-store" })
             .then((response) => {
-              if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+              if (response.ok) {
+                const clone = response.clone();
+                return caches.open(CACHE_NAME)
+                  .then(cache => cache.put(request, clone))
+                  .then(() => response)
+                  .catch(() => response);
+              }
               return response;
             })
-            .catch(() => caches.match(request))
-      : caches.match(request).then(cached => cached || fetch(request).then(response => {
-          if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-          return response;
-        })))
+            .catch(() => caches.match(request.url))
+        : isTileRequest
+          ? caches.open(TILE_CACHE_NAME)
+              .then(cache => cache.match(request.url))
+              .then(cached => cached || fetch(request).then((response) => {
+                  if (response.ok) {
+                    const clone = response.clone();
+                    caches.open(TILE_CACHE_NAME).then((cache) => {
+                      cache.put(request, clone).catch(() => {});
+                      trimTileCache(cache);
+                    });
+                  }
+                  return response;
+                }))
+          : caches.match(request.url).then(cached => cached || fetch(request).then(response => {
+              if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+              return response;
+            })))
       .catch(() => new Response("", { status: 503, statusText: "Offline" }))
   );
 });
+
+function trimTileCache(cache) {
+  cache.keys().then((keys) => {
+    if (keys.length <= TILE_CACHE_MAX) return;
+    Promise.all(keys.slice(0, TILE_CACHE_TRIM).map(key => cache.delete(key))).catch(() => {});
+  }).catch(() => {});
+}

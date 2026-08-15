@@ -257,6 +257,17 @@ def main() -> None:
     print(f"總門牌 {total:,}，跳過 {skipped:,}")
     print("各區門牌數：", dict(district_counts.most_common()))
 
+    # 更新 meta.json 的地址資料版本戳記（前端用它判斷地址資料是否需要重新下載）
+    meta_path = DATA_DIR / "meta.json"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        addr_files = [index_path, var_path, *ADDR_DIR.glob("*.json")]
+        meta["addrUpdated"] = max(p.stat().st_mtime for p in addr_files).isoformat(timespec="seconds")
+        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"meta.json addrUpdated = {meta['addrUpdated']}")
+    except (OSError, ValueError) as error:
+        print(f"警告：無法更新 meta.json addrUpdated（{error}）")
+
 
 if __name__ == "__main__":
     main()
