@@ -6825,19 +6825,34 @@
           GlobalModal.confirm(text, () => resolve(true), () => resolve(false));
         }),
         confirmMerge: (info) => new Promise(resolve => {
-          GlobalModal.show({
-            title: "同步還原方式",
-            content: `收到 ${info.records} 筆紀錄、${info.photos} 張照片（${info.sizeMB}）。<br><br>
-              <strong>合併到本機</strong>：把對端的新資料加入本機，不會覆蓋既有資料與照片（共用電腦建議使用）。<br>
-              <strong>覆蓋本機</strong>：以對端資料取代本機全部資料與照片（個人專用裝置建議使用）。`,
-            type: "confirm",
-            confirmText: "合併到本機資料",
-            discardText: "覆蓋本機資料",
-            cancelText: "取消",
-            onConfirm: () => resolve("merge"),
-            onDiscard: () => resolve("replace"),
-            onCancel: () => resolve("cancel"),
-          });
+          const showMergeModal = () => {
+            GlobalModal.show({
+              title: "同步還原方式",
+              content: `收到 ${info.records} 筆紀錄、${info.photos} 張照片（${info.sizeMB}）。<br><br>
+                <strong>合併到本機</strong>：把對端的新資料加入本機，不會覆蓋既有資料與照片（共用電腦建議使用）。<br>
+                <strong>覆蓋本機</strong>：以對端資料取代本機全部資料與照片（個人專用裝置建議使用）。`,
+              type: "confirm",
+              confirmText: "合併到本機資料",
+              discardText: "覆蓋本機資料",
+              cancelText: "取消",
+              onConfirm: () => resolve("merge"),
+              onDiscard: () => {
+                const localPhotoCount = state.records.reduce((total, record) => total + (record.photos || []).length, 0);
+                GlobalModal.show({
+                  title: "確定覆蓋本機資料？",
+                  content: `本機目前有 <strong>${state.records.length}</strong> 筆紀錄、<strong>${localPhotoCount}</strong> 張照片。<br>
+                    覆蓋後將全部被對端資料取代，<strong style="color:#b91c1c">無法復原</strong>。確定要覆蓋嗎？`,
+                  type: "confirm",
+                  confirmText: "確定覆蓋",
+                  cancelText: "回到選擇",
+                  onConfirm: () => resolve("replace"),
+                  onCancel: () => showMergeModal(),
+                });
+              },
+              onCancel: () => resolve("cancel"),
+            });
+          };
+          showMergeModal();
         }),
       };
 
@@ -6936,21 +6951,36 @@
         const imported = await importZipBackup(file);
         const existingFolderIds = new Set(state.folders.map(folder => folder.id));
         const existingRecordIds = new Set(state.records.map(record => record.id));
+        const localPhotoIds = new Set();
+        for (const record of state.records) {
+          for (const photo of record.photos || []) localPhotoIds.add(photo.id);
+        }
         const newFolders = imported.parsed.folders.filter(folder => !existingFolderIds.has(folder.id));
-        const newRecords = imported.parsed.records.filter(record => !existingRecordIds.has(record.id));
-        const newRecordIds = new Set(newRecords.map(record => record.id));
         const allFolderIds = new Set([...existingFolderIds, ...newFolders.map(folder => folder.id)]);
         newFolders.forEach(folder => {
           if (folder.parentId && !allFolderIds.has(folder.parentId)) folder.parentId = null;
         });
-        const recordIdByPhotoId = new Map();
-        for (const record of imported.parsed.records) {
-          for (const photo of record.photos || []) recordIdByPhotoId.set(photo.id, record.id);
+        const newRecords = [];
+        let photoMergedRecords = 0;
+        for (const remote of imported.parsed.records) {
+          if (!existingRecordIds.has(remote.id)) {
+            newRecords.push(remote);
+            continue;
+          }
+          const local = state.records.find(record => record.id === remote.id);
+          const photosById = new Map((local.photos || []).map(photo => [photo.id, photo]));
+          for (const photo of remote.photos || []) {
+            if (!photosById.has(photo.id)) photosById.set(photo.id, photo);
+          }
+          const mergedPhotos = [...photosById.values()];
+          if (mergedPhotos.length !== (local.photos || []).length) {
+            local.photos = mergedPhotos;
+            photoMergedRecords++;
+          }
         }
         let photoAdded = 0, photoSkipped = 0;
         for (const entry of imported.photoEntries || []) {
-          const recordId = recordIdByPhotoId.get(entry.id);
-          if (!recordId || !newRecordIds.has(recordId)) { photoSkipped++; continue; }
+          if (localPhotoIds.has(entry.id)) { photoSkipped++; continue; }
           if (await photoDbRequest("readonly", store => store.get(entry.id))) { photoSkipped++; continue; }
           await putPhotoBlob(entry.id, entry.blob);
           photoAdded++;
@@ -6964,7 +6994,7 @@
         refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
-        return { folderCount: newFolders.length, recordCount: newRecords.length, photoAdded, photoSkipped };
+        return { folderCount: newFolders.length, recordCount: newRecords.length, photoMergedRecords, photoAdded, photoSkipped };
       }
 
       async function verifyZipManifest(zip, manifest) {
