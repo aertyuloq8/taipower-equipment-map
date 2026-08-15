@@ -107,12 +107,18 @@
     const searchToggle = document.getElementById("mapSearchToggle");
     const layerPanel = document.getElementById("layerMenuPanel");
     const layerToggle = document.getElementById("layerMenuToggle");
+    const addrPanel = document.getElementById("v2AddressPanel");
+    const addrToggle = document.getElementById("v2AddressToggle");
     search?.classList.remove("is-open");
     searchToggle?.classList.remove("is-active");
     searchToggle?.setAttribute("aria-expanded", "false");
     if (layerPanel) layerPanel.hidden = true;
     layerToggle?.classList.remove("is-active");
     layerToggle?.setAttribute("aria-expanded", "false");
+    addrPanel?.classList.remove("is-open");
+    addrPanel?.setAttribute("aria-hidden", "true");
+    addrToggle?.classList.remove("is-active");
+    addrToggle?.setAttribute("aria-expanded", "false");
   }
 
   function setPanelOpen(open) {

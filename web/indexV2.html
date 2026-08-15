@@ -9,10 +9,13 @@
     <title>土木設備分布地圖照片版</title>
     <link rel="manifest" href="manifest-v2.json" />
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="cadastre-v2.css" />
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
       :root {
@@ -2102,6 +2105,14 @@
         }
       }
 
+      @media (max-width: 520px) {
+        .map-search-btn {
+          font-size: 12px;
+          min-width: 60px;
+          padding: 0 8px;
+        }
+      }
+
       @media (max-height: 520px) and (orientation: landscape) and (pointer: coarse),
              (max-width: 980px) and (max-height: 520px) and (orientation: landscape) {
         html,
@@ -2375,13 +2386,15 @@
         aria-expanded="false" title="展開面板"
         style="box-shadow:0 8px 20px rgba(22,36,52,0.18)">≡</button>
       <button id="mapSearchToggle" class="map-search-btn" type="button"
-        aria-expanded="false" aria-controls="mapSearchPanel" title="搜尋設備">🔍 搜尋</button>
+        aria-expanded="false" aria-controls="mapSearchPanel" title="搜尋設備">🔍 設備</button>
       <button id="v2CadastreToggle" class="map-search-btn" type="button"
         aria-expanded="false" aria-controls="v2CadastrePanel" title="查詢地籍圖">🗺️ 地籍</button>
+      <button id="v2AddressToggle" class="map-search-btn" type="button"
+        aria-expanded="false" aria-controls="v2AddressPanel" title="查詢門牌地址">🏠 門牌</button>
       <div class="layer-menu">
-        <button id="layerMenuToggle" class="layer-menu-toggle" type="button" aria-expanded="false" aria-controls="layerMenuPanel" title="更多圖層控制">
+        <button id="layerMenuToggle" class="layer-menu-toggle" type="button" aria-expanded="false" aria-controls="layerMenuPanel" title="圖層控制">
           <span class="layer-menu-glyph" aria-hidden="true"><span></span><span></span><span></span></span>
-          <span>更多</span>
+          <span>圖層</span>
         </button>
         <div id="layerMenuPanel" class="layer-menu-panel" hidden>
           <div class="layer-menu-heading">圖層控制</div>
@@ -2472,6 +2485,66 @@
       </div>
     </section>
 
+    <section id="v2AddressPanel" class="v2-address-panel" aria-hidden="true" aria-label="門牌地址查詢">
+      <div class="v2-address-inner">
+        <header class="v2-address-head">
+          <span class="v2-address-title">🏠 門牌地址查詢</span>
+          <button id="v2AddressClose" class="v2-address-close" type="button" title="關閉門牌地址查詢" aria-label="關閉門牌地址查詢">×</button>
+        </header>
+        <p class="v2-address-warning">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
+        <input id="addrSearchInput" type="search" placeholder="門牌地址，例如 竹子腳98-22（之可用 -）" autocomplete="off" aria-controls="addrSearchResults" />
+        <p id="addrSearchStatus" class="v2-address-status" aria-live="polite"></p>
+        <div id="addrSearchResults" class="v2-address-results" role="listbox"></div>
+        <p class="v2-address-disclaimer">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
+      </div>
+    </section>
+
+    <section id="v2SyncPanel" class="v2-sync-panel" aria-hidden="true" aria-label="裝置同步">
+      <div class="v2-sync-inner">
+        <header class="v2-sync-head">
+          <span class="v2-sync-title">📡 裝置同步</span>
+          <button id="v2SyncClose" class="v2-sync-close" type="button" title="關閉裝置同步" aria-label="關閉裝置同步">×</button>
+        </header>
+        <p class="v2-sync-intro">兩台裝置都開啟本頁後，任一方按「重新產生」取得配對碼，另一方輸入同一組 6 位配對碼（手機可掃描 QR）即可連線。資料直接在兩台裝置間傳送，不經過任何伺服器。</p>
+        <div class="v2-sync-options">
+          <label><input type="checkbox" id="v2SyncSend" checked /> 傳送本機資料</label>
+          <label><input type="checkbox" id="v2SyncRecv" checked /> 接收對端資料</label>
+        </div>
+        <div class="v2-sync-limit">
+          <label for="v2SyncMaxMb">同步大小上限</label>
+          <input type="number" id="v2SyncMaxMb" min="10" max="2048" step="10" value="200" inputmode="numeric" />
+          <span>MB</span>
+        </div>
+        <div class="v2-sync-pair">
+          <div class="v2-sync-host">
+            <div class="v2-sync-host-code">
+              <div id="v2SyncQr"></div>
+              <div>
+                <span class="v2-sync-code-label">我的配對碼</span>
+                <strong id="v2SyncCode" class="v2-sync-code">--------</strong>
+              </div>
+            </div>
+            <button id="v2SyncRegen" class="v2-sync-mini-btn" type="button">重新產生</button>
+          </div>
+          <div class="v2-sync-join">
+            <label for="v2SyncJoinInput">輸入對方配對碼</label>
+            <div class="v2-sync-join-row">
+              <input id="v2SyncJoinInput" type="text" maxlength="6" placeholder="6 碼，例如 7K3QZP" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+              <button id="v2SyncScanBtn" class="is-secondary" type="button" hidden>掃 QR</button>
+              <button id="v2SyncJoinBtn" type="button">連線</button>
+            </div>
+          </div>
+        </div>
+        <video id="v2SyncScanVideo" class="v2-sync-scan-video" hidden playsinline></video>
+        <p id="v2SyncStatus" class="v2-sync-status" aria-live="polite"></p>
+        <div id="v2SyncProgress" class="v2-sync-progress" hidden>
+          <div class="v2-sync-progress-bar"><div id="v2SyncProgressFill" class="v2-sync-progress-fill"></div></div>
+          <span id="v2SyncProgressText" class="v2-sync-progress-text"></span>
+        </div>
+        <p class="v2-sync-disclaimer">傳輸上限由雙方設定的較小值決定；超過上限會拒絕傳輸。配對碼為臨時身分，僅供本次連線使用，連線結束或關閉面板即失效。</p>
+      </div>
+    </section>
+
     <main class="app is-panel-collapsed">
       <aside id="panel" class="panel is-collapsed">
         <header class="panel-head">
@@ -2542,6 +2615,7 @@
             <div class="folder-btn-group">
               <button id="exportSystemBtn" class="btn-action btn-export-zip" title="下載紀錄、Excel 與照片的完整 ZIP 備份">💾 完整備份</button>
               <button id="importSystemBtn" class="btn-action btn-import-zip" title="從完整 ZIP 或舊版 JSON 備份還原">📂 資料還原</button>
+              <button id="v2SyncToggle" class="btn-action btn-sync" title="兩台裝置直接傳輸資料，不需帳號與伺服器">📡 裝置同步</button>
               <input type="file" id="importSystemInput" accept=".zip,.zip.enc,.json" style="display:none" />
             </div>
             <section class="storage-health" aria-label="裝置儲存狀態">
@@ -2859,13 +2933,23 @@
         const isOpen = mapSearchPanel.classList.contains("is-open");
         mapSearchToggle.setAttribute("aria-expanded", String(isOpen));
         mapSearchToggle.classList.toggle("is-active", isOpen);
-        mapSearchToggle.title = isOpen ? "關閉搜尋" : "搜尋設備";
+        mapSearchToggle.title = isOpen ? "關閉設備搜尋" : "搜尋設備";
       }
 
       function closeMapSearchPanel() {
         if (!mapSearchPanel) return;
         mapSearchPanel.classList.remove("is-open");
         syncMapSearchState();
+      }
+
+      function closeAddressPanel() {
+        const addrPanel = document.getElementById("v2AddressPanel");
+        const addrToggle = document.getElementById("v2AddressToggle");
+        if (!addrPanel) return;
+        addrPanel.classList.remove("is-open");
+        addrPanel.setAttribute("aria-hidden", "true");
+        addrToggle?.classList.remove("is-active");
+        addrToggle?.setAttribute("aria-expanded", "false");
       }
 
       function closeLayerMenu() {
@@ -2904,6 +2988,8 @@
         if (!layerMenuPanel || !layerMenuToggle) return;
         if (willOpen) {
           closeMapSearchPanel();
+          closeAddressPanel();
+          window.__closeSyncPanel && window.__closeSyncPanel();
           if (!collapsePanelControl()) return;
         }
         layerMenuPanel.hidden = !willOpen;
@@ -2929,6 +3015,8 @@
       function collapseFloatingControls() {
         closeMapSearchPanel();
         closeLayerMenu();
+        closeAddressPanel();
+        window.__closeSyncPanel && window.__closeSyncPanel();
         collapsePanelControl();
       }
       mapSearchToggle.addEventListener("click", () => {
@@ -2936,6 +3024,8 @@
         const willOpen = !mapSearchPanel.classList.contains("is-open");
         if (willOpen) {
           closeLayerMenu();
+          window.__closeSyncPanel && window.__closeSyncPanel();
+          closeAddressPanel();
           if (!collapsePanelControl()) return;
         }
         mapSearchPanel.classList.toggle("is-open", willOpen);
@@ -5034,6 +5124,10 @@
         if (!inspectionPanel || inspectionPanel.classList.contains("is-collapsed")) return;
         if (!setPanelCollapsed(true)) event.preventDefault();
       });
+      document.addEventListener("v2-address-open", event => {
+        if (!inspectionPanel || inspectionPanel.classList.contains("is-collapsed")) return;
+        if (!setPanelCollapsed(true)) event.preventDefault();
+      });
 
       panelToggle.addEventListener("click", () => {
         const collapsed = !inspectionPanel.classList.contains("is-collapsed");
@@ -6708,6 +6802,25 @@
           manifestHash: await sha256Hex(manifestText),
         };
       }
+
+      window.__syncBridge = {
+        buildBackup: async () => {
+          normalizeInspectionState();
+          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份");
+          return {
+            blob: archive.blob,
+            photoCount: archive.photoCount,
+            recordCount: state.records.length,
+            manifestHash: archive.manifestHash,
+          };
+        },
+        restoreBackup: async (file) => {
+          await processBackupImport(file, "");
+        },
+        confirm: (text) => new Promise(resolve => {
+          GlobalModal.confirm(text, () => resolve(true), () => resolve(false));
+        }),
+      };
 
       async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original") {
         try {
@@ -8605,5 +8718,7 @@ function renderDefectStats() {
     </script>
     <script src="cadastre-config-v2.js"></script>
     <script src="cadastre-v2.js"></script>
+    <script src="address-search-v2.js"></script>
+    <script src="sync-v2.js"></script>
   </body>
 </html>
