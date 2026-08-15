@@ -32,7 +32,7 @@
         --shadow: 0 12px 36px rgba(22, 36, 52, 0.16);
         --control-z: 900;
       }
-      * { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
       html, body, .app { height: 100%; margin: 0; }
       body {
         background: var(--bg);
@@ -88,7 +88,7 @@
         font-weight: 800;
         padding: 0 12px;
       }
-      button:hover { background: var(--accent-dark); }
+      button:hover { background: #e8f1f2; }
       button:disabled { cursor: progress; opacity: 0.7; }
       .icon-button {
         align-items: center;
@@ -6818,8 +6818,26 @@
         restoreBackup: async (file) => {
           await processBackupImport(file, "");
         },
+        mergeBackup: async (file) => {
+          return await mergeZipBackup(file);
+        },
         confirm: (text) => new Promise(resolve => {
           GlobalModal.confirm(text, () => resolve(true), () => resolve(false));
+        }),
+        confirmMerge: (info) => new Promise(resolve => {
+          GlobalModal.show({
+            title: "同步還原方式",
+            content: `收到 ${info.records} 筆紀錄、${info.photos} 張照片（${info.sizeMB}）。<br><br>
+              <strong>合併到本機</strong>：把對端的新資料加入本機，不會覆蓋既有資料與照片（共用電腦建議使用）。<br>
+              <strong>覆蓋本機</strong>：以對端資料取代本機全部資料與照片（個人專用裝置建議使用）。`,
+            type: "confirm",
+            confirmText: "合併到本機資料",
+            discardText: "覆蓋本機資料",
+            cancelText: "取消",
+            onConfirm: () => resolve("merge"),
+            onDiscard: () => resolve("replace"),
+            onCancel: () => resolve("cancel"),
+          });
         }),
       };
 
@@ -6911,6 +6929,42 @@
         refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
+      }
+
+      async function mergeZipBackup(file) {
+        if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
+        const imported = await importZipBackup(file);
+        const existingFolderIds = new Set(state.folders.map(folder => folder.id));
+        const existingRecordIds = new Set(state.records.map(record => record.id));
+        const newFolders = imported.parsed.folders.filter(folder => !existingFolderIds.has(folder.id));
+        const newRecords = imported.parsed.records.filter(record => !existingRecordIds.has(record.id));
+        const newRecordIds = new Set(newRecords.map(record => record.id));
+        const allFolderIds = new Set([...existingFolderIds, ...newFolders.map(folder => folder.id)]);
+        newFolders.forEach(folder => {
+          if (folder.parentId && !allFolderIds.has(folder.parentId)) folder.parentId = null;
+        });
+        const recordIdByPhotoId = new Map();
+        for (const record of imported.parsed.records) {
+          for (const photo of record.photos || []) recordIdByPhotoId.set(photo.id, record.id);
+        }
+        let photoAdded = 0, photoSkipped = 0;
+        for (const entry of imported.photoEntries || []) {
+          const recordId = recordIdByPhotoId.get(entry.id);
+          if (!recordId || !newRecordIds.has(recordId)) { photoSkipped++; continue; }
+          if (await photoDbRequest("readonly", store => store.get(entry.id))) { photoSkipped++; continue; }
+          await putPhotoBlob(entry.id, entry.blob);
+          photoAdded++;
+        }
+        state.folders.push(...newFolders);
+        state.records.push(...newRecords);
+        normalizeInspectionState();
+        saveToLocalStorage();
+        renderer.redraw();
+        renderPhotoBrowser();
+        refreshStorageStatus();
+        const folderSelect = document.getElementById("sidebar-folder");
+        if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
+        return { folderCount: newFolders.length, recordCount: newRecords.length, photoAdded, photoSkipped };
       }
 
       async function verifyZipManifest(zip, manifest) {

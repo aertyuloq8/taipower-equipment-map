@@ -287,17 +287,25 @@
     try {
       const blob = new Blob(recv.parts, { type: "application/zip" });
       const file = new File([blob], "同步備份.zip", { type: "application/zip" });
-      const ok = await window.__syncBridge.confirm(
-        `收到 ${recv.records ?? "?"} 筆紀錄、${recv.photos ?? "?"} 張照片（${fmtMB(recv.size)}）。\n還原會以對端資料覆蓋本機現有資料，確定要還原嗎？`
-      );
-      if (!ok) {
+      const choice = await window.__syncBridge.confirmMerge({
+        records: recv.records ?? "?",
+        photos: recv.photos ?? "?",
+        sizeMB: fmtMB(recv.size),
+      });
+      if (choice === "cancel") {
         setStatus("已取消還原，接收的資料已捨棄。");
         setProgress(false);
         return;
       }
-      setStatus("正在還原…");
-      await window.__syncBridge.restoreBackup(file);
-      setStatus("同步完成，資料已還原。", "ok");
+      if (choice === "merge") {
+        setStatus("正在合併…");
+        const result = await window.__syncBridge.mergeBackup(file);
+        setStatus(`同步完成，已合併 ${result.recordCount} 筆紀錄（新增 ${result.photoAdded} 張照片）。`, "ok");
+      } else {
+        setStatus("正在還原…");
+        await window.__syncBridge.restoreBackup(file);
+        setStatus("同步完成，資料已還原。", "ok");
+      }
     } catch (err) {
       console.error("restore error:", err);
       setStatus("還原失敗：" + err.message, "error");
