@@ -2542,6 +2542,10 @@
           <div class="v2-sync-progress-bar"><div id="v2SyncProgressFill" class="v2-sync-progress-fill"></div></div>
           <span id="v2SyncProgressText" class="v2-sync-progress-text"></span>
         </div>
+        <div id="v2SyncSnapshot" class="v2-sync-snapshot" hidden>
+          <span id="v2SyncSnapshotText" class="v2-sync-snapshot-text"></span>
+          <button id="v2SyncSnapshotRestore" class="v2-sync-mini-btn" type="button">↩ 還原</button>
+        </div>
         <p class="v2-sync-disclaimer">傳輸上限由雙方設定的較小值決定；超過上限會拒絕傳輸。配對碼為臨時身分，僅供本次連線使用，連線結束或關閉面板即失效。</p>
       </div>
     </section>
@@ -3017,7 +3021,6 @@
         closeMapSearchPanel();
         closeLayerMenu();
         closeAddressPanel();
-        window.__closeSyncPanel && window.__closeSyncPanel();
         collapsePanelControl();
       }
       mapSearchToggle.addEventListener("click", () => {
@@ -6821,6 +6824,51 @@
         mergeBackup: async (file) => {
           return await mergeZipBackup(file);
         },
+        confirmEmptySend: (info) => new Promise(resolve => {
+          GlobalModal.show({
+            title: "本機沒有資料",
+            content: `本機目前有 ${info.records} 筆紀錄、${info.photos} 張照片。<br><br>
+              將傳送<strong>空資料</strong>給對方 — 對方若選擇「覆蓋本機資料」，其資料會被清空。<strong style="color:#b91c1c">確定要傳送嗎？</strong>`,
+            type: "confirm",
+            confirmText: "仍要傳送",
+            cancelText: "取消傳送",
+            onConfirm: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        }),
+        snapshotBeforeOverwrite: async () => {
+          try {
+            const archive = await createPhotoArchive(state.records, state.folders, "覆蓋前自動快照");
+            await putAppDataRecord("tpSyncPreOverwriteSnapshot", {
+              blob: archive.blob,
+              recordCount: state.records.length,
+              photoCount: archive.photoCount,
+              createdAt: new Date().toISOString(),
+            });
+            return true;
+          } catch (error) {
+            console.error("建立覆蓋前快照失敗：", error);
+            return false;
+          }
+        },
+        getSnapshotInfo: async () => {
+          try {
+            const record = await getAppDataRecord("tpSyncPreOverwriteSnapshot");
+            if (!record?.value?.blob) return null;
+            return {
+              recordCount: record.value.recordCount,
+              photoCount: record.value.photoCount,
+              createdAt: record.value.createdAt,
+            };
+          } catch { return null; }
+        },
+        restoreSnapshot: async () => {
+          const record = await getAppDataRecord("tpSyncPreOverwriteSnapshot");
+          if (!record?.value?.blob) throw new Error("沒有可還原的快照");
+          const file = new File([record.value.blob], "覆蓋前快照.zip", { type: "application/zip" });
+          await processBackupImport(file, "");
+          return true;
+        },
         confirm: (text) => new Promise(resolve => {
           GlobalModal.confirm(text, () => resolve(true), () => resolve(false));
         }),
@@ -6837,15 +6885,30 @@
               cancelText: "取消",
               onConfirm: () => resolve("merge"),
               onDiscard: () => {
+                const remoteCount = Number(info.records);
+                if (!Number.isFinite(remoteCount) || remoteCount === 0) {
+                  GlobalModal.show({
+                    title: "無法覆蓋",
+                    content: "對方沒有資料（0 筆紀錄），無法覆蓋本機。請改選<strong>「合併到本機資料」</strong>或<strong>「取消」</strong>。",
+                    type: "alert",
+                    confirmText: "了解",
+                    onConfirm: () => showMergeModal(),
+                  });
+                  return;
+                }
                 const localPhotoCount = state.records.reduce((total, record) => total + (record.photos || []).length, 0);
                 GlobalModal.show({
                   title: "確定覆蓋本機資料？",
-                  content: `本機目前有 <strong>${state.records.length}</strong> 筆紀錄、<strong>${localPhotoCount}</strong> 張照片。<br>
-                    覆蓋後將全部被對端資料取代，<strong style="color:#b91c1c">無法復原</strong>。確定要覆蓋嗎？`,
+                  content: `對方資料：<strong>${info.records}</strong> 筆紀錄、<strong>${info.photos}</strong> 張照片<br>
+                    本機目前：<strong>${state.records.length}</strong> 筆紀錄、<strong>${localPhotoCount}</strong> 張照片<br><br>
+                    覆蓋後本機資料將全部被取代，<strong style="color:#b91c1c">無法復原</strong>（覆蓋前會自動留存一份快照，可於同步面板「↩ 還原」）。確定要覆蓋嗎？`,
                   type: "confirm",
                   confirmText: "確定覆蓋",
                   cancelText: "回到選擇",
-                  onConfirm: () => resolve("replace"),
+                  onConfirm: async () => {
+                    await window.__syncBridge.snapshotBeforeOverwrite();
+                    resolve("replace");
+                  },
                   onCancel: () => showMergeModal(),
                 });
               },

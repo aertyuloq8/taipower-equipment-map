@@ -224,6 +224,14 @@
     setStatus("正在建立備份 ZIP…");
     try {
       const archive = await window.__syncBridge.buildBackup();
+      if (archive.recordCount === 0 && archive.photoCount === 0) {
+        const ok = await window.__syncBridge.confirmEmptySend({ records: 0, photos: 0 });
+        if (!ok) {
+          c.send({ t: "abort", reason: "傳送端本機沒有資料，已取消傳送。" });
+          setStatus("已取消傳送（本機沒有資料，避免覆蓋對方資料）。", "error");
+          return;
+        }
+      }
       if (archive.blob.size > maxBytes) {
         c.send({ t: "abort", reason: `備份大小 ${fmtMB(archive.blob.size)} 超過同步上限 ${fmtMB(maxBytes)}，請調高上限後重試。` });
         setStatus(`備份太大：${fmtMB(archive.blob.size)} 超過上限 ${fmtMB(maxBytes)}，已取消。`, "error");
@@ -373,6 +381,7 @@
     panel.setAttribute("aria-hidden", "false");
     active = true;
     initMaxMb();
+    refreshSnapshotUi();
     startHost();
   }
 
@@ -389,6 +398,30 @@
     joinInput.value = "";
   }
   window.__closeSyncPanel = closePanel;
+
+  async function refreshSnapshotUi() {
+    try {
+      const snapshotBox = $("v2SyncSnapshot");
+      const snapshotText = $("v2SyncSnapshotText");
+      if (!snapshotBox || !snapshotText) return;
+      const info = await window.__syncBridge.getSnapshotInfo();
+      if (!info) { snapshotBox.hidden = true; return; }
+      snapshotBox.hidden = false;
+      const time = new Date(info.createdAt).toLocaleString("zh-TW", { hour12: false });
+      snapshotText.textContent = `覆蓋前快照 ${time}（${info.recordCount} 筆紀錄、${info.photoCount} 張照片）`;
+    } catch (err) {
+      console.error("refreshSnapshotUi error:", err);
+    }
+  }
+  $("v2SyncSnapshotRestore").addEventListener("click", async () => {
+    try {
+      setStatus("正在還原覆蓋前快照…");
+      await window.__syncBridge.restoreSnapshot();
+      setStatus("覆蓋前快照已還原。", "ok");
+    } catch (err) {
+      setStatus("快照還原失敗：" + err.message, "error");
+    }
+  });
 
   document.addEventListener("v2-address-open", closePanel);
   document.addEventListener("v2-cadastre-open", closePanel);

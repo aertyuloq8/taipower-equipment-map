@@ -658,6 +658,23 @@
   margin: 0;
   padding-top: 9px;
 }
+.v2-sync-snapshot {
+  align-items: center;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  color: #92400e;
+  display: flex;
+  font-size: 11px;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 6px 8px;
+}
+.v2-sync-snapshot-text {
+  flex: 1;
+  line-height: 1.4;
+  min-width: 0;
+}
 
 @media (max-width: 768px) {
   .v2-sync-panel {
