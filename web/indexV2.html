@@ -235,6 +235,7 @@
       .btn-import-json { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }
       .btn-export-zip { background: #ecfeff; color: #0f766e; border: 1px dashed #0f766e; }
       .btn-import-zip { background: #f5f3ff; color: #6d28d9; border: 1px dashed #6d28d9; }
+.btn-drive { background: #fff7ed; color: #c2410c; border: 1px dashed #c2410c; }
       .btn-sync { background: #f0f9ff; color: #0369a1; border: 1px dashed #0369a1; }
       .edition-switch-link {
         align-items: center;
@@ -2620,6 +2621,8 @@
             <div class="folder-btn-group">
               <button id="exportSystemBtn" class="btn-action btn-export-zip" title="下載紀錄、Excel 與照片的完整 ZIP 備份">💾 完整備份</button>
               <button id="importSystemBtn" class="btn-action btn-import-zip" title="從完整 ZIP 或舊版 JSON 備份還原">📂 資料還原</button>
+              <button id="driveBackupBtn" class="btn-action btn-drive" title="將完整備份 ZIP 上傳到個人 Google 雲端硬碟（需 Google 帳號登入）">☁️ 備份到 Drive</button>
+              <button id="driveRestoreBtn" class="btn-action btn-drive" title="從 Google 雲端硬碟下載完整備份 ZIP 並還原">☁️ 從 Drive 還原</button>
               <button id="v2SyncToggle" class="btn-action btn-sync" title="兩台裝置直接傳輸資料，不需帳號與伺服器">📡 裝置同步</button>
               <input type="file" id="importSystemInput" accept=".zip,.zip.enc,.json" style="display:none" />
             </div>
@@ -6940,6 +6943,203 @@
         }
       }
 
+      // ===== Google Drive 備份（個人帳號 OAuth；token 不持久化，每次操作重新授權，關閉即無殘留）=====
+      const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+      let _driveClientId = null;
+      function getDriveClientId() {
+        const fromUrl = new URLSearchParams(location.search).get("driveClientId");
+        if (fromUrl) return fromUrl;
+        if (_driveClientId === null) _driveClientId = localStorage.getItem("tpDriveClientId") || "";
+        return _driveClientId;
+      }
+      async function ensureDriveClientId() {
+        let clientId = getDriveClientId();
+        if (clientId) return clientId;
+        clientId = await new Promise(resolve => {
+          GlobalModal.prompt(
+            "第一次使用需要設定 Google Client ID（個人用）。<br><small>設定方式：Google Cloud Console → APIs & Services → Credentials → 建立 OAuth Client ID（Web 應用程式）→ Authorized JavaScript origins 填 https://aertyuloq8.github.io → 複製 Client ID 貼上。<br>此設定只存在本瀏覽器。也可以在網址後加 ?driveClientId=你的ID 永久帶入。</small>",
+            "",
+            resolve,
+            {
+              inputType: "text",
+              confirmText: "儲存",
+              cancelText: "取消",
+              onCancel: () => resolve(""),
+            }
+          );
+        });
+        if (!clientId) return "";
+        localStorage.setItem("tpDriveClientId", clientId.trim());
+        _driveClientId = clientId.trim();
+        return _driveClientId;
+      }
+      async function loadGIS() {
+        if (window.google?.accounts?.oauth2) return;
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://accounts.google.com/gsi/client";
+          script.onload = resolve;
+          script.onerror = () => reject(new Error("無法載入 Google 登入元件，請確認網路可連 Google 後重試"));
+          document.head.appendChild(script);
+        });
+      }
+      let _driveAccessToken = null;
+      let _driveTokenExpiresAt = 0;
+      async function getDriveAccessToken() {
+        const clientId = await ensureDriveClientId();
+        if (!clientId) throw new Error("尚未設定 Google Client ID，已取消");
+        if (_driveAccessToken && _driveTokenExpiresAt > Date.now() + 60000) return _driveAccessToken;
+        await loadGIS();
+        const token = await new Promise((resolve, reject) => {
+          const client = google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: DRIVE_SCOPE,
+            callback: (resp) => {
+              if (resp.error) return reject(new Error("Google 登入失敗：" + (resp.error_description || resp.error)));
+              resolve(resp.access_token);
+            },
+          });
+          client.requestAccessToken();
+        });
+        _driveAccessToken = token;
+        _driveTokenExpiresAt = Date.now() + 3300000;
+        return token;
+      }
+      async function driveFetch(url, options = {}) {
+        const token = await getDriveAccessToken();
+        const resp = await fetch(url, {
+          ...options,
+          headers: { Authorization: "Bearer " + token, ...(options.headers || {}) },
+        });
+        if (!resp.ok) {
+          let detail = "";
+          try { detail = (await resp.json()).error?.message || ""; } catch { /* ignore */ }
+          throw new Error("Google Drive 請求失敗（" + resp.status + "）" + (detail ? "：" + detail : ""));
+        }
+        return resp;
+      }
+      async function uploadZipToDrive(blob, name) {
+        const init = await driveFetch(
+          "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Upload-Content-Type": "application/zip",
+              "X-Upload-Content-Length": String(blob.size),
+            },
+            body: JSON.stringify({ name, mimeType: "application/zip" }),
+          }
+        );
+        const location = init.headers.get("Location");
+        if (!location) throw new Error("Google Drive 未提供上傳位址");
+        const put = await fetch(location, {
+          method: "PUT",
+          headers: { "Content-Range": "bytes 0-" + (blob.size - 1) + "/" + blob.size },
+          body: blob,
+        });
+        if (!put.ok) throw new Error("上傳失敗（" + put.status + "），請確認網路後重試");
+        return put.json();
+      }
+      async function listDriveBackups() {
+        const query = encodeURIComponent("name contains '設備地圖備份' and trashed = false");
+        const resp = await driveFetch(
+          "https://www.googleapis.com/drive/v3/files?q=" + query +
+          "&orderBy=createdTime desc&pageSize=20&fields=files(id,name,size,createdTime)"
+        );
+        return (await resp.json()).files || [];
+      }
+      async function downloadDriveFile(fileId) {
+        const resp = await driveFetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
+        return resp.blob();
+      }
+      function driveBackupFileName() {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return "設備地圖備份_" + now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) +
+          "_" + pad(now.getHours()) + pad(now.getMinutes()) + ".zip";
+      }
+      async function driveBackupAction() {
+        const button = document.getElementById("driveBackupBtn");
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "☁️ 登入 Google 中";
+        try {
+          if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
+          await getDriveAccessToken();
+          normalizeInspectionState();
+          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份");
+          button.textContent = "☁️ 上傳中（" + formatStorageBytes(archive.blob.size) + "）";
+          const fileName = driveBackupFileName();
+          await uploadZipToDrive(archive.blob, fileName);
+          saveBackupSummary({
+            exportedAt: new Date().toISOString(),
+            folders: state.folders.length,
+            records: state.records.length,
+            photos: archive.photoCount,
+            profile: "original",
+            encrypted: false,
+            formatVersion: BACKUP_FORMAT_VERSION,
+            manifestHash: archive.manifestHash,
+          });
+          GlobalModal.alert("已備份到個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
+            state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + formatStorageBytes(archive.blob.size) + "）。<br>" +
+            "其他裝置可在「☁️ 從 Drive 還原」選取此檔。<small>備份檔未加密，請勿放入機密照片。</small>");
+        } catch (error) {
+          console.error("Drive 備份失敗：", error);
+          if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 備份失敗：" + error.message);
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+      async function driveRestoreAction() {
+        const button = document.getElementById("driveRestoreBtn");
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "☁️ 讀取雲端備份";
+        try {
+          const files = await listDriveBackups();
+          if (!files.length) {
+            GlobalModal.alert("個人雲端硬碟目前沒有「設備地圖備份」開頭的檔案。");
+            return;
+          }
+          const rows = files.map((f, i) =>
+            '<label style="display:block; padding:6px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
+            '<input type="radio" name="driveBackupPick" value="' + f.id + '"' + (i === 0 ? " checked" : "") + "> " +
+            "<strong>" + escapeHtml(f.name) + "</strong><br>" +
+            '<span style="font-size:12px; color:#64748b; margin-left:20px;">' +
+            (f.createdTime ? new Date(f.createdTime).toLocaleString("zh-TW") : "") +
+            (f.size ? " · " + formatStorageBytes(Number(f.size)) : "") + "</span></label>"
+          ).join("");
+          const pickedId = await new Promise(resolve => {
+            GlobalModal.show({
+              title: "選擇雲端備份",
+              content: rows + '<div style="margin-top:8px; font-size:12px; color:#64748b;">選擇後會下載並進入還原確認。</div>',
+              type: "confirm",
+              confirmText: "下載並還原",
+              cancelText: "取消",
+              onConfirm: () => {
+                const checked = document.querySelector('input[name="driveBackupPick"]:checked');
+                resolve(checked ? checked.value : "");
+              },
+              onCancel: () => resolve(""),
+            });
+          });
+          if (!pickedId) return;
+          const picked = files.find((f) => f.id === pickedId);
+          button.textContent = "☁️ 下載中";
+          const blob = await downloadDriveFile(pickedId);
+          await processBackupImport(new File([blob], picked.name, { type: "application/zip" }), "");
+        } catch (error) {
+          console.error("Drive 還原失敗：", error);
+          if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 還原失敗：" + error.message);
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+
       async function exportSystemBackup() {
         if (!window.JSZip) {
           GlobalModal.alert("完整備份元件尚未載入，請確認網路後重試。");
@@ -7221,6 +7421,8 @@
 
       document.getElementById("exportSystemBtn").addEventListener("click", exportSystemBackup);
       document.getElementById("importSystemBtn").addEventListener("click", () => document.getElementById("importSystemInput").click());
+      document.getElementById("driveBackupBtn").addEventListener("click", driveBackupAction);
+      document.getElementById("driveRestoreBtn").addEventListener("click", driveRestoreAction);
       document.getElementById("importSystemInput").addEventListener("change", async (event) => {
         const file = event.target.files[0];
         event.target.value = "";
