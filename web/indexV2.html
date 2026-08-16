@@ -6945,11 +6945,12 @@
 
       // ===== Google Drive 備份（個人帳號 OAuth；token 不持久化，每次操作重新授權，關閉即無殘留）=====
       const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+      const DRIVE_CLIENT_ID_DEFAULT = "1005424982828-ncebcgsd539occ7ds0rjpae3coodae9u.apps.googleusercontent.com";
       let _driveClientId = null;
       function getDriveClientId() {
         const fromUrl = new URLSearchParams(location.search).get("driveClientId");
         if (fromUrl) return fromUrl;
-        if (_driveClientId === null) _driveClientId = localStorage.getItem("tpDriveClientId") || "";
+        if (_driveClientId === null) _driveClientId = localStorage.getItem("tpDriveClientId") || DRIVE_CLIENT_ID_DEFAULT;
         return _driveClientId;
       }
       async function ensureDriveClientId() {
