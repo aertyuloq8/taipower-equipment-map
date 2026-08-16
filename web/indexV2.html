@@ -6986,6 +6986,10 @@
       }
       let _driveAccessToken = null;
       let _driveTokenExpiresAt = 0;
+      function clearDriveAccessToken() {
+        _driveAccessToken = null;
+        _driveTokenExpiresAt = 0;
+      }
       async function getDriveAccessToken() {
         const clientId = await ensureDriveClientId();
         if (!clientId) throw new Error("尚未設定 Google Client ID，已取消");
@@ -7090,6 +7094,7 @@
           console.error("Drive 備份失敗：", error);
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 備份失敗：" + error.message);
         } finally {
+          clearDriveAccessToken();
           button.disabled = false;
           button.textContent = originalText;
         }
@@ -7136,6 +7141,7 @@
           console.error("Drive 還原失敗：", error);
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 還原失敗：" + error.message);
         } finally {
+          clearDriveAccessToken();
           button.disabled = false;
           button.textContent = originalText;
         }
