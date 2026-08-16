@@ -883,6 +883,7 @@
       }
       .record-item-meta { font-size: 11px; color: var(--muted); }
       .folder-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+      #folderList > .folder-item:first-child { border-top-color: transparent !important; }
       .btn-small {
         background: transparent;
         color: var(--muted);
@@ -1934,7 +1935,20 @@
         .folder-header > div,
         .folder-btn-group,
         .folder-actions {
-          gap: 8px;
+          gap: 4px;
+        }
+
+        .folder-actions .btn-small {
+          font-size: 11px;
+          min-height: 34px;
+          padding: 3px 5px;
+        }
+
+        .folder-actions .btn-small[data-move-up],
+        .folder-actions .btn-small[data-move-down],
+        .folder-actions .btn-small[data-toggle-visibility],
+        .folder-actions .btn-small[data-delete-folder] {
+          min-width: 34px;
         }
 
         .btn-action,
@@ -2157,6 +2171,13 @@
           font-size: 12px;
           min-width: 60px;
           padding: 0 8px;
+        }
+      }
+
+      @media (max-width: 360px) {
+        .folder-actions {
+          display: grid !important;
+          grid-template-columns: repeat(4, 1fr);
         }
       }
 
