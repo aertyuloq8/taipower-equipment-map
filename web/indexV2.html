@@ -3265,14 +3265,25 @@
           });
           const toolsFold = document.getElementById("recordsToolsFold");
           if (toolsFold) {
+            const collapseToolsFold = () => {
+              if (toolsFold.open) {
+                toolsFold.open = false;
+                try { localStorage.setItem("recordsToolsOpen", "0"); } catch { /* ignore */ }
+              }
+            };
             toolsFold.querySelectorAll("button").forEach(btn => {
               btn.addEventListener("click", () => {
+                const progress = document.getElementById("backupProgress");
                 setTimeout(() => {
-                  if (toolsFold.open) {
-                    toolsFold.open = false;
-                    try { localStorage.setItem("recordsToolsOpen", "0"); } catch { /* ignore */ }
+                  if (progress && !progress.hidden) {
+                    const obs = new MutationObserver((muts, ob) => {
+                      if (progress.hidden) { ob.disconnect(); collapseToolsFold(); }
+                    });
+                    obs.observe(progress, { attributes: true, attributeFilter: ["hidden"] });
+                  } else {
+                    setTimeout(collapseToolsFold, 800);
                   }
-                }, 1200);
+                }, 400);
               });
             });
           }
