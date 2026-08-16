@@ -2627,10 +2627,14 @@
             <div class="folder-btn-group">
               <button id="driveBackupBtn" class="btn-action btn-drive" title="將完整備份 ZIP 上傳到個人 Google 雲端硬碟（需 Google 帳號登入）">☁️ 備份到 Drive</button>
               <button id="driveRestoreBtn" class="btn-action btn-drive" title="從 Google 雲端硬碟下載完整備份 ZIP 並還原">☁️ 從 Drive 還原</button>
-              <button id="driveDeleteBtn" class="btn-action btn-drive-delete" title="刪除個人雲端硬碟中的備份 ZIP（本機不受影響）">🗑 刪除雲端備份</button>
             </div>
             <div class="folder-btn-group">
+              <button id="driveDeleteBtn" class="btn-action btn-drive-delete" title="刪除個人雲端硬碟中的備份 ZIP（本機不受影響）">🗑 刪除雲端備份</button>
               <button id="v2SyncToggle" class="btn-action btn-sync" title="兩台裝置直接傳輸資料，不需帳號與伺服器">📡 裝置同步</button>
+            </div>
+            <div id="backupProgress" class="v2-sync-progress" hidden>
+              <div class="v2-sync-progress-bar"><div id="backupProgressFill" class="v2-sync-progress-fill"></div></div>
+              <span id="backupProgressText" class="v2-sync-progress-text"></span>
             </div>
             <section class="storage-health" aria-label="裝置儲存狀態">
               <div class="storage-health-head">
@@ -6694,10 +6698,11 @@
         }
       }
 
-      async function createPhotoArchive(records, folders, archiveTitle, photoProfile = "original") {
+      async function createPhotoArchive(records, folders, archiveTitle, photoProfile = "original", onProgress = null) {
         if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試。");
 
         const zip = new JSZip();
+        const totalPhotos = records.reduce((n, record) => n + (record.photos || []).length, 0);
         const manifestFiles = [];
         const exportedAt = new Date().toISOString();
         const orderedRecords = sortInspectionRecords(records);
@@ -6748,6 +6753,7 @@
               folderPath: folderPathFromList(record.folderId, folders),
             });
             photoCount++;
+            if (onProgress) onProgress(photoCount, Math.max(1, totalPhotos));
           }
         }
 
@@ -7023,6 +7029,20 @@
           client.requestAccessToken();
         });
       }
+      function backupProgressShow() {
+        document.getElementById("backupProgress").hidden = false;
+      }
+      function backupProgressUpdate(percent, text) {
+        backupProgressShow();
+        document.getElementById("backupProgressFill").style.width =
+          Math.max(0, Math.min(100, percent)) + "%";
+        document.getElementById("backupProgressText").textContent = text || "";
+      }
+      function backupProgressHide() {
+        document.getElementById("backupProgress").hidden = true;
+        document.getElementById("backupProgressFill").style.width = "0%";
+        document.getElementById("backupProgressText").textContent = "";
+      }
       async function driveFetch(url, options = {}) {
         const token = await getDriveAccessToken();
         const resp = await fetch(url, {
@@ -7036,28 +7056,43 @@
         }
         return resp;
       }
-      async function uploadZipToDrive(blob, name) {
-        const init = await driveFetch(
-          "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Upload-Content-Type": "application/zip",
-              "X-Upload-Content-Length": String(blob.size),
-            },
-            body: JSON.stringify({ name, mimeType: "application/zip" }),
-          }
-        );
-        const location = init.headers.get("Location");
-        if (!location) throw new Error("Google Drive 未提供上傳位址");
-        const put = await fetch(location, {
-          method: "PUT",
-          headers: { "Content-Range": "bytes 0-" + (blob.size - 1) + "/" + blob.size },
-          body: blob,
+      async function uploadZipToDrive(blob, name, onProgress = null) {
+        const token = await getDriveAccessToken();
+        return new Promise((resolve, reject) => {
+          const init = new XMLHttpRequest();
+          init.open("POST", "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable");
+          init.setRequestHeader("Authorization", "Bearer " + token);
+          init.setRequestHeader("Content-Type", "application/json");
+          init.setRequestHeader("X-Upload-Content-Type", "application/zip");
+          init.setRequestHeader("X-Upload-Content-Length", String(blob.size));
+          init.onload = () => {
+            const location = init.getResponseHeader("Location");
+            if (init.status < 200 || init.status >= 300 || !location) {
+              reject(new Error("Google Drive 未提供上傳位址（" + init.status + "）"));
+              return;
+            }
+            const put = new XMLHttpRequest();
+            put.open("PUT", location);
+            put.setRequestHeader("Content-Type", "application/zip");
+            put.upload.onprogress = (event) => {
+              if (event.lengthComputable && onProgress) {
+                onProgress(Math.round((event.loaded / event.total) * 100));
+              }
+            };
+            put.onload = () => {
+              if (put.status >= 200 && put.status < 300) {
+                try { resolve(JSON.parse(put.responseText)); }
+                catch { resolve({}); }
+              } else {
+                reject(new Error("上傳失敗（" + put.status + "），請確認網路後重試"));
+              }
+            };
+            put.onerror = () => reject(new Error("上傳失敗，請確認網路後重試"));
+            put.send(blob);
+          };
+          init.onerror = () => reject(new Error("Google Drive 連線失敗，請確認網路後重試"));
+          init.send(JSON.stringify({ name, mimeType: "application/zip" }));
         });
-        if (!put.ok) throw new Error("上傳失敗（" + put.status + "），請確認網路後重試");
-        return put.json();
       }
       async function listDriveBackups() {
         const query = encodeURIComponent("name contains '設備地圖備份' and trashed = false");
@@ -7067,9 +7102,25 @@
         );
         return (await resp.json()).files || [];
       }
-      async function downloadDriveFile(fileId) {
-        const resp = await driveFetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
-        return resp.blob();
+      async function downloadDriveFile(fileId, onProgress = null) {
+        const token = await getDriveAccessToken();
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("GET", "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
+          xhr.responseType = "blob";
+          xhr.setRequestHeader("Authorization", "Bearer " + token);
+          xhr.onprogress = (event) => {
+            if (event.lengthComputable && onProgress) {
+              onProgress(Math.round((event.loaded / event.total) * 100));
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+            else reject(new Error("下載失敗（" + xhr.status + "）"));
+          };
+          xhr.onerror = () => reject(new Error("下載失敗，請確認網路後重試"));
+          xhr.send();
+        });
       }
       function driveBackupFileName() {
         const now = new Date();
@@ -7084,12 +7135,16 @@
         button.textContent = "☁️ 登入 Google 中";
         try {
           if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
+          backupProgressUpdate(2, "準備打包…");
           await getDriveAccessToken();
           normalizeInspectionState();
-          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份");
+          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份", "original",
+            (done, total) => backupProgressUpdate(3 + Math.round((done / Math.max(1, total)) * 57), "打包照片 " + done + " / " + total + "…"));
           button.textContent = "☁️ 上傳中（" + formatStorageBytes(archive.blob.size) + "）";
+          backupProgressUpdate(62, "上傳中（" + formatStorageBytes(archive.blob.size) + "）…");
           const fileName = driveBackupFileName();
-          await uploadZipToDrive(archive.blob, fileName);
+          await uploadZipToDrive(archive.blob, fileName, (pct) => backupProgressUpdate(62 + Math.round(pct * 0.36), "上傳 " + pct + "%…"));
+          backupProgressUpdate(100, "完成");
           saveBackupSummary({
             exportedAt: new Date().toISOString(),
             folders: state.folders.length,
@@ -7108,6 +7163,7 @@
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 備份失敗：" + error.message);
         } finally {
           clearDriveAccessToken();
+          backupProgressHide();
           button.disabled = false;
           button.textContent = originalText;
         }
@@ -7151,13 +7207,17 @@
           if (!pickedId) return;
           const picked = files.find((f) => f.id === pickedId);
           button.textContent = "☁️ 下載中";
-          const blob = await downloadDriveFile(pickedId);
-          await processBackupImport(new File([blob], picked.name, { type: "application/zip" }), "");
+          backupProgressUpdate(5, "下載備份…");
+          const blob = await downloadDriveFile(pickedId, (pct) => backupProgressUpdate(5 + Math.round(pct * 0.6), "下載備份 " + pct + "%…"));
+          backupProgressUpdate(68, "解壓與檢查備份…");
+          await processBackupImport(new File([blob], picked.name, { type: "application/zip" }), "", (done, total) => backupProgressUpdate(68 + Math.round((done / Math.max(1, total)) * 28), "解壓照片 " + done + " / " + total + "…"));
+          backupProgressUpdate(100, "完成");
         } catch (error) {
           console.error("Drive 還原失敗：", error);
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 還原失敗：" + error.message);
         } finally {
           clearDriveAccessToken();
+          backupProgressHide();
           button.disabled = false;
           button.textContent = originalText;
         }
@@ -7168,11 +7228,14 @@
         button.disabled = true;
         button.textContent = "🗑 讀取雲端備份";
         try {
+          backupProgressUpdate(5, "讀取雲端備份清單…");
           const files = await listDriveBackups();
           if (!files.length) {
+            backupProgressHide();
             GlobalModal.alert("個人雲端硬碟目前沒有「設備地圖備份」開頭的檔案。");
             return;
           }
+          backupProgressUpdate(30, "請確認要刪除的備份…");
           const rows = driveBackupRows(files);
           const pickedId = await new Promise(resolve => {
             GlobalModal.show({
@@ -7199,13 +7262,16 @@
           });
           if (!confirmed) return;
           button.textContent = "🗑 刪除中";
+          backupProgressUpdate(60, "刪除中…");
           await driveFetch("https://www.googleapis.com/drive/v3/files/" + pickedId, { method: "DELETE" });
+          backupProgressUpdate(100, "完成");
           GlobalModal.alert("已刪除雲端備份：" + escapeHtml(picked.name));
         } catch (error) {
           console.error("Drive 刪除失敗：", error);
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 刪除失敗：" + error.message);
         } finally {
           clearDriveAccessToken();
+          backupProgressHide();
           button.disabled = false;
           button.textContent = originalText;
         }
@@ -7230,13 +7296,18 @@
         button.disabled = true;
         button.textContent = password ? "⏳ 加密備份中" : "⏳ 打包中";
         try {
+          backupProgressUpdate(2, "準備打包…");
           normalizeInspectionState();
           const archive = await createPhotoArchive(
             state.records,
             state.folders,
-            "土木設備分布地圖照片版完整備份"
+            "土木設備分布地圖照片版完整備份",
+            "original",
+            (done, total) => backupProgressUpdate(3 + Math.round((done / Math.max(1, total)) * 62), "打包照片 " + done + " / " + total + "…")
           );
+          backupProgressUpdate(68, password ? "加密中…" : "產生 ZIP…");
           const encryptedArchive = await encryptBackupBlob(archive.blob, password);
+          backupProgressUpdate(100, "完成");
           const fileExtension = encryptedArchive.encrypted ? ".zip.enc" : ".zip";
           downloadBlob(encryptedArchive.blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}${fileExtension}`);
           saveBackupSummary({
@@ -7254,6 +7325,7 @@
           console.error("完整備份失敗：", error);
           GlobalModal.alert("完整備份失敗：" + error.message);
         } finally {
+          backupProgressHide();
           button.disabled = false;
           button.textContent = originalText;
         }
@@ -7354,7 +7426,7 @@
         return { valid: errors.length === 0, legacy: false, checked, errors };
       }
 
-      async function importZipBackup(file) {
+      async function importZipBackup(file, onProgress = null) {
         if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
         const zip = await JSZip.loadAsync(file);
         const recordsEntry = zip.file("records.json");
@@ -7369,6 +7441,7 @@
         const metaById = new Map(parsed.records.flatMap(record => (record.photos || []).map(photo => [photo.id, photo])));
         const photoPrefixes = [...metaById.keys()].map(id => [id + "_", id]).sort((a, b) => b[0].length - a[0].length);
         const photoEntries = [];
+        let photoDone = 0;
         for (const path of Object.keys(zip.files)) {
           const entry = zip.files[path];
           if (entry.dir || !path.startsWith("photos/")) continue;
@@ -7378,6 +7451,8 @@
           const photo = metaById.get(photoId);
           const blob = normalizePhotoBlob(await entry.async("blob"), photo);
           photoEntries.push({ id: photoId, blob });
+          photoDone++;
+          if (onProgress) onProgress(photoDone, Math.max(1, metaById.size));
         }
         const metadataPhotos = [...metaById.values()];
         return {
@@ -7465,12 +7540,12 @@
         });
       }
 
-      async function processBackupImport(file, password = "") {
+      async function processBackupImport(file, password = "", onProgress = null) {
         let source = file;
         const encrypted = await isEncryptedBackupFile(file);
         if (encrypted) source = await decryptBackupFile(file, password);
         if (/\.zip$/i.test(file.name) || encrypted || file.type === "application/zip") {
-          const imported = await importZipBackup(source);
+          const imported = await importZipBackup(source, onProgress);
           await confirmBackupRestore(file.name, imported, true);
           return;
         }
@@ -7500,21 +7575,29 @@
         event.target.value = "";
         if (!file) return;
         try {
+          backupProgressUpdate(5, "讀取備份…");
           if (await isEncryptedBackupFile(file)) {
             GlobalModal.prompt(
               "此備份已加密，請輸入密碼",
               "",
               async password => {
-                try { await processBackupImport(file, password); }
+                try {
+                  await processBackupImport(file, password, (done, total) => backupProgressUpdate(10 + Math.round((done / Math.max(1, total)) * 75), "解壓照片 " + done + " / " + total + "…"));
+                  backupProgressUpdate(100, "完成");
+                }
                 catch (error) { GlobalModal.alert("讀取加密備份失敗：" + error.message); }
+                finally { backupProgressHide(); }
               },
               { inputType: "password", confirmText: "解密並檢查", cancelText: "取消" }
             );
             return;
           }
-          await processBackupImport(file);
+          await processBackupImport(file, "", (done, total) => backupProgressUpdate(10 + Math.round((done / Math.max(1, total)) * 75), "解壓照片 " + done + " / " + total + "…"));
+          backupProgressUpdate(100, "完成");
         } catch (error) {
           GlobalModal.alert("讀取備份失敗：" + error.message);
+        } finally {
+          backupProgressHide();
         }
       });
 
