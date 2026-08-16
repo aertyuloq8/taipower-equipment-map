@@ -178,7 +178,8 @@
     if (!hints.length) return q;
     const hint = hints[0];
     const rewritten = hint.name + q.slice(hint.short.length);
-    if (roads.some(r => r.k.includes(hint.name) && stripLiSegment(r.k).includes(rewritten))) return rewritten;
+    const roadPart = rewritten.replace(/[0-9之\-]+.*$/, "").replace(/[、\s]+$/, "");
+    if (roadPart.length >= hint.name.length && roads.some(r => r.k.includes(hint.name) && stripLiSegment(r.k).includes(roadPart))) return rewritten;
     return q;
   }
 
