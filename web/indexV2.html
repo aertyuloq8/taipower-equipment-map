@@ -227,8 +227,8 @@
         align-items: center;
         margin-bottom: 12px;
       }
-      .folder-btn-group { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
-      .btn-action { flex: 1; min-height: 32px; font-size: 13px; border-radius: 4px; background: #fff; }
+      .folder-btn-group { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+      .btn-action { flex: 1 1 140px; min-height: 32px; font-size: 13px; border-radius: 4px; background: #fff; }
       .btn-add-folder  { color: var(--accent); border: 1px dashed var(--accent); }
       .btn-import-csv  { background: #f0fdf4; color: #16a34a; border: 1px dashed #16a34a; }
       .btn-export-json { background: #fffbeb; color: #d97706; border: 1px dashed #d97706; }
@@ -236,6 +236,7 @@
       .btn-export-zip { background: #ecfeff; color: #0f766e; border: 1px dashed #0f766e; }
       .btn-import-zip { background: #f5f3ff; color: #6d28d9; border: 1px dashed #6d28d9; }
 .btn-drive { background: #fff7ed; color: #c2410c; border: 1px dashed #c2410c; }
+      .btn-drive-delete { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }
       .btn-sync { background: #f0f9ff; color: #0369a1; border: 1px dashed #0369a1; }
       .edition-switch-link {
         align-items: center;
@@ -2621,10 +2622,15 @@
             <div class="folder-btn-group">
               <button id="exportSystemBtn" class="btn-action btn-export-zip" title="下載紀錄、Excel 與照片的完整 ZIP 備份">💾 完整備份</button>
               <button id="importSystemBtn" class="btn-action btn-import-zip" title="從完整 ZIP 或舊版 JSON 備份還原">📂 資料還原</button>
+              <input type="file" id="importSystemInput" accept=".zip,.zip.enc,.json" style="display:none" />
+            </div>
+            <div class="folder-btn-group">
               <button id="driveBackupBtn" class="btn-action btn-drive" title="將完整備份 ZIP 上傳到個人 Google 雲端硬碟（需 Google 帳號登入）">☁️ 備份到 Drive</button>
               <button id="driveRestoreBtn" class="btn-action btn-drive" title="從 Google 雲端硬碟下載完整備份 ZIP 並還原">☁️ 從 Drive 還原</button>
+              <button id="driveDeleteBtn" class="btn-action btn-drive-delete" title="刪除個人雲端硬碟中的備份 ZIP（本機不受影響）">🗑 刪除雲端備份</button>
+            </div>
+            <div class="folder-btn-group">
               <button id="v2SyncToggle" class="btn-action btn-sync" title="兩台裝置直接傳輸資料，不需帳號與伺服器">📡 裝置同步</button>
-              <input type="file" id="importSystemInput" accept=".zip,.zip.enc,.json" style="display:none" />
             </div>
             <section class="storage-health" aria-label="裝置儲存狀態">
               <div class="storage-health-head">
@@ -7106,6 +7112,16 @@
           button.textContent = originalText;
         }
       }
+      function driveBackupRows(files) {
+        return files.map((f, i) =>
+          '<label style="display:block; padding:6px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
+          '<input type="radio" name="driveBackupPick" value="' + f.id + '"' + (i === 0 ? " checked" : "") + "> " +
+          "<strong>" + escapeHtml(f.name) + "</strong><br>" +
+          '<span style="font-size:12px; color:#64748b; margin-left:20px;">' +
+          (f.createdTime ? new Date(f.createdTime).toLocaleString("zh-TW") : "") +
+          (f.size ? " · " + formatStorageBytes(Number(f.size)) : "") + "</span></label>"
+        ).join("");
+      }
       async function driveRestoreAction() {
         const button = document.getElementById("driveRestoreBtn");
         const originalText = button.textContent;
@@ -7117,14 +7133,7 @@
             GlobalModal.alert("個人雲端硬碟目前沒有「設備地圖備份」開頭的檔案。");
             return;
           }
-          const rows = files.map((f, i) =>
-            '<label style="display:block; padding:6px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
-            '<input type="radio" name="driveBackupPick" value="' + f.id + '"' + (i === 0 ? " checked" : "") + "> " +
-            "<strong>" + escapeHtml(f.name) + "</strong><br>" +
-            '<span style="font-size:12px; color:#64748b; margin-left:20px;">' +
-            (f.createdTime ? new Date(f.createdTime).toLocaleString("zh-TW") : "") +
-            (f.size ? " · " + formatStorageBytes(Number(f.size)) : "") + "</span></label>"
-          ).join("");
+          const rows = driveBackupRows(files);
           const pickedId = await new Promise(resolve => {
             GlobalModal.show({
               title: "選擇雲端備份",
@@ -7147,6 +7156,54 @@
         } catch (error) {
           console.error("Drive 還原失敗：", error);
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 還原失敗：" + error.message);
+        } finally {
+          clearDriveAccessToken();
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
+      async function driveDeleteAction() {
+        const button = document.getElementById("driveDeleteBtn");
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "🗑 讀取雲端備份";
+        try {
+          const files = await listDriveBackups();
+          if (!files.length) {
+            GlobalModal.alert("個人雲端硬碟目前沒有「設備地圖備份」開頭的檔案。");
+            return;
+          }
+          const rows = driveBackupRows(files);
+          const pickedId = await new Promise(resolve => {
+            GlobalModal.show({
+              title: "選擇要刪除的雲端備份",
+              content: rows + '<div style="margin-top:8px; font-size:12px; color:#64748b;">刪除後無法從雲端還原此備份，本機資料不受影響。</div>',
+              type: "confirm",
+              confirmText: "刪除",
+              cancelText: "取消",
+              onConfirm: () => {
+                const checked = document.querySelector('input[name="driveBackupPick"]:checked');
+                resolve(checked ? checked.value : "");
+              },
+              onCancel: () => resolve(""),
+            });
+          });
+          if (!pickedId) return;
+          const picked = files.find((f) => f.id === pickedId);
+          const confirmed = await new Promise(resolve => {
+            GlobalModal.confirm(
+              "確定刪除 <strong>" + escapeHtml(picked.name) + "</strong>？<br>此操作無法復原（本機資料不受影響）。",
+              () => resolve(true),
+              () => resolve(false)
+            );
+          });
+          if (!confirmed) return;
+          button.textContent = "🗑 刪除中";
+          await driveFetch("https://www.googleapis.com/drive/v3/files/" + pickedId, { method: "DELETE" });
+          GlobalModal.alert("已刪除雲端備份：" + escapeHtml(picked.name));
+        } catch (error) {
+          console.error("Drive 刪除失敗：", error);
+          if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 刪除失敗：" + error.message);
         } finally {
           clearDriveAccessToken();
           button.disabled = false;
@@ -7437,6 +7494,7 @@
       document.getElementById("importSystemBtn").addEventListener("click", () => document.getElementById("importSystemInput").click());
       document.getElementById("driveBackupBtn").addEventListener("click", driveBackupAction);
       document.getElementById("driveRestoreBtn").addEventListener("click", driveRestoreAction);
+      document.getElementById("driveDeleteBtn").addEventListener("click", driveDeleteAction);
       document.getElementById("importSystemInput").addEventListener("change", async (event) => {
         const file = event.target.files[0];
         event.target.value = "";
