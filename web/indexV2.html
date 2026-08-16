@@ -2634,7 +2634,7 @@
             <div class="photo-browser-batch-actions">
               <span id="photoBrowserSelectedCount">未選取照片</span>
               <div>
-                <button id="photoBrowserSelectAllBtn" type="button">選取目前照片</button>
+                <button id="photoBrowserSelectAllBtn" type="button">全部選取</button>
                 <button id="photoBrowserDeleteSelectedBtn" type="button" disabled>刪除所選</button>
                 <button id="photoBrowserDeleteAllBtn" type="button">刪除全部照片</button>
               </div>
@@ -2659,7 +2659,7 @@
                </div>
             </div>
             <details class="panel-fold" id="recordsToolsFold">
-              <summary>資料備份與還原</summary>
+              <summary>🧰 資料備份與還原</summary>
               <div class="panel-fold-body">
                 <div class="folder-btn-group">
                   <button id="addFolderBtn" class="btn-action btn-add-folder">+ 新增最上層資料夾</button>
@@ -2686,7 +2686,7 @@
               </div>
             </details>
             <details class="panel-fold" id="storageHealthFold">
-              <summary>資料儲存空間</summary>
+              <summary>💾 資料儲存空間</summary>
               <div class="panel-fold-body">
                 <section class="storage-health" aria-label="裝置儲存狀態">
                   <div class="storage-health-head">
@@ -3183,7 +3183,7 @@
             return;
           }
           const folderHead = event.target.closest(".photo-folder-head");
-          if (folderHead && !event.target.closest(".photo-folder-delete")) {
+          if (folderHead && !event.target.closest(".photo-folder-delete") && !event.target.closest(".photo-folder-select") && !event.target.closest(".photo-folder-toggle")) {
             togglePhotoFolderCollapse(folderHead.closest(".photo-folder-group")?.dataset.photoFolder || "__uncategorized__");
             return;
           }
@@ -3215,12 +3215,17 @@
           if (record) openEditPanel(record);
         });
         document.getElementById("photoBrowserGrid").addEventListener("change", event => {
+          const folderBox = event.target.closest("[data-photo-folder-select]");
+          if (folderBox) {
+            selectPhotoFolderPhotos(folderBox.dataset.photoFolderSelect || "__uncategorized__", folderBox.checked);
+            return;
+          }
           if (event.target.matches("[data-photo-select]")) updatePhotoBrowserSelectionUi();
         });
         document.getElementById("photoBrowserGrid").addEventListener("keydown", event => {
           if (event.key !== "Enter" && event.key !== " ") return;
           const head = event.target.closest(".photo-folder-head");
-          if (!head) return;
+          if (!head || event.target.closest(".photo-folder-select") || event.target.closest(".photo-folder-toggle")) return;
           event.preventDefault();
           togglePhotoFolderCollapse(head.closest(".photo-folder-group")?.dataset.photoFolder || "__uncategorized__");
         });
@@ -4315,6 +4320,25 @@
         if (event.key === "Escape") closePhotoViewer();
       });
 
+      function updatePhotoFolderSelectStates() {
+        document.querySelectorAll("#photoBrowserGrid .photo-folder-group").forEach(group => {
+          const box = group.querySelector(".photo-folder-select");
+          if (!box) return;
+          const inputs = [...group.querySelectorAll("[data-photo-select]")];
+          const checked = inputs.filter(input => input.checked).length;
+          box.checked = inputs.length > 0 && checked === inputs.length;
+          box.indeterminate = checked > 0 && checked < inputs.length;
+          box.disabled = inputs.length === 0;
+        });
+      }
+
+      function selectPhotoFolderPhotos(folderId, shouldSelect) {
+        const group = document.querySelector(`#photoBrowserGrid [data-photo-folder-select="${CSS.escape(folderId || "__uncategorized__")}"]`)?.closest(".photo-folder-group");
+        if (!group) return;
+        group.querySelectorAll("[data-photo-select]").forEach(input => { input.checked = shouldSelect; });
+        updatePhotoBrowserSelectionUi();
+      }
+
       function updatePhotoBrowserSelectionUi() {
         const grid = document.getElementById("photoBrowserGrid");
         const selectedCount = document.getElementById("photoBrowserSelectedCount");
@@ -4323,6 +4347,7 @@
         const count = grid.querySelectorAll("[data-photo-select]:checked").length;
         selectedCount.textContent = count ? `已選取 ${count} 張照片` : "未選取照片";
         deleteSelected.disabled = count === 0;
+        updatePhotoFolderSelectStates();
       }
 
       function stopPhotoThumbnailLoading() {
@@ -4394,7 +4419,7 @@
         const shouldSelect = inputs.some(input => !input.checked);
         inputs.forEach(input => { input.checked = shouldSelect; });
         const button = document.getElementById("photoBrowserSelectAllBtn");
-        if (button) button.textContent = shouldSelect ? "取消選取" : "選取目前照片";
+        if (button) button.textContent = shouldSelect ? "取消選取" : "全部選取";
         updatePhotoBrowserSelectionUi();
       }
 
@@ -4439,6 +4464,7 @@
         const count = document.getElementById("photoBrowserCount");
         const folderFilter = document.getElementById("photoBrowserFolderFilter");
         if (!grid || !count || !folderFilter) return;
+        const prevChecked = new Set([...grid.querySelectorAll("[data-photo-select]:checked")].map(input => input.dataset.photoSelect));
         stopPhotoThumbnailLoading();
         clearPhotoBrowserPreviewUrls();
         const epoch = photoBrowserRenderEpoch;
@@ -4458,7 +4484,7 @@
         if (!records.length) {
           grid.innerHTML = '<div style="font-size:13px; color:var(--muted); padding:18px 0;">尚無符合條件的照片紀錄</div>';
           const selectButton = document.getElementById("photoBrowserSelectAllBtn");
-          if (selectButton) selectButton.textContent = "選取目前照片";
+          if (selectButton) selectButton.textContent = "全部選取";
           updatePhotoBrowserSelectionUi();
           return;
         }
@@ -4475,6 +4501,7 @@
           return `<section class="photo-folder-group${folderCollapsed ? " is-collapsed" : ""}" data-photo-folder="${escapeHtml(group.folderId || "__uncategorized__")}">
             <div class="photo-folder-head${folderCollapsed ? " is-collapsed" : ""}" role="button" tabindex="0" aria-expanded="${folderCollapsed ? "false" : "true"}">
               <button type="button" class="photo-folder-toggle" data-photo-folder-toggle="${escapeHtml(group.folderId || "__uncategorized__")}" title="收合/展開資料夾" aria-label="收合/展開資料夾">▾</button>
+              <input type="checkbox" class="photo-folder-select" data-photo-folder-select="${escapeHtml(group.folderId || "__uncategorized__")}" aria-label="選取此資料夾所有照片" title="選取此資料夾所有照片">
               <strong>📂 ${escapeHtml(group.label)}</strong>
               <span>${groupPhotoCount} 張</span>
               <button type="button" class="photo-folder-delete" data-photo-delete-folder="${escapeHtml(group.folderId)}">刪除此資料夾照片</button>
@@ -4487,7 +4514,7 @@
                 </div>
                 <div class="photo-record-strip">${record.photos.map(photo => `
                   <figure class="photo-browser-item">
-                    <input type="checkbox" data-photo-select="${escapeHtml(photo.id)}" aria-label="選取 ${escapeHtml(photo.fileName || "巡檢照片")}">
+                    <input type="checkbox" data-photo-select="${escapeHtml(photo.id)}" aria-label="選取 ${escapeHtml(photo.fileName || "巡檢照片")}"${prevChecked.has(photo.id) ? " checked" : ""}>
                     <img data-photo-open="${escapeHtml(photo.id)}" data-browser-image="${escapeHtml(photo.id)}" alt="${escapeHtml(photo.fileName || "巡檢照片")}" title="點擊查看原圖" loading="lazy" />
                     <button type="button" data-photo-delete-single="${escapeHtml(photo.id)}" title="刪除這張照片" aria-label="刪除這張照片">×</button>
                   </figure>`).join("")}</div>
@@ -4515,8 +4542,9 @@
           });
         }
         const selectButton = document.getElementById("photoBrowserSelectAllBtn");
-        if (selectButton) selectButton.textContent = "選取目前照片";
+        if (selectButton) selectButton.textContent = prevChecked.size ? "取消選取" : "全部選取";
         updatePhotoBrowserSelectionUi();
+        updatePhotoFolderSelectStates();
       }
 
       // ==========================================
