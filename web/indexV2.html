@@ -2476,8 +2476,7 @@
             style="background:transparent; color:var(--muted); border:none; min-height:unset; padding:4px 8px; font-size:16px; cursor:pointer;">✕</button>
         </div>
         <select id="areaSelect"><option value="">全部區域</option></select>
-        <input id="searchInput" type="search" placeholder="設備或圖號座標，例如 M9993HC1197" autocomplete="off" />
-        <p style="font-size:11px; color:var(--muted); margin:0">💡 找不到設備時，可輸入 9 或 11 碼圖號座標定位該格中心；9 碼停止輸入約 1 秒後定位，若要使用 11 碼可直接繼續輸入後兩碼。</p>
+        <input id="searchInput" type="search" placeholder="搜尋設備或圖號座標" autocomplete="off" />
       </div>
       <div class="map-search-stats">
         <span>總點位 <strong id="totalCount">--</strong></span>
@@ -2539,7 +2538,7 @@
           <button id="v2AddressClose" class="v2-address-close" type="button" title="關閉門牌地址查詢" aria-label="關閉門牌地址查詢">×</button>
         </header>
         <p class="v2-address-warning">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
-        <input id="addrSearchInput" type="search" placeholder="門牌地址，例如 竹子腳98-22（之可用 -）" autocomplete="off" aria-controls="addrSearchResults" />
+        <input id="addrSearchInput" type="search" placeholder="搜尋門牌地址" autocomplete="off" aria-controls="addrSearchResults" />
         <p id="addrSearchStatus" class="v2-address-status" aria-live="polite"></p>
         <div id="addrSearchResults" class="v2-address-results" role="listbox"></div>
         <p class="v2-address-disclaimer">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
@@ -4453,6 +4452,7 @@
       }
 
       const collapsedPhotoFolders = new Set();
+      let collapsedPhotoFoldersInitialized = false;
       function togglePhotoFolderCollapse(folderId) {
         const key = folderId || "__uncategorized__";
         if (collapsedPhotoFolders.has(key)) collapsedPhotoFolders.delete(key);
@@ -4464,6 +4464,10 @@
         const count = document.getElementById("photoBrowserCount");
         const folderFilter = document.getElementById("photoBrowserFolderFilter");
         if (!grid || !count || !folderFilter) return;
+        if (!collapsedPhotoFoldersInitialized) {
+          state.folders.forEach(folder => collapsedPhotoFolders.add(folder.id));
+          collapsedPhotoFoldersInitialized = true;
+        }
         const prevChecked = new Set([...grid.querySelectorAll("[data-photo-select]:checked")].map(input => input.dataset.photoSelect));
         stopPhotoThumbnailLoading();
         clearPhotoBrowserPreviewUrls();

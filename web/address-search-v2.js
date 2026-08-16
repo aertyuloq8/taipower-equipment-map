@@ -77,6 +77,14 @@
     return out.replace(/號/g, "");
   }
 
+  function stripLiSegment(value) {
+    const s = String(value || "");
+    const idx = s.indexOf("區");
+    const head = idx === -1 ? "" : s.slice(0, idx + 1);
+    const rest = s.slice(idx === -1 ? 0 : idx + 1).replace(/^.*?里/, "").replace(/^\d*鄰/, "");
+    return head + rest;
+  }
+
   // ---------------- 資料載入 ----------------
   function loadIndex() {
     if (state.indexPromise) return state.indexPromise;
@@ -132,6 +140,7 @@
               la: plate.la,
               ln: plate.ln,
               k: prefix + normalize(plate.r),
+              s: prefix + stripLiSegment(normalize(plate.r)),
             };
             state.platesByKey.set(p.k, p);
             return p;
@@ -157,15 +166,32 @@
     return "";
   }
 
+  function applyDistrictHint(q, roads) {
+    const names = Object.values(state.index.districts || {});
+    for (const name of names) {
+      if (q.startsWith(name)) return q;
+    }
+    const hints = names
+      .map(name => ({ name, short: name.replace(/區$/, "") }))
+      .filter(({ short }) => short && q.startsWith(short))
+      .sort((a, b) => b.short.length - a.short.length);
+    if (!hints.length) return q;
+    const hint = hints[0];
+    const rewritten = hint.name + q.slice(hint.short.length);
+    if (roads.some(r => r.k.includes(hint.name) && stripLiSegment(r.k).includes(rewritten))) return rewritten;
+    return q;
+  }
+
   async function performSearch() {
-    const q = normalize(controls.input.value).trim();
+    const raw = normalize(controls.input.value).trim();
     const resultsEl = controls.results;
-    if (!q) {
+    if (!raw) {
       resultsEl.innerHTML = "";
       setStatus("");
       return;
     }
     const roads = state.index.roads || [];
+    const q = applyDistrictHint(raw, roads);
     const prefix = roadPrefixFor(q, roads);
     if (!prefix) {
       resultsEl.innerHTML = `<p class="v2-address-empty">查無符合「${escapeHtml(q)}」的門牌。可試試路名或村里名，例如「竹子腳」「塩埕」；號碼中的「之」可用「-」代替（如 98-22）。</p>`;
@@ -181,14 +207,11 @@
     let plates = [];
     let plateCount = 0;
     try {
-      const lists = [];
-      for (let i = 0; i < selected.length; i++) {
-        lists.push(await loadDistrict(selected[i]));
-        if (selected.length > 3) setStatus(`載入門牌資料 ${i + 1}/${selected.length}…`);
-      }
+      const lists = await Promise.all(selected.map(code => loadDistrict(code)));
+      if (selected.length > 3) setStatus(`載入門牌資料 ${selected.length} 個行政區…`);
       const all = lists.flat();
-      plates = all.filter(p => p.k.includes(q)).slice(0, 50);
-      plateCount = all.reduce((n, p) => n + (p.k.includes(q) ? 1 : 0), 0);
+      plates = all.filter(p => p.k.includes(q) || p.s.includes(q)).slice(0, 50);
+      plateCount = all.reduce((n, p) => n + (p.k.includes(q) || p.s.includes(q) ? 1 : 0), 0);
     } catch (error) {
       console.error("門牌資料載入失敗", error);
       setStatus("門牌資料載入失敗，請稍後再試。");
