@@ -2648,15 +2648,6 @@
 
         <div id="tabRecords" class="tab-content is-active">
           <section class="folders-section" aria-label="巡視紀錄">
-            <div class="folder-header">
-               <div style="display:flex; gap:8px; width:100%; justify-content:space-between;">
-                 <span style="font-weight:bold; font-size:14px">全部地圖標記：</span>
-                 <div>
-                   <button id="showAllStarsBtn" class="text-button" style="font-size:12px; margin-right:8px">全部顯示</button>
-                   <button id="hideAllStarsBtn" class="text-button" style="font-size:12px">全部隱藏🙈</button>
-                 </div>
-               </div>
-            </div>
             <details class="panel-fold" id="recordsToolsFold">
               <summary>🧰 資料備份與還原</summary>
               <div class="panel-fold-body">
@@ -2706,6 +2697,16 @@
                 </section>
               </div>
             </details>
+            <div style="border-top:1px solid var(--line); margin:6px 0 10px;"></div>
+            <div class="folder-header">
+              <div style="display:flex; gap:8px; width:100%; justify-content:space-between;">
+                <span style="font-weight:bold; font-size:14px">巡檢標記：</span>
+                <div>
+                  <button id="showAllStarsBtn" class="text-button" style="font-size:12px; margin-right:8px">全部顯示</button>
+                  <button id="hideAllStarsBtn" class="text-button" style="font-size:12px">全部隱藏🙈</button>
+                </div>
+              </div>
+            </div>
             <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; padding:8px 12px; border-radius:6px; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
               <div style="display:flex; align-items:center; gap:8px">
                 <button id="selectAllBtn" style="background:#0f766e; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">全選 ☑️</button>
