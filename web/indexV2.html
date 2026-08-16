@@ -228,6 +228,35 @@
         margin-bottom: 12px;
       }
       .folder-btn-group { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+      .panel-fold {
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        margin-bottom: 8px;
+      }
+      .panel-fold > summary {
+        align-items: center;
+        color: var(--accent-dark);
+        cursor: pointer;
+        display: flex;
+        font-size: 13px;
+        font-weight: bold;
+        justify-content: space-between;
+        list-style: none;
+        min-height: 40px;
+        padding: 8px 12px;
+        user-select: none;
+      }
+      .panel-fold > summary::-webkit-details-marker { display: none; }
+      .panel-fold > summary::after {
+        color: var(--muted);
+        content: "▶";
+        font-size: 10px;
+        transition: transform 0.15s ease;
+      }
+      .panel-fold[open] > summary::after { transform: rotate(90deg); }
+      .panel-fold > .panel-fold-body { padding: 0 10px 10px; }
+      .panel-fold .folder-btn-group:last-child { margin-bottom: 0; }
       .btn-action { flex: 1 1 140px; min-height: 32px; font-size: 13px; border-radius: 4px; background: #fff; }
       .btn-add-folder  { color: var(--accent); border: 1px dashed var(--accent); }
       .btn-import-csv  { background: #f0fdf4; color: #16a34a; border: 1px dashed #16a34a; }
@@ -511,10 +540,24 @@
       }
       .photo-folder-head {
         align-items: center;
+        cursor: pointer;
         display: flex;
         gap: 8px;
         justify-content: space-between;
+        user-select: none;
       }
+      .photo-folder-toggle {
+        background: none;
+        border: 0;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+        min-height: 30px;
+        padding: 0 4px;
+        transition: transform 0.15s ease;
+      }
+      .photo-folder-head.is-collapsed .photo-folder-toggle { transform: rotate(-90deg); }
+      .photo-folder-group.is-collapsed .photo-folder-records { display: none; }
       .photo-folder-head strong { color: var(--accent-dark); font-size: 13px; overflow-wrap: anywhere; }
       .photo-folder-head span { color: var(--muted); font-size: 11px; margin-left: auto; white-space: nowrap; }
       .photo-folder-delete {
@@ -2614,45 +2657,55 @@
                  </div>
                </div>
             </div>
-            <div class="folder-btn-group">
-              <button id="addFolderBtn" class="btn-action btn-add-folder">+ 新增最上層資料夾</button>
-              <button id="importCsvBtn" class="btn-action btn-import-csv" title="支援 .xlsx, .xls, .csv">📥 匯入 Excel</button>
-              <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls,.xlsm" style="display:none" />
-            </div>
-            <div class="folder-btn-group">
-              <button id="exportSystemBtn" class="btn-action btn-export-zip" title="下載紀錄、Excel 與照片的完整 ZIP 備份">💾 完整備份</button>
-              <button id="importSystemBtn" class="btn-action btn-import-zip" title="從完整 ZIP 或舊版 JSON 備份還原">📂 資料還原</button>
-              <input type="file" id="importSystemInput" accept=".zip,.zip.enc,.json" style="display:none" />
-            </div>
-            <div class="folder-btn-group">
-              <button id="driveBackupBtn" class="btn-action btn-drive" title="將完整備份 ZIP 上傳到個人 Google 雲端硬碟（需 Google 帳號登入）">☁️ 備份到 Drive</button>
-              <button id="driveRestoreBtn" class="btn-action btn-drive" title="從 Google 雲端硬碟下載完整備份 ZIP 並還原">☁️ 從 Drive 還原</button>
-            </div>
-            <div class="folder-btn-group">
-              <button id="driveDeleteBtn" class="btn-action btn-drive-delete" title="刪除個人雲端硬碟中的備份 ZIP（本機不受影響）">🗑 刪除雲端備份</button>
-              <button id="v2SyncToggle" class="btn-action btn-sync" title="兩台裝置直接傳輸資料，不需帳號與伺服器">📡 裝置同步</button>
-            </div>
-            <div id="backupProgress" class="v2-sync-progress" hidden>
-              <div class="v2-sync-progress-bar"><div id="backupProgressFill" class="v2-sync-progress-fill"></div></div>
-              <span id="backupProgressText" class="v2-sync-progress-text"></span>
-            </div>
-            <section class="storage-health" aria-label="裝置儲存狀態">
-              <div class="storage-health-head">
-                <strong>裝置儲存</strong>
-                <button id="storageRefreshBtn" class="storage-refresh-button" type="button" title="更新儲存狀態" aria-label="更新儲存狀態">↻</button>
+            <details class="panel-fold" id="recordsToolsFold">
+              <summary>🧰 資料操作</summary>
+              <div class="panel-fold-body">
+                <div class="folder-btn-group">
+                  <button id="addFolderBtn" class="btn-action btn-add-folder">+ 新增最上層資料夾</button>
+                  <button id="importCsvBtn" class="btn-action btn-import-csv" title="支援 .xlsx, .xls, .csv">📥 匯入 Excel</button>
+                  <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls,.xlsm" style="display:none" />
+                </div>
+                <div class="folder-btn-group">
+                  <button id="exportSystemBtn" class="btn-action btn-export-zip" title="下載紀錄、Excel 與照片的完整 ZIP 備份">💾 完整備份</button>
+                  <button id="importSystemBtn" class="btn-action btn-import-zip" title="從完整 ZIP 或舊版 JSON 備份還原">📂 資料還原</button>
+                  <input type="file" id="importSystemInput" accept=".zip,.zip.enc,.json" style="display:none" />
+                </div>
+                <div class="folder-btn-group">
+                  <button id="driveBackupBtn" class="btn-action btn-drive" title="將完整備份 ZIP 上傳到個人 Google 雲端硬碟（需 Google 帳號登入）">☁️ 備份到 Drive</button>
+                  <button id="driveRestoreBtn" class="btn-action btn-drive" title="從 Google 雲端硬碟下載完整備份 ZIP 並還原">☁️ 從 Drive 還原</button>
+                </div>
+                <div class="folder-btn-group">
+                  <button id="driveDeleteBtn" class="btn-action btn-drive-delete" title="刪除個人雲端硬碟中的備份 ZIP（本機不受影響）">🗑 刪除雲端備份</button>
+                  <button id="v2SyncToggle" class="btn-action btn-sync" title="兩台裝置直接傳輸資料，不需帳號與伺服器">📡 裝置同步</button>
+                </div>
+                <div id="backupProgress" class="v2-sync-progress" hidden>
+                  <div class="v2-sync-progress-bar"><div id="backupProgressFill" class="v2-sync-progress-fill"></div></div>
+                  <span id="backupProgressText" class="v2-sync-progress-text"></span>
+                </div>
               </div>
-              <div class="storage-health-values">
-                <span class="storage-health-value">照片目前使用<strong id="photoStorageUsage">讀取中</strong></span>
-                <span class="storage-health-value">瀏覽器估算額度<strong id="storageQuota">讀取中</strong></span>
-                <span class="storage-health-value">尚可使用<strong id="storageAvailable">讀取中</strong></span>
+            </details>
+            <details class="panel-fold" id="storageHealthFold">
+              <summary>💾 裝置儲存與備份</summary>
+              <div class="panel-fold-body">
+                <section class="storage-health" aria-label="裝置儲存狀態">
+                  <div class="storage-health-head">
+                    <strong>裝置儲存</strong>
+                    <button id="storageRefreshBtn" class="storage-refresh-button" type="button" title="更新儲存狀態" aria-label="更新儲存狀態">↻</button>
+                  </div>
+                  <div class="storage-health-values">
+                    <span class="storage-health-value">照片目前使用<strong id="photoStorageUsage">讀取中</strong></span>
+                    <span class="storage-health-value">瀏覽器估算額度<strong id="storageQuota">讀取中</strong></span>
+                    <span class="storage-health-value">尚可使用<strong id="storageAvailable">讀取中</strong></span>
+                  </div>
+                  <div id="storageWarning" class="storage-warning" hidden></div>
+                  <div id="storagePersistenceStatus" class="storage-persistence">資料保護：檢查中</div>
+                  <div id="backupSummary" class="backup-summary">最近一次備份：尚未建立</div>
+                  <div class="storage-health-actions">
+                    <button id="requestPersistentStorageBtn" class="storage-persist-button" type="button">保護此裝置資料</button>
+                  </div>
+                </section>
               </div>
-              <div id="storageWarning" class="storage-warning" hidden></div>
-              <div id="storagePersistenceStatus" class="storage-persistence">資料保護：檢查中</div>
-              <div id="backupSummary" class="backup-summary">最近一次備份：尚未建立</div>
-              <div class="storage-health-actions">
-                <button id="requestPersistentStorageBtn" class="storage-persist-button" type="button">保護此裝置資料</button>
-              </div>
-            </section>
+            </details>
             <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; padding:8px 12px; border-radius:6px; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
               <div style="display:flex; align-items:center; gap:8px">
                 <button id="selectAllBtn" style="background:#0f766e; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; min-height:0;">全選 ☑️</button>
@@ -3122,6 +3175,17 @@
         document.getElementById("photoBrowserSearch").addEventListener("input", () => renderPhotoBrowser());
         document.getElementById("photoBrowserFolderFilter").addEventListener("change", () => renderPhotoBrowser());
         document.getElementById("photoBrowserGrid").addEventListener("click", (event) => {
+          const folderToggle = event.target.closest("[data-photo-folder-toggle]");
+          if (folderToggle) {
+            event.stopPropagation();
+            togglePhotoFolderCollapse(folderToggle.dataset.photoFolderToggle || "__uncategorized__");
+            return;
+          }
+          const folderHead = event.target.closest(".photo-folder-head");
+          if (folderHead && !event.target.closest(".photo-folder-delete")) {
+            togglePhotoFolderCollapse(folderHead.closest(".photo-folder-group")?.dataset.photoFolder || "__uncategorized__");
+            return;
+          }
           const deleteSingle = event.target.closest("[data-photo-delete-single]");
           if (deleteSingle) {
             event.stopPropagation();
@@ -3152,8 +3216,28 @@
         document.getElementById("photoBrowserGrid").addEventListener("change", event => {
           if (event.target.matches("[data-photo-select]")) updatePhotoBrowserSelectionUi();
         });
+        document.getElementById("photoBrowserGrid").addEventListener("keydown", event => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          const head = event.target.closest(".photo-folder-head");
+          if (!head) return;
+          event.preventDefault();
+          togglePhotoFolderCollapse(head.closest(".photo-folder-group")?.dataset.photoFolder || "__uncategorized__");
+        });
         document.getElementById("storageRefreshBtn").addEventListener("click", refreshStorageStatus);
         document.getElementById("requestPersistentStorageBtn").addEventListener("click", requestPersistentStorage);
+        (function initPanelFolds() {
+          const folds = [["recordsToolsFold", "recordsToolsOpen"], ["storageHealthFold", "storageHealthOpen"]];
+          folds.forEach(([id, key]) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            try {
+              if (localStorage.getItem(key) === "1") el.open = true;
+              el.addEventListener("toggle", () => {
+                try { localStorage.setItem(key, el.open ? "1" : "0"); } catch { /* ignore */ }
+              });
+            } catch { /* ignore */ }
+          });
+        })();
         document.getElementById("photoBrowserSelectAllBtn").addEventListener("click", selectAllVisibleBrowserPhotos);
         document.getElementById("photoBrowserDeleteSelectedBtn").addEventListener("click", deleteSelectedBrowserPhotos);
         document.getElementById("photoBrowserDeleteAllBtn").addEventListener("click", deleteAllBrowserPhotos);
@@ -4342,6 +4426,13 @@
         });
       }
 
+      const collapsedPhotoFolders = new Set();
+      function togglePhotoFolderCollapse(folderId) {
+        const key = folderId || "__uncategorized__";
+        if (collapsedPhotoFolders.has(key)) collapsedPhotoFolders.delete(key);
+        else collapsedPhotoFolders.add(key);
+        renderPhotoBrowser();
+      }
       async function renderPhotoBrowser() {
         const grid = document.getElementById("photoBrowserGrid");
         const count = document.getElementById("photoBrowserCount");
@@ -4379,8 +4470,10 @@
         });
         grid.innerHTML = [...groups.values()].map(group => {
           const groupPhotoCount = group.records.reduce((total, record) => total + record.photos.length, 0);
-          return `<section class="photo-folder-group" data-photo-folder="${escapeHtml(group.folderId || "__uncategorized__")}">
-            <div class="photo-folder-head">
+          const folderCollapsed = collapsedPhotoFolders.has(group.folderId || "__uncategorized__");
+          return `<section class="photo-folder-group${folderCollapsed ? " is-collapsed" : ""}" data-photo-folder="${escapeHtml(group.folderId || "__uncategorized__")}">
+            <div class="photo-folder-head${folderCollapsed ? " is-collapsed" : ""}" role="button" tabindex="0" aria-expanded="${folderCollapsed ? "false" : "true"}">
+              <button type="button" class="photo-folder-toggle" data-photo-folder-toggle="${escapeHtml(group.folderId || "__uncategorized__")}" title="收合/展開資料夾" aria-label="收合/展開資料夾">▾</button>
               <strong>📂 ${escapeHtml(group.label)}</strong>
               <span>${groupPhotoCount} 張</span>
               <button type="button" class="photo-folder-delete" data-photo-delete-folder="${escapeHtml(group.folderId)}">刪除此資料夾照片</button>
