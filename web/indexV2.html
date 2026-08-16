@@ -3263,6 +3263,19 @@
               });
             } catch { /* ignore */ }
           });
+          const toolsFold = document.getElementById("recordsToolsFold");
+          if (toolsFold) {
+            toolsFold.querySelectorAll("button").forEach(btn => {
+              btn.addEventListener("click", () => {
+                setTimeout(() => {
+                  if (toolsFold.open) {
+                    toolsFold.open = false;
+                    try { localStorage.setItem("recordsToolsOpen", "0"); } catch { /* ignore */ }
+                  }
+                }, 1200);
+              });
+            });
+          }
         })();
         document.getElementById("photoBrowserSelectAllBtn").addEventListener("click", selectAllVisibleBrowserPhotos);
         document.getElementById("photoBrowserDeleteSelectedBtn").addEventListener("click", deleteSelectedBrowserPhotos);
