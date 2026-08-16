@@ -2707,6 +2707,7 @@
                     <span class="storage-health-value">照片目前使用<strong id="photoStorageUsage">讀取中</strong></span>
                     <span class="storage-health-value">瀏覽器估算額度<strong id="storageQuota">讀取中</strong></span>
                     <span class="storage-health-value">尚可使用<strong id="storageAvailable">讀取中</strong></span>
+                    <span class="storage-health-value">離線快取<strong id="offlineCacheUsage">讀取中</strong></span>
                   </div>
                   <div id="storageWarning" class="storage-warning" hidden></div>
                   <div id="storagePersistenceStatus" class="storage-persistence">資料保護：檢查中</div>
@@ -3467,17 +3468,54 @@
         });
       }
 
+      async function getOfflineCacheStats() {
+        try {
+          if (typeof caches === "undefined") return null;
+          const cacheName = (await caches.keys()).find(key => key.includes("tiles"));
+          if (!cacheName) return { count: 0, bytes: 0 };
+          const cache = await caches.open(cacheName);
+          const keys = await cache.keys();
+          const sample = keys.slice(0, 500);
+          let bytes = 0;
+          for (const key of sample) {
+            try {
+              const response = await cache.match(key);
+              const length = response?.headers?.get("content-length");
+              bytes += length ? Number(length) : 0;
+            } catch (error) {}
+          }
+          if (bytes === 0 && sample.length > 0) {
+            let blobBytes = 0;
+            const blobSample = sample.slice(0, 50);
+            for (const key of blobSample) {
+              try {
+                const blob = await (await cache.match(key)).blob();
+                blobBytes += blob.size;
+              } catch (error) {}
+            }
+            if (blobBytes > 0) bytes = Math.round((blobBytes / blobSample.length) * sample.length);
+          } else if (sample.length > 0 && keys.length > sample.length) {
+            bytes = Math.round((bytes / sample.length) * keys.length);
+          }
+          return { count: keys.length, bytes };
+        } catch (error) {
+          return null;
+        }
+      }
+
       async function refreshStorageStatus() {
         const photoUsageEl = document.getElementById("photoStorageUsage");
         const quotaEl = document.getElementById("storageQuota");
         const availableEl = document.getElementById("storageAvailable");
+        const offlineCacheEl = document.getElementById("offlineCacheUsage");
         const warningEl = document.getElementById("storageWarning");
         const persistenceEl = document.getElementById("storagePersistenceStatus");
         const persistButton = document.getElementById("requestPersistentStorageBtn");
-        if (!photoUsageEl || !quotaEl || !availableEl || !warningEl || !persistenceEl || !persistButton) return;
+        if (!photoUsageEl || !quotaEl || !availableEl || !offlineCacheEl || !warningEl || !persistenceEl || !persistButton) return;
         photoUsageEl.textContent = "更新中";
         quotaEl.textContent = "更新中";
         availableEl.textContent = "更新中";
+        offlineCacheEl.textContent = "更新中";
         warningEl.hidden = true;
         warningEl.classList.remove("is-critical");
         persistenceEl.classList.remove("is-protected");
@@ -3485,12 +3523,14 @@
         renderBackupSummary();
         try {
           const storage = navigator.storage;
-          const [photos, estimate, persisted] = await Promise.all([
+          const [photos, estimate, persisted, offline] = await Promise.all([
             getPhotoStorageUsage(),
             storage?.estimate ? storage.estimate() : Promise.resolve(null),
             storage?.persisted ? storage.persisted() : Promise.resolve(null),
+            getOfflineCacheStats(),
           ]);
           photoUsageEl.textContent = `${photos.count} 張 / ${formatStorageBytes(photos.bytes)}`;
+          offlineCacheEl.textContent = offline === null ? "無法讀取" : `${offline.count} 張圖磚 / ${formatStorageBytes(offline.bytes)}`;
           const quota = Number.isFinite(estimate?.quota) ? estimate.quota : null;
           quotaEl.textContent = quota === null ? "瀏覽器未提供" : formatStorageBytes(quota);
           const remaining = Number.isFinite(estimate?.quota) && Number.isFinite(estimate?.usage)
@@ -3527,6 +3567,7 @@
           photoUsageEl.textContent = "無法讀取";
           quotaEl.textContent = "無法讀取";
           availableEl.textContent = "無法讀取";
+          offlineCacheEl.textContent = "無法讀取";
           warningEl.textContent = "無法取得瀏覽器儲存估算，仍請定期建立 ZIP 備份。";
           warningEl.hidden = false;
           persistenceEl.textContent = "資料保護：無法讀取";
@@ -9406,7 +9447,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker-v2.js?rev=6', { scope: './' })
+          navigator.serviceWorker.register('./service-worker-v2.js?rev=7', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
               registration.update();

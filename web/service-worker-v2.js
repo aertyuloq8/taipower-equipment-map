@@ -1,6 +1,6 @@
 const CACHE_NAME = "equipment-map-photo-edition-v2-r9";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
-const TILE_CACHE_MAX = 6000;
+const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
 const APP_SHELL = "./indexV2.html";
 const STATIC_ASSETS = [
