@@ -7029,8 +7029,11 @@
           client.requestAccessToken();
         });
       }
+      let backupProgressTimer = null;
       function backupProgressShow() {
         document.getElementById("backupProgress").hidden = false;
+        clearTimeout(backupProgressTimer);
+        backupProgressTimer = setTimeout(backupProgressHide, 30000);
       }
       function backupProgressUpdate(percent, text) {
         backupProgressShow();
@@ -7039,6 +7042,7 @@
         document.getElementById("backupProgressText").textContent = text || "";
       }
       function backupProgressHide() {
+        clearTimeout(backupProgressTimer);
         document.getElementById("backupProgress").hidden = true;
         document.getElementById("backupProgressFill").style.width = "0%";
         document.getElementById("backupProgressText").textContent = "";
@@ -7583,7 +7587,7 @@
                 catch (error) { GlobalModal.alert("讀取加密備份失敗：" + error.message); }
                 finally { backupProgressHide(); }
               },
-              { inputType: "password", confirmText: "解密並檢查", cancelText: "取消" }
+              { inputType: "password", confirmText: "解密並檢查", cancelText: "取消", onCancel: () => backupProgressHide() }
             );
             return;
           }
