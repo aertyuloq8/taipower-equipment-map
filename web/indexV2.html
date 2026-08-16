@@ -6950,29 +6950,13 @@
       function getDriveClientId() {
         const fromUrl = new URLSearchParams(location.search).get("driveClientId");
         if (fromUrl) return fromUrl;
-        if (_driveClientId === null) _driveClientId = localStorage.getItem("tpDriveClientId") || DRIVE_CLIENT_ID_DEFAULT;
+        if (_driveClientId === null) _driveClientId = DRIVE_CLIENT_ID_DEFAULT;
         return _driveClientId;
       }
       async function ensureDriveClientId() {
-        let clientId = getDriveClientId();
+        const clientId = getDriveClientId();
         if (clientId) return clientId;
-        clientId = await new Promise(resolve => {
-          GlobalModal.prompt(
-            "第一次使用需要設定 Google Client ID（個人用）。<br><small>設定方式：Google Cloud Console → APIs & Services → Credentials → 建立 OAuth Client ID（Web 應用程式）→ Authorized JavaScript origins 填 https://aertyuloq8.github.io → 複製 Client ID 貼上。<br>此設定只存在本瀏覽器。也可以在網址後加 ?driveClientId=你的ID 永久帶入。</small>",
-            "",
-            resolve,
-            {
-              inputType: "text",
-              confirmText: "儲存",
-              cancelText: "取消",
-              onCancel: () => resolve(""),
-            }
-          );
-        });
-        if (!clientId) return "";
-        localStorage.setItem("tpDriveClientId", clientId.trim());
-        _driveClientId = clientId.trim();
-        return _driveClientId;
+        return "";
       }
       async function loadGIS() {
         if (window.google?.accounts?.oauth2) return;
