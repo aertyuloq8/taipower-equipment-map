@@ -7282,12 +7282,7 @@
           GlobalModal.alert("完整備份元件尚未載入，請確認網路後重試。");
           return;
         }
-        GlobalModal.prompt(
-          "輸入備份密碼（可留空）<br><small>填寫後會建立加密的 .zip.enc；忘記密碼將無法還原。留空則建立一般 ZIP。</small>",
-          "",
-          password => runSystemBackup(String(password || "")),
-          { inputType: "password", confirmText: "建立備份", cancelText: "取消" }
-        );
+        await runSystemBackup("");
       }
 
       async function runSystemBackup(password = "") {
