@@ -7450,24 +7450,11 @@
             return;
           }
           const rows = driveBackupRows(files);
-          window.__v2DriveDownloadOnly = async () => {
+          let downloadOnlyId = "";
+          window.__v2DriveDownloadOnly = () => {
             const checked = document.querySelector('input[name="driveBackupPick"]:checked');
+            downloadOnlyId = checked ? checked.value : "";
             document.getElementById("gmCancelBtn").click();
-            if (!checked) return;
-            const file = files.find((f) => f.id === checked.value);
-            if (!file) return;
-            backupProgressUpdate(5, "下載中…");
-            try {
-              const blob = await downloadDriveFile(file.id, (pct) => backupProgressUpdate(5 + Math.round(pct * 0.85), "下載中 " + pct + "%…"));
-              backupProgressUpdate(100, "完成");
-              downloadBlob(blob, file.name);
-              GlobalModal.alert("已下載雲端檔案：<strong>" + escapeHtml(file.name) + "</strong>");
-            } catch (error) {
-              console.error("雲端檔案下載失敗：", error);
-              GlobalModal.alert("雲端檔案下載失敗：" + error.message);
-            } finally {
-              backupProgressHide();
-            }
           };
           const pickedId = await new Promise(resolve => {
             GlobalModal.show({
@@ -7484,8 +7471,23 @@
               onCancel: () => resolve(""),
             });
           });
-          if (!pickedId) return;
-          const picked = files.find((f) => f.id === pickedId);
+          if (!pickedId && !downloadOnlyId) return;
+          const picked = files.find((f) => f.id === (downloadOnlyId || pickedId));
+          if (downloadOnlyId) {
+            if (!picked) return;
+            button.textContent = "⬇️ 下載中";
+            backupProgressUpdate(5, "下載中…");
+            try {
+              const blob = await downloadDriveFile(picked.id, (pct) => backupProgressUpdate(5 + Math.round(pct * 0.85), "下載中 " + pct + "%…"));
+              backupProgressUpdate(100, "完成");
+              downloadBlob(blob, picked.name);
+              GlobalModal.alert("已下載雲端檔案：<strong>" + escapeHtml(picked.name) + "</strong>");
+            } catch (error) {
+              console.error("雲端檔案下載失敗：", error);
+              GlobalModal.alert("雲端檔案下載失敗：" + error.message);
+            }
+            return;
+          }
           if (!/\.zip$/i.test(picked.name)) {
             GlobalModal.alert("此檔不是 ZIP 備份（" + escapeHtml(picked.name) + "），無法還原。可使用「⬇️ 僅下載檔案」先存到本機。");
             return;
