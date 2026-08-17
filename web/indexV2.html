@@ -7452,7 +7452,7 @@
           const rows = driveBackupRows(files);
           window.__v2DriveDownloadOnly = async () => {
             const checked = document.querySelector('input[name="driveBackupPick"]:checked');
-            document.getElementById("globalModal").style.display = "none";
+            document.getElementById("gmCancelBtn").click();
             if (!checked) return;
             const file = files.find((f) => f.id === checked.value);
             if (!file) return;
