@@ -5910,19 +5910,32 @@
             '<option value="xlsx">Excel：僅匯出表格資料</option>',
           ].join(""),
           format => {
-            if (format === "xlsx") {
-              const workbook = createRecordsWorkbook(records, fallbackFolderPath);
-              XLSX.writeFile(workbook, `${safeFileBaseName}.xlsx`);
-              return;
-            }
             GlobalModal.select(
-              "選擇 ZIP 照片版本",
-              "完整備份建議使用原圖；壓縮版適合分享，還原後只會保留壓縮圖片。",
+              "選擇儲存位置",
+              "可下載到本機，或直接上傳到您的個人雲端硬碟。",
               [
-                '<option value="original">原圖：可完整備份與還原</option>',
-                '<option value="compressed">壓縮版：檔案較小，適合分享</option>',
+                '<option value="local">本地下載</option>',
+                '<option value="drive">雲端 Drive</option>',
+                '<option value="both">本機與雲端都要</option>',
               ].join(""),
-              photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile)
+              destination => {
+                if (format === "xlsx") {
+                  const workbook = createRecordsWorkbook(records, fallbackFolderPath);
+                  const fileName = `${safeFileBaseName}.xlsx`;
+                  if (destination === "local" || destination === "both") XLSX.writeFile(workbook, fileName);
+                  if (destination === "drive" || destination === "both") uploadRecordsWorkbookToDrive(workbook, fileName);
+                  return;
+                }
+                GlobalModal.select(
+                  "選擇 ZIP 照片版本",
+                  "完整備份建議使用原圖；壓縮版適合分享，還原後只會保留壓縮圖片。",
+                  [
+                    '<option value="original">原圖：可完整備份與還原</option>',
+                    '<option value="compressed">壓縮版：檔案較小，適合分享</option>',
+                  ].join(""),
+                  photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile, destination)
+                );
+              }
             );
           }
         );
@@ -7147,10 +7160,17 @@
         }),
       };
 
-      async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original") {
+      async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original", destination = "local") {
         try {
           const { blob, photoCount, manifestHash } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile);
-          downloadBlob(blob, `${fileBaseName}.zip`);
+          const fileName = fileBaseName + ".zip";
+          if (destination === "local" || destination === "both") downloadBlob(blob, fileName);
+          const toCloud = destination === "drive" || destination === "both";
+          if (toCloud) {
+            backupProgressUpdate(10, "上傳 ZIP 至雲端…");
+            await uploadZipToDrive(blob, fileName, (pct) => backupProgressUpdate(10 + Math.round(pct * 0.85), "上傳 ZIP " + pct + "%…"));
+            backupProgressUpdate(100, "完成");
+          }
           saveBackupSummary({
             exportedAt: new Date().toISOString(),
             folders: folders.length,
@@ -7161,10 +7181,24 @@
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash,
           });
-          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。`);
+          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + fileName + "）。" : ""}`);
         } catch (error) {
           console.error("ZIP 匯出失敗：", error);
           GlobalModal.alert("ZIP 匯出失敗：" + error.message);
+        }
+      }
+
+      async function uploadRecordsWorkbookToDrive(workbook, fileName) {
+        try {
+          backupProgressUpdate(10, "上傳 Excel 至雲端…");
+          const array = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+          const blob = new Blob([array], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+          await uploadZipToDrive(blob, fileName, (pct) => backupProgressUpdate(10 + Math.round(pct * 0.85), "上傳 Excel " + pct + "%…"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          backupProgressUpdate(100, "完成");
+          GlobalModal.alert(`Excel 已上傳到雲端硬碟：${fileName}`);
+        } catch (error) {
+          console.error("Excel 雲端上傳失敗：", error);
+          GlobalModal.alert("Excel 雲端上傳失敗：" + error.message);
         }
       }
 
@@ -7273,14 +7307,14 @@
         }
         return resp;
       }
-      async function uploadZipToDrive(blob, name, onProgress = null) {
+      async function uploadZipToDrive(blob, name, onProgress = null, mimeType = "application/zip") {
         const token = await getDriveAccessToken();
         return new Promise((resolve, reject) => {
           const init = new XMLHttpRequest();
           init.open("POST", "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable");
           init.setRequestHeader("Authorization", "Bearer " + token);
           init.setRequestHeader("Content-Type", "application/json");
-          init.setRequestHeader("X-Upload-Content-Type", "application/zip");
+          init.setRequestHeader("X-Upload-Content-Type", mimeType);
           init.setRequestHeader("X-Upload-Content-Length", String(blob.size));
           init.onload = () => {
             const location = init.getResponseHeader("Location");
@@ -7290,7 +7324,7 @@
             }
             const put = new XMLHttpRequest();
             put.open("PUT", location);
-            put.setRequestHeader("Content-Type", "application/zip");
+            put.setRequestHeader("Content-Type", mimeType);
             put.upload.onprogress = (event) => {
               if (event.lengthComputable && onProgress) {
                 onProgress(Math.round((event.loaded / event.total) * 100));
