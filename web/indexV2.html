@@ -5900,6 +5900,12 @@
         return state.folders.filter(folder => includedIds.has(folder.id));
       }
 
+      function cloudExportBaseName(base) {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return base + "_" + pad(now.getHours()) + pad(now.getMinutes());
+      }
+
       function chooseRecordExportFormat(records, folders, fileBaseName, fallbackFolderPath = "") {
         const safeFileBaseName = zipPathPart(fileBaseName);
         GlobalModal.select(
@@ -5919,11 +5925,12 @@
                 '<option value="both">本機與雲端都要</option>',
               ].join(""),
               destination => {
+                const cloudBase = destination === "drive" || destination === "both" ? cloudExportBaseName(safeFileBaseName) : "";
                 if (format === "xlsx") {
                   const workbook = createRecordsWorkbook(records, fallbackFolderPath);
                   const fileName = `${safeFileBaseName}.xlsx`;
                   if (destination === "local" || destination === "both") XLSX.writeFile(workbook, fileName);
-                  if (destination === "drive" || destination === "both") uploadRecordsWorkbookToDrive(workbook, fileName);
+                  if (destination === "drive" || destination === "both") uploadRecordsWorkbookToDrive(workbook, cloudBase + ".xlsx");
                   return;
                 }
                 GlobalModal.select(
@@ -5933,7 +5940,7 @@
                     '<option value="original">原圖：可完整備份與還原</option>',
                     '<option value="compressed">壓縮版：檔案較小，適合分享</option>',
                   ].join(""),
-                  photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile, destination)
+                  photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile, destination, cloudBase)
                 );
               }
             );
@@ -7160,15 +7167,17 @@
         }),
       };
 
-      async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original", destination = "local") {
+      async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original", destination = "local", cloudBaseName = "") {
         try {
           const { blob, photoCount, manifestHash } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile);
           const fileName = fileBaseName + ".zip";
           if (destination === "local" || destination === "both") downloadBlob(blob, fileName);
           const toCloud = destination === "drive" || destination === "both";
+          let cloudName = "";
           if (toCloud) {
+            cloudName = (cloudBaseName || fileBaseName) + ".zip";
             backupProgressUpdate(10, "上傳 ZIP 至雲端…");
-            await uploadZipToDrive(blob, fileName, (pct) => backupProgressUpdate(10 + Math.round(pct * 0.85), "上傳 ZIP " + pct + "%…"));
+            await uploadZipToDrive(blob, cloudName, (pct) => backupProgressUpdate(10 + Math.round(pct * 0.85), "上傳 ZIP " + pct + "%…"));
             backupProgressUpdate(100, "完成");
           }
           saveBackupSummary({
@@ -7181,7 +7190,7 @@
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash,
           });
-          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + fileName + "）。" : ""}`);
+          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + cloudName + "）。" : ""}`);
         } catch (error) {
           console.error("ZIP 匯出失敗：", error);
           GlobalModal.alert("ZIP 匯出失敗：" + error.message);
@@ -7346,7 +7355,7 @@
         });
       }
       async function listDriveBackups() {
-        const query = encodeURIComponent("name contains '設備地圖備份' and trashed = false");
+        const query = encodeURIComponent("(name contains '設備地圖備份' or name contains '批次匯出' or name contains '巡視紀錄') and trashed = false");
         const resp = await driveFetch(
           "https://www.googleapis.com/drive/v3/files?q=" + query +
           "&orderBy=createdTime desc&pageSize=20&fields=files(id,name,size,createdTime)"
@@ -7437,14 +7446,34 @@
         try {
           const files = await listDriveBackups();
           if (!files.length) {
-            GlobalModal.alert("個人雲端硬碟目前沒有「設備地圖備份」開頭的檔案。");
+            GlobalModal.alert("個人雲端硬碟目前沒有「設備地圖備份」或匯出（批次匯出／巡視紀錄）開頭的檔案。");
             return;
           }
           const rows = driveBackupRows(files);
+          window.__v2DriveDownloadOnly = async () => {
+            const checked = document.querySelector('input[name="driveBackupPick"]:checked');
+            document.getElementById("globalModal").style.display = "none";
+            if (!checked) return;
+            const file = files.find((f) => f.id === checked.value);
+            if (!file) return;
+            backupProgressUpdate(5, "下載中…");
+            try {
+              const blob = await downloadDriveFile(file.id, (pct) => backupProgressUpdate(5 + Math.round(pct * 0.85), "下載中 " + pct + "%…"));
+              backupProgressUpdate(100, "完成");
+              downloadBlob(blob, file.name);
+              GlobalModal.alert("已下載雲端檔案：<strong>" + escapeHtml(file.name) + "</strong>");
+            } catch (error) {
+              console.error("雲端檔案下載失敗：", error);
+              GlobalModal.alert("雲端檔案下載失敗：" + error.message);
+            } finally {
+              backupProgressHide();
+            }
+          };
           const pickedId = await new Promise(resolve => {
             GlobalModal.show({
               title: "選擇雲端備份",
-              content: rows + '<div style="margin-top:8px; font-size:12px; color:#64748b;">選擇後會下載並進入還原確認。</div>',
+              content: rows + '<div style="margin-top:8px; font-size:12px; color:#64748b;">ZIP 備份可下載並還原；「僅下載檔案」可將任何雲端檔案（ZIP 或 Excel）存到本機。</div>' +
+                '<button type="button" style="margin-top:8px; width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; color:#334155; font-size:12px; cursor:pointer;" onclick="window.__v2DriveDownloadOnly()">⬇️ 僅下載檔案（不還原）</button>',
               type: "confirm",
               confirmText: "下載並還原",
               cancelText: "取消",
@@ -7457,6 +7486,10 @@
           });
           if (!pickedId) return;
           const picked = files.find((f) => f.id === pickedId);
+          if (!/\.zip$/i.test(picked.name)) {
+            GlobalModal.alert("此檔不是 ZIP 備份（" + escapeHtml(picked.name) + "），無法還原。可使用「⬇️ 僅下載檔案」先存到本機。");
+            return;
+          }
           button.textContent = "☁️ 下載中";
           backupProgressUpdate(5, "下載備份…");
           const blob = await downloadDriveFile(pickedId, (pct) => backupProgressUpdate(5 + Math.round(pct * 0.6), "下載備份 " + pct + "%…"));
