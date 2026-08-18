@@ -5387,26 +5387,50 @@
       });
       panelCloseButton?.addEventListener("click", () => setPanelCollapsed(true));
 
-      // 手機版：在面板頂部往下拖曳即可收合（桌面滑鼠不觸發；僅 touch 裝置）
+      // 手機版：面板頂部往下拖曳收合（跟手；桌面滑鼠不觸發；僅 touch 裝置）
       (function initPanelDragHandle() {
         const handle = document.getElementById("panelDragHandle");
         if (!handle) return;
+        const panel = document.getElementById("panel");
         let startY = 0;
+        let panelHeight = 1;
+        let lastDelta = 0;
         let dragging = false;
         handle.addEventListener("touchstart", (event) => {
           if (event.touches.length !== 1) return;
           startY = event.touches[0].clientY;
+          lastDelta = 0;
+          panelHeight = panel.getBoundingClientRect().height || 1;
           dragging = true;
+          panel.style.transition = "none";
         }, { passive: true });
         handle.addEventListener("touchmove", (event) => {
           if (!dragging) return;
-          if (event.touches[0].clientY - startY > 48) {
-            dragging = false;
-            setPanelCollapsed(true);
+          lastDelta = event.touches[0].clientY - startY;
+          if (lastDelta > 0) {
+            panel.style.transform = "translateY(" + Math.min(lastDelta, Math.round(panelHeight * 0.7)) + "px)";
           }
         }, { passive: true });
-        handle.addEventListener("touchend", () => { dragging = false; });
-        handle.addEventListener("touchcancel", () => { dragging = false; });
+        handle.addEventListener("touchend", () => {
+          if (!dragging) return;
+          dragging = false;
+          const delta = lastDelta;
+          if (delta > 100) {
+            setPanelCollapsed(true);
+            requestAnimationFrame(() => {
+              panel.style.transition = "";
+              panel.style.transform = "";
+            });
+          } else {
+            panel.style.transition = "";
+            panel.style.transform = "";
+          }
+        });
+        handle.addEventListener("touchcancel", () => {
+          dragging = false;
+          panel.style.transition = "";
+          panel.style.transform = "";
+        });
       })();
 
       // ==========================================
