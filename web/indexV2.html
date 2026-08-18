@@ -285,6 +285,7 @@
       }
       .edition-switch-link:hover { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
       .edition-switch-link-compact { display: none; }
+.panel-drag-handle { display: none; }
       .panel-collapse-button {
         align-items: center;
         background: #f1f5f9;
@@ -1835,7 +1836,7 @@
           flex-direction: row;
           gap: 10px;
           min-height: 60px;
-          padding: 18px 16px 8px;
+          padding: 26px 16px 8px;
         }
 
         .panel-title {
@@ -1858,6 +1859,26 @@
         }
 
         .panel-collapse-button { display: inline-flex; }
+
+        .panel-drag-handle {
+          align-items: center;
+          display: flex;
+          justify-content: center;
+          left: 0;
+          padding: 9px 0 5px;
+          position: absolute;
+          right: 0;
+          top: 0;
+          touch-action: none;
+          z-index: 3;
+        }
+
+        .panel-drag-handle-bar {
+          background: rgba(100, 116, 139, 0.35);
+          border-radius: 3px;
+          height: 5px;
+          width: 44px;
+        }
 
         .edition-switch-link-compact {
           align-items: center;
@@ -2617,6 +2638,7 @@
 
     <main class="app is-panel-collapsed">
       <aside id="panel" class="panel is-collapsed">
+        <div id="panelDragHandle" class="panel-drag-handle" aria-hidden="true"><span class="panel-drag-handle-bar"></span></div>
         <header class="panel-head">
           <div class="panel-title"><h1>土木設備分布地圖照片版</h1></div>
           <button id="panelCloseButton" class="panel-collapse-button" type="button" aria-label="收合巡檢紀錄面板" title="收合巡檢紀錄面板">▼</button>
@@ -5364,6 +5386,28 @@
         setPanelCollapsed(collapsed);
       });
       panelCloseButton?.addEventListener("click", () => setPanelCollapsed(true));
+
+      // 手機版：在面板頂部往下拖曳即可收合（桌面滑鼠不觸發；僅 touch 裝置）
+      (function initPanelDragHandle() {
+        const handle = document.getElementById("panelDragHandle");
+        if (!handle) return;
+        let startY = 0;
+        let dragging = false;
+        handle.addEventListener("touchstart", (event) => {
+          if (event.touches.length !== 1) return;
+          startY = event.touches[0].clientY;
+          dragging = true;
+        }, { passive: true });
+        handle.addEventListener("touchmove", (event) => {
+          if (!dragging) return;
+          if (event.touches[0].clientY - startY > 48) {
+            dragging = false;
+            setPanelCollapsed(true);
+          }
+        }, { passive: true });
+        handle.addEventListener("touchend", () => { dragging = false; });
+        handle.addEventListener("touchcancel", () => { dragging = false; });
+      })();
 
       // ==========================================
       // ★ jumpToRecord：支援孤兒記錄與正常記錄的完美跳轉
