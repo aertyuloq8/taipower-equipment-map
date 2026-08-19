@@ -3769,6 +3769,11 @@ function renderDefectStats() {
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (refreshingForServiceWorker) return;
           refreshingForServiceWorker = true;
+          if (sessionStorage.getItem('sw-reloaded')) {
+            console.log('SW 更新循環防護：本次工作階段已重整過，跳過重整');
+            return;
+          }
+          sessionStorage.setItem('sw-reloaded', '1');
           window.location.reload();
         });
 
@@ -3776,7 +3781,6 @@ function renderDefectStats() {
           navigator.serviceWorker.register('./service-worker.js')
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
-              registration.update();
 
               if (registration.waiting) {
                 registration.waiting.postMessage({ type: 'SKIP_WAITING' });
