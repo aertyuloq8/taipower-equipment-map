@@ -2571,11 +2571,11 @@
             <span class="layer-menu-item-name">標籤圖層</span>
             <span id="labelsLayerState" class="layer-menu-item-state">顯示</span>
           </button>
-          <button id="tpcGridToggle" class="layer-menu-item" type="button" aria-pressed="false" title="顯示或隱藏圖號網格">
+          <button id="tpcGridToggle" class="layer-menu-item is-hidden" type="button" aria-pressed="false" title="顯示或隱藏圖號網格">
             <span class="layer-menu-item-name">圖號網格</span>
             <span id="tpcGridLayerState" class="layer-menu-item-state">隱藏</span>
           </button>
-          <button id="routeLayerToggle" class="layer-menu-item" type="button" aria-pressed="false" title="顯示或隱藏路線圖層">
+          <button id="routeLayerToggle" class="layer-menu-item is-hidden" type="button" aria-pressed="false" title="顯示或隱藏路線圖層">
             <span class="layer-menu-item-name">路線圖層</span>
             <span id="routeLayerState" class="layer-menu-item-state">隱藏</span>
           </button>
@@ -3180,11 +3180,13 @@
         }
         if (gridBtn && typeof tpcGrid !== "undefined") {
           gridBtn.classList.toggle("is-active", tpcGrid.visible);
+          gridBtn.classList.toggle("is-hidden", !tpcGrid.visible);
           gridBtn.setAttribute("aria-pressed", String(tpcGrid.visible));
           if (gridState) gridState.textContent = tpcGrid.visible ? "顯示" : "隱藏";
         }
         if (routeBtn && typeof state !== "undefined") {
           routeBtn.classList.toggle("is-active", state.routeLayerVisible);
+          routeBtn.classList.toggle("is-hidden", !state.routeLayerVisible);
           routeBtn.setAttribute("aria-pressed", String(state.routeLayerVisible));
           if (routeState) routeState.textContent = state.routeLayerVisible ? "顯示" : "隱藏";
         }
@@ -8867,6 +8869,7 @@
         const routeBtn = document.getElementById("routeLayerToggle");
         if (routeBtn) {
           routeBtn.classList.remove("is-active");
+          routeBtn.classList.add("is-hidden");
           routeBtn.setAttribute("aria-pressed", "false");
         }
         state.labelsHidden = false;
@@ -9051,8 +9054,9 @@
         syncMobileMapControls();
         syncLayerMenuState();
         renderer.redraw(); updateRecordMarkers();
+        try { e.currentTarget.blur(); } catch (err) {}
       });
-      document.getElementById("routeLayerToggle").addEventListener("click", () => {
+      document.getElementById("routeLayerToggle").addEventListener("click", (e) => {
         state.routeLayerVisible = !state.routeLayerVisible;
         if (state.routeLayerVisible) {
           closeMapSearchPanel();
@@ -9067,18 +9071,21 @@
         syncLayerMenuState();
         if (state.routeLayerVisible) setStatus("已顯示設備開頭推估路線");
         window.setTimeout(() => setStatus(""), 1800);
+        try { e.currentTarget.blur(); } catch (err) {}
       });
 
-      document.getElementById("tpcGridToggle").addEventListener("click", () => {
+      document.getElementById("tpcGridToggle").addEventListener("click", (e) => {
         tpcGrid.visible = !tpcGrid.visible;
         const btn = document.getElementById("tpcGridToggle");
         btn.classList.toggle("is-active", tpcGrid.visible);
+        btn.classList.toggle("is-hidden", !tpcGrid.visible);
         btn.setAttribute("aria-pressed", String(tpcGrid.visible));
         buildTpcGridLayer();
         updateTpcGridReadout();
         syncLayerMenuState();
         setStatus(tpcGrid.visible ? "已顯示圖號網格；精確圖號請看地圖上方中心讀值" : "已隱藏圖號網格");
         window.setTimeout(() => setStatus(""), 1800);
+        try { e.currentTarget.blur(); } catch (err) {}
       });
       map.on("moveend zoomend", () => {
         updateTpcGridReadout();
