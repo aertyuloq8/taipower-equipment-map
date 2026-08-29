@@ -1,6 +1,6 @@
 {
-  "name": "土木設備分布地圖照片版",
-  "short_name": "設備照片版",
+  "name": "土木設備分布地圖",
+  "short_name": "設備地圖",
   "start_url": "./indexV2.html",
   "scope": "./indexV2.html",
   "display": "standalone",

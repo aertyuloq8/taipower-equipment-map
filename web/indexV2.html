@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>土木設備分布地圖照片版</title>
+    <title>土木設備分布地圖</title>
     <link rel="manifest" href="manifest-v2.json" />
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -304,24 +304,6 @@
 .btn-drive { background: #fff7ed; color: #c2410c; border: 1px dashed #c2410c; }
       .btn-drive-delete { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }
       .btn-sync { background: #f0f9ff; color: #0369a1; border: 1px dashed #0369a1; }
-      .edition-switch-link {
-        align-items: center;
-        align-self: stretch;
-        background: #eef8f9;
-        border: 1px solid #9bd4d9;
-        border-radius: 6px;
-        color: var(--accent-dark);
-        display: inline-flex;
-        font-size: 13px;
-        font-weight: 800;
-        justify-content: center;
-        margin: 0 18px 10px;
-        min-height: 36px;
-        padding: 7px 10px;
-        text-decoration: none;
-      }
-      .edition-switch-link:hover { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
-      .edition-switch-link-compact { display: none; }
 .panel-drag-handle { display: none; }
       .panel-collapse-button {
         align-items: center;
@@ -1920,8 +1902,7 @@
           white-space: nowrap;
         }
 
-        .panel-head > .btn-global-toggle,
-        .edition-switch-link-full {
+        .panel-head > .btn-global-toggle {
           display: none;
         }
 
@@ -1945,25 +1926,6 @@
           border-radius: 3px;
           height: 5px;
           width: 44px;
-        }
-
-        .edition-switch-link-compact {
-          align-items: center;
-          align-self: auto;
-          background: #eef8f9;
-          border: 1px solid #9bd4d9;
-          border-radius: 6px;
-          color: var(--accent-dark);
-          display: inline-flex;
-          flex: 0 0 auto;
-          font-size: 12px;
-          font-weight: 800;
-          justify-content: center;
-          margin: 0;
-          min-height: 34px;
-          padding: 5px 9px;
-          text-decoration: none;
-          white-space: nowrap;
         }
 
         h1 {
@@ -2379,22 +2341,6 @@
           display: none;
         }
 
-        .edition-switch-link-full {
-          display: inline-flex;
-        }
-
-        .edition-switch-link-compact {
-          display: none;
-        }
-
-        .edition-switch-link {
-          grid-column: 2;
-          grid-row: 2;
-          margin: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
-          min-height: 32px;
-          padding: 5px 8px;
-        }
-
         .tab-nav {
           align-self: stretch;
           border-bottom: 0;
@@ -2731,11 +2677,9 @@
       <aside id="panel" class="panel is-collapsed">
         <div id="panelDragHandle" class="panel-drag-handle" aria-hidden="true"><span class="panel-drag-handle-bar"></span></div>
         <header class="panel-head">
-          <div class="panel-title"><h1>土木設備分布地圖照片版</h1></div>
+          <div class="panel-title"><h1>土木設備分布地圖</h1></div>
           <button id="panelCloseButton" class="panel-collapse-button" type="button" aria-label="收合巡檢紀錄面板" title="收合巡檢紀錄面板">▼</button>
-          <a class="edition-switch-link edition-switch-link-compact" href="./index.html" title="切換至不含照片功能的基本地圖版">切換基本版</a>
         </header>
-        <a class="edition-switch-link edition-switch-link-full" href="./index.html" title="切換至不含照片功能的基本地圖版">↩ 開啟基本版</a>
         <nav class="tab-nav">
           <button class="tab-btn is-active" id="tabRecordsBtn">📋 巡視紀錄</button>
           <button class="tab-btn" id="tabStatsBtn">📊 不良統計</button>
@@ -7371,7 +7315,7 @@
       window.__syncBridge = {
         buildBackup: async () => {
           normalizeInspectionState();
-          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份");
+          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖完整備份");
           return {
             blob: archive.blob,
             photoCount: archive.photoCount,
@@ -7482,7 +7426,7 @@
 
       async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original", destination = "local", cloudBaseName = "") {
         try {
-          const { blob, photoCount, manifestHash } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile);
+          const { blob, photoCount, manifestHash } = await createPhotoArchive(records, folders, "土木設備分布地圖巡檢匯出", photoProfile);
           const fileName = fileBaseName + ".zip";
           if (destination === "local" || destination === "both") downloadBlob(blob, fileName);
           const toCloud = destination === "drive" || destination === "both";
@@ -7789,7 +7733,7 @@
           backupProgressUpdate(2, "準備打包…");
           await getDriveAccessToken();
           normalizeInspectionState();
-          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份", "original",
+          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖完整備份", "original",
             (done, total) => backupProgressUpdate(3 + Math.round((done / Math.max(1, total)) * 57), "打包照片 " + done + " / " + total + "…"));
           button.textContent = "☁️ 上傳中（" + formatStorageBytes(archive.blob.size) + "）";
           backupProgressUpdate(62, "上傳中（" + formatStorageBytes(archive.blob.size) + "）…");
@@ -7978,7 +7922,7 @@
           const archive = await createPhotoArchive(
             state.records,
             state.folders,
-            "土木設備分布地圖照片版完整備份",
+            "土木設備分布地圖完整備份",
             "original",
             (done, total) => backupProgressUpdate(3 + Math.round((done / Math.max(1, total)) * 62), "打包照片 " + done + " / " + total + "…")
           );
@@ -7986,7 +7930,7 @@
           const encryptedArchive = await encryptBackupBlob(archive.blob, password);
           backupProgressUpdate(100, "完成");
           const fileExtension = encryptedArchive.encrypted ? ".zip.enc" : ".zip";
-          downloadBlob(encryptedArchive.blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}${fileExtension}`);
+          downloadBlob(encryptedArchive.blob, `土木設備完整備份_${new Date().toISOString().slice(0, 10)}${fileExtension}`);
           saveBackupSummary({
             exportedAt: new Date().toISOString(),
             folders: state.folders.length,
@@ -8107,7 +8051,7 @@
         await ensureJSZip();
         const zip = await JSZip.loadAsync(file);
         const recordsEntry = zip.file("records.json");
-        if (!recordsEntry) throw new Error("找不到 records.json，這不是照片版完整備份");
+        if (!recordsEntry) throw new Error("找不到 records.json，這不是完整備份");
         const parsed = JSON.parse(await recordsEntry.async("string"));
         if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("records.json 格式錯誤");
         const manifestEntry = zip.file("manifest.json");
@@ -9932,7 +9876,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker-v2.js?rev=10', { scope: './' })
+          navigator.serviceWorker.register('./service-worker-v2.js?rev=11', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 
