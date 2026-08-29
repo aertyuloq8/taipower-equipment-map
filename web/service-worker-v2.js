@@ -1,12 +1,11 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2-r12";
+const CACHE_NAME = "equipment-map-photo-edition-v2-r13";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
-const APP_SHELLS = ["./index.html", "./indexV2.html"];
+const APP_SHELLS = ["./index.html"];
 const STATIC_ASSETS = [
   ...APP_SHELLS,
   "./manifest.json",
-  "./manifest-v2.json",
   "./icon-192.png",
   "./icon-512.png",
   "./cadastre-config-v2.js",
@@ -61,7 +60,7 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const isV2Navigation = request.mode === "navigate"
-    && (/\/indexV2\.html$|\/index\.html$/).test(new URL(request.url).pathname);
+    && (/\/index\.html$/).test(new URL(request.url).pathname);
   const url = new URL(request.url);
   const isEquipmentData = /\/data\/(meta|points|cadastral-dropdowns-tw)\.json$/.test(url.pathname);
   const isCadastreAsset = /\/cadastre-(config-v2|v2)\.(js|css)$/.test(url.pathname);
@@ -78,7 +77,7 @@ self.addEventListener("fetch", (event) => {
             if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
             return response;
           })
-          .catch(() => caches.match(request).then(cached => cached || caches.match("./index.html") || caches.match("./indexV2.html")))
+          .catch(() => caches.match(request).then(cached => cached || caches.match("./index.html")))
       : (isEquipmentData || isCadastreAsset || isSyncAsset || isArchiveWorker)
         ? fetch(request, { cache: "no-store" })
             .then((response) => {

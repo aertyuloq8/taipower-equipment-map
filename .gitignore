@@ -9,11 +9,18 @@ tools/__pycache__/
 .env.*
 !.env.example
 
-# 本地備份與測試資料（勿推送）
+# 本地備份與測試資料（暫存，勿推送）
 .playwright-cli/
 web/backups/
 /土木設備照片版完整備份_2026-08-04/
 /土木設備照片版完整備份_2026-08-04.zip
 
-# 本機專用 V2 資料夾（線上版使用 web/ 根目錄版本，勿推送）
+# 本地專用 V2 資料夾（線上版使用 web/ 根目錄，勿推送）
 web/V2/
+
+# 開發側檔
+*.vision.md
+arrow_zone.png
+full.png
+2026-08-16_155030.png
+114年臺南市門牌坐標資料.csv
