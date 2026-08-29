@@ -12,6 +12,8 @@ tools/__pycache__/
 # 本地備份與測試資料（暫存，勿推送）
 .playwright-cli/
 web/backups/
+dist/
+web/index.html.bak-v2migration
 /土木設備照片版完整備份_2026-08-04/
 /土木設備照片版完整備份_2026-08-04.zip
 

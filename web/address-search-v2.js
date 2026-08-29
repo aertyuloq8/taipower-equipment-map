@@ -131,7 +131,7 @@
   function showPlate(map, plate){
     const marker = ensureMarker(map);
     marker.setLatLng([plate.la, plate.ln]);
-    map.flyTo([plate.la, plate.ln], Math.max(map.getZoom(), 18), {duration:0.5});
+    map.flyTo([plate.la, plate.ln], Math.max(map.getZoom(), 19), {duration:0.5});
     const content = `<div class="v2-cadastre-popup"><strong>${escapeHtml(plate.r)}</strong><div class="v2-cadastre-popup-actions"><a class="popup-navigation-link" href="${googleNavUrl(plate.la, plate.ln)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" onclick="window.__v2AddressClearMarker()">✕ 清除</button></div></div>`;
     marker.bindPopup(content, {autoPanPadding:[10,10]});
     marker.on("click", ()=>marker.openPopup());
