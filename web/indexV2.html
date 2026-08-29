@@ -2580,19 +2580,19 @@
             <span id="routeLayerState" class="layer-menu-item-state">隱藏</span>
           </button>
           <div class="layer-menu-heading" style="margin-top:6px;">疊加圖層</div>
-          <button id="overlayLANDSECTToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加段籍圖">
+          <button id="overlayLANDSECTToggle" class="layer-menu-item is-hidden" type="button" aria-pressed="false" title="疊加段籍圖">
             <span class="layer-menu-item-name">段籍圖</span>
             <span id="overlayLANDSECTState" class="layer-menu-item-state">隱藏</span>
           </button>
-          <button id="overlayTOWNToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加鄉鎮界">
+          <button id="overlayTOWNToggle" class="layer-menu-item is-hidden" type="button" aria-pressed="false" title="疊加鄉鎮界">
             <span class="layer-menu-item-name">鄉鎮界</span>
             <span id="overlayTOWNState" class="layer-menu-item-state">隱藏</span>
           </button>
-          <button id="overlayVillageToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加村里界">
+          <button id="overlayVillageToggle" class="layer-menu-item is-hidden" type="button" aria-pressed="false" title="疊加村里界">
             <span class="layer-menu-item-name">村里界</span>
             <span id="overlayVillageState" class="layer-menu-item-state">隱藏</span>
           </button>
-          <button id="overlayROADToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加道路路網">
+          <button id="overlayROADToggle" class="layer-menu-item is-hidden" type="button" aria-pressed="false" title="疊加道路路網">
             <span class="layer-menu-item-name">道路路網</span>
             <span id="overlayROADState" class="layer-menu-item-state">隱藏</span>
           </button>
@@ -5069,13 +5069,17 @@
         }
         if (btn) btn.setAttribute("aria-pressed", String(visible));
         if (stateEl) stateEl.textContent = visible ? "顯示" : "隱藏";
-        if (btn) btn.classList.toggle("is-active", visible);
+        if (btn) {
+          btn.classList.toggle("is-active", visible);
+          btn.classList.toggle("is-hidden", !visible);
+        }
       }
       ["LANDSECT", "TOWN", "Village", "ROAD"].forEach(key => {
         const btn = document.getElementById(`overlay${key}Toggle`);
         btn?.addEventListener("click", () => {
           const isActive = btn.getAttribute("aria-pressed") === "true";
           setOverlayVisible(key, !isActive);
+          try { btn.blur(); } catch (e) {}
         });
       });
 
