@@ -101,6 +101,22 @@
     return null;
   }
 
+  // ---- 國土測繪精確座標（點選地址後，QuerySearch 回傳 LOCATION）----
+  async function nlscGeo(addr){
+    try{
+      const data = await gasJsonp({ action: "addrGeo", word: addr });
+      const list = (data && Array.isArray(data.results)) ? data.results : [];
+      if(list.length){
+        // 優先精確匹配；否則取第一筆
+        const plain = (s)=>String(s||"").normalize("NFKC").replace(/[()\[\]（）\s]+/g,"").replace(/號/g,"");
+        const norm = plain(addr);
+        const exact = list.find(it=> plain(it.address) === norm) || list[0];
+        if(Number.isFinite(exact.x) && Number.isFinite(exact.y)) return { la: exact.y, ln: exact.x };
+      }
+    }catch(e){ console.warn("NLSC 定位失敗", e.message); }
+    return null;
+  }
+
   // ---- ArcGIS 備援 ----
   async function fetchArcGIS(q){
     let addr = q.trim();
@@ -170,16 +186,20 @@
     marker.on("click", ()=>marker.openPopup());
     setTimeout(()=>marker.openPopup(),520);
   }
-  // 點擊時解析座標（NLSC 只給地址字串）
+  // 點擊時解析座標（NLSC AutoComplete 只給地址字串，用 QuerySearch 精確定位）
   async function handlePlateClick(plate){
     const map = getMap(); if(!map) return;
     if(!(Number.isFinite(plate.la) && Number.isFinite(plate.ln))){
       setStatus("定位中…");
-      const hit = await findLocalCoords(plate.addr || plate.r);
-      if(hit){ plate.la = hit.la; plate.ln = hit.ln; }
+      const geo = await nlscGeo(plate.addr || plate.r);
+      if(geo){ plate.la = geo.la; plate.ln = geo.ln; }
       else {
-        const list = await fetchArcGIS(plate.addr || plate.r);
-        if(list.length){ plate.la = list[0].la; plate.ln = list[0].ln; }
+        const hit = await findLocalCoords(plate.addr || plate.r);
+        if(hit){ plate.la = hit.la; plate.ln = hit.ln; }
+        else {
+          const list = await fetchArcGIS(plate.addr || plate.r);
+          if(list.length){ plate.la = list[0].la; plate.ln = list[0].ln; }
+        }
       }
     }
     if(!(Number.isFinite(plate.la) && Number.isFinite(plate.ln))){
