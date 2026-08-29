@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2-r10";
+const CACHE_NAME = "equipment-map-photo-edition-v2-r11";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
@@ -54,8 +54,12 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+let dynamicTileMax = TILE_CACHE_MAX;
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+  if (event.data?.type === "SET_TILE_CACHE_MAX" && Number.isFinite(event.data.max)) {
+    dynamicTileMax = Math.max(500, Math.min(5000, Number(event.data.max)));
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -116,7 +120,8 @@ self.addEventListener("fetch", (event) => {
 
 function trimTileCache(cache) {
   cache.keys().then((keys) => {
-    if (keys.length <= TILE_CACHE_MAX) return;
-    Promise.all(keys.slice(0, TILE_CACHE_TRIM).map(key => cache.delete(key))).catch(() => {});
+    if (keys.length <= dynamicTileMax) return;
+    const trimCount = Math.max(200, Math.floor(dynamicTileMax * 0.2));
+    Promise.all(keys.slice(0, trimCount).map(key => cache.delete(key))).catch(() => {});
   }).catch(() => {});
 }
