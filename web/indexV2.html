@@ -10,12 +10,49 @@
     <link rel="manifest" href="manifest-v2.json" />
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" href="icon-192.png">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
     <link rel="stylesheet" href="cadastre-v2.css" />
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+      // CDN 按需載入（含 SRI），避免首屏阻塞
+      const __CDN_ASSETS = {
+        jszip: { src: "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js", integrity: "sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" },
+        xlsx: { src: "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js", integrity: "sha384-QCIdq2UMVEoSRhR3ZWZwdz2/pivLowr+eokFMdYyukq7qI26VYRxFa4Nl6FKetmL" },
+        peerjs: { src: "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js", integrity: "sha384-x0YgkOr/3UOZP2CRDxGW9e0Q+2Qjyr3uJrm4xU32Y7ZCNAo7Cc7bjhrZMi/dwczu" },
+        qrcode: { src: "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js", integrity: "sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" }
+      };
+      const __cdnCache = {};
+      function loadScript(src, integrity) {
+        if (__cdnCache[src]) return __cdnCache[src];
+        __cdnCache[src] = new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = src;
+          if (integrity) s.integrity = integrity;
+          s.crossOrigin = "anonymous";
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error("CDN 載入失敗：" + src));
+          document.head.appendChild(s);
+        });
+        return __cdnCache[src];
+      }
+      async function ensureJSZip() {
+        if (window.JSZip) return;
+        await loadScript(__CDN_ASSETS.jszip.src, __CDN_ASSETS.jszip.integrity);
+        if (!window.JSZip) throw new Error("JSZip 載入失敗");
+      }
+      async function ensureXLSX() {
+        if (window.XLSX) return;
+        await loadScript(__CDN_ASSETS.xlsx.src, __CDN_ASSETS.xlsx.integrity);
+        if (!window.XLSX) throw new Error("XLSX 載入失敗");
+      }
+      async function ensurePeerDeps() {
+        const needPeer = !window.Peer;
+        const needQR = !window.QRCode;
+        const tasks = [];
+        if (needPeer) tasks.push(loadScript(__CDN_ASSETS.peerjs.src, __CDN_ASSETS.peerjs.integrity));
+        if (needQR) tasks.push(loadScript(__CDN_ASSETS.qrcode.src, __CDN_ASSETS.qrcode.integrity));
+        if (tasks.length) await Promise.all(tasks);
+      }
+    </script>
 
     <style>
       :root {
@@ -1088,6 +1125,34 @@
       .offline-notice-close:focus-visible { background: rgba(154, 52, 18, 0.1) !important; border-radius: 4px; }
       .offline-notice[hidden] { display: none !important; }
       .offline-notice.is-error { background: rgba(254, 242, 242, 0.97); border-color: #fca5a5; color: #b91c1c; }
+      .pwa-update-banner {
+        align-items: center;
+        background: #0f766e;
+        border-radius: 8px;
+        bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        box-shadow: var(--shadow);
+        color: #fff;
+        display: flex;
+        font-size: 13px;
+        font-weight: 800;
+        gap: 10px;
+        left: 50%;
+        padding: 10px 12px;
+        position: fixed;
+        transform: translateX(-50%);
+        z-index: 600;
+      }
+      .pwa-update-banner[hidden] { display: none !important; }
+      .pwa-update-banner button {
+        border: 1px solid rgba(255,255,255,0.7);
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 800;
+        min-height: 32px;
+        padding: 0 12px;
+      }
+      #pwaUpdateReload { background: #fff; color: #0f766e; }
+      #pwaUpdateDismiss { background: transparent; color: #fff; border-color: rgba(255,255,255,0.4); min-width: 32px; padding: 0 8px; }
       .edit-unsaved-badge {
         color: #b45309;
         font-size: 11px;
@@ -2411,6 +2476,11 @@
   </head>
 
   <body>
+    <div id="pwaUpdateBanner" class="pwa-update-banner" hidden>
+      <span>有新版本可用</span>
+      <button id="pwaUpdateReload" type="button">重新載入</button>
+      <button id="pwaUpdateDismiss" type="button" aria-label="關閉">×</button>
+    </div>
     <div id="globalModal" class="custom-modal-overlay">
       <div class="custom-modal-box">
         <h3 id="gmTitle" style="margin-top:0; font-size:18px; font-weight:900; color:var(--text);"></h3>
@@ -2910,7 +2980,7 @@
       </button>
     </template>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 
     <script>
       // ==========================================
@@ -5855,7 +5925,8 @@
         cell.l = { Target: target, Tooltip: tooltip };
       }
 
-      function createRecordsWorkbook(records, fallbackFolderPath = "", photoLinkFor = null, photoLinkLabels = null) {
+      async function createRecordsWorkbook(records, fallbackFolderPath = "", photoLinkFor = null, photoLinkLabels = null) {
+        await ensureXLSX();
         const includePhotoLinks = typeof photoLinkFor === "function";
         const labels = {
           card: photoLinkLabels?.card || "巡檢卡連結",
@@ -5993,26 +6064,29 @@
                 '<option value="both">本機與雲端都要</option>',
               ].join(""),
               destination => {
-                const cloudBase = destination === "drive" || destination === "both" ? cloudExportBaseName(safeFileBaseName) : "";
-                if (format === "xlsx") {
-                  const workbook = createRecordsWorkbook(records, fallbackFolderPath);
-                  const fileName = `${safeFileBaseName}.xlsx`;
-                  if (destination === "local" || destination === "both") XLSX.writeFile(workbook, fileName);
-                  if (destination === "drive" || destination === "both") {
-                    window.__v2DriveResume = { type: "export", mode: "xlsx", records, fallbackFolderPath, fileName: cloudBase + ".xlsx" };
-                    uploadRecordsWorkbookToDrive(workbook, cloudBase + ".xlsx");
+                (async () => {
+                  const cloudBase = destination === "drive" || destination === "both" ? cloudExportBaseName(safeFileBaseName) : "";
+                  if (format === "xlsx") {
+                    await ensureXLSX();
+                    const workbook = await createRecordsWorkbook(records, fallbackFolderPath);
+                    const fileName = `${safeFileBaseName}.xlsx`;
+                    if (destination === "local" || destination === "both") XLSX.writeFile(workbook, fileName);
+                    if (destination === "drive" || destination === "both") {
+                      window.__v2DriveResume = { type: "export", mode: "xlsx", records, fallbackFolderPath, fileName: cloudBase + ".xlsx" };
+                      uploadRecordsWorkbookToDrive(workbook, cloudBase + ".xlsx");
+                    }
+                    return;
                   }
-                  return;
-                }
                 GlobalModal.select(
-                  "選擇 ZIP 照片版本",
-                  "完整備份建議使用原圖；壓縮版適合分享，還原後只會保留壓縮圖片。",
-                  [
-                    '<option value="original">原圖：可完整備份與還原</option>',
-                    '<option value="compressed">壓縮版：檔案較小，適合分享</option>',
-                  ].join(""),
-                  photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile, destination, cloudBase)
-                );
+                    "選擇 ZIP 照片版本",
+                    "完整備份建議使用原圖；壓縮版適合分享，還原後只會保留壓縮圖片。",
+                    [
+                      '<option value="original">原圖：可完整備份與還原</option>',
+                      '<option value="compressed">壓縮版：檔案較小，適合分享</option>',
+                    ].join(""),
+                    photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile, destination, cloudBase)
+                  );
+                })();
               }
             );
           }
@@ -6311,8 +6385,9 @@
       document.querySelector("#importFileInput").addEventListener("change", (e) => {
         const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
-        reader.onload = function (event) {
+        reader.onload = async function (event) {
           try {
+            await ensureXLSX();
             const data = new Uint8Array(event.target.result);
             const workbook = XLSX.read(data, { type: "array" });
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false });
@@ -6934,15 +7009,75 @@
         return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
       }
 
-      async function addArchiveFile(zip, manifestFiles, path, data, type = "application/octet-stream") {
+      async function addArchiveFile(manifestFiles, archiveFiles, path, data, type = "application/octet-stream") {
         const blob = await archiveDataToBlob(data, type);
-        zip.file(path, blob);
+        archiveFiles.push({ path, data: blob, type });
         manifestFiles.push({
           path,
           bytes: blob.size,
           sha256: await sha256Hex(blob),
         });
         return blob;
+      }
+      let __archiveWorker = null;
+      function getArchiveWorker() {
+        if (__archiveWorker) return __archiveWorker;
+        try {
+          __archiveWorker = new Worker("./archive-worker.js");
+        } catch (e) {
+          __archiveWorker = null;
+        }
+        return __archiveWorker;
+      }
+      async function generateZipViaWorker(archiveFiles, onProgress) {
+        const worker = getArchiveWorker();
+        if (!worker) {
+          const zip = new JSZip();
+          for (const f of archiveFiles) zip.file(f.path, f.data);
+          return zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }, (meta) => {
+            if (onProgress) onProgress(meta.percent);
+          });
+        }
+        return new Promise((resolve, reject) => {
+          const id = String(Date.now()) + Math.random().toString(36).slice(2);
+          let settled = false;
+          const cleanup = () => {
+            worker.removeEventListener("message", handle);
+            worker.removeEventListener("error", errorHandle);
+          };
+          const handle = (event) => {
+            const msg = event.data;
+            if (!msg || msg.id !== id) return;
+            if (msg.type === "progress" && onProgress) onProgress(msg.percent);
+            else if (msg.type === "done") {
+              if (settled) return; settled = true;
+              cleanup(); clearTimeout(timer);
+              resolve(msg.blob);
+            } else if (msg.type === "error") {
+              if (settled) return; settled = true;
+              cleanup(); clearTimeout(timer);
+              reject(new Error(msg.error));
+            }
+          };
+          const errorHandle = (err) => {
+            if (settled) return; settled = true;
+            cleanup(); clearTimeout(timer);
+            reject(new Error(err.message || "Worker 錯誤"));
+          };
+          worker.addEventListener("message", handle);
+          worker.addEventListener("error", errorHandle);
+          const filesForWorker = archiveFiles.map(f => ({ path: f.path, data: f.data, type: f.type }));
+          try { worker.postMessage({ id, files: filesForWorker }); } catch (e) {
+            cleanup();
+            reject(new Error("Worker 傳送失敗：" + e.message));
+            return;
+          }
+          const timer = setTimeout(() => {
+            if (settled) return; settled = true;
+            cleanup();
+            reject(new Error("Worker 逾時"));
+          }, 15000);
+        });
       }
 
       const BACKUP_ENCRYPTION_MAGIC = new Uint8Array([84, 80, 87, 50]);
@@ -7003,9 +7138,9 @@
       }
 
       async function createPhotoArchive(records, folders, archiveTitle, photoProfile = "original", onProgress = null) {
-        if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試。");
-
-        const zip = new JSZip();
+        await ensureJSZip();
+        await ensureXLSX();
+        const archiveFiles = [];
         const totalPhotos = records.reduce((n, record) => n + (record.photos || []).length, 0);
         const manifestFiles = [];
         const exportedAt = new Date().toISOString();
@@ -7040,7 +7175,7 @@
             }
             const path = photoArchivePath(record, photo, photoProfile);
             const cardPath = inspectionCardDetailPath(photo.id);
-            await addArchiveFile(zip, manifestFiles, path, blob, blob.type || "image/jpeg");
+            await addArchiveFile(manifestFiles, archiveFiles, path, blob, blob.type || "image/jpeg");
             const originalTarget = excelPhotoLinkTarget(path);
             exportedPhotoLinks.set(photo.id, {
               card: inspectionCardLinkTarget(photo.id),
@@ -7058,6 +7193,7 @@
             });
             photoCount++;
             if (onProgress) onProgress(photoCount, Math.max(1, totalPhotos));
+            if (photoCount % 10 === 0) await new Promise(r => setTimeout(r, 0));
           }
         }
 
@@ -7070,20 +7206,20 @@
           folders,
           records: archiveRecords,
         }, null, 2);
-        await addArchiveFile(zip, manifestFiles, "records.json", recordsJson, "application/json");
-        await addArchiveFile(zip, manifestFiles, INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards, folders), "text/html");
+        await addArchiveFile(manifestFiles, archiveFiles, "records.json", recordsJson, "application/json");
+        await addArchiveFile(manifestFiles, archiveFiles, INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards, folders), "text/html");
         inspectionCards.forEach(card => {
           cardFiles.push({ path: card.cardPath, data: createInspectionCardDetailHtml(card) });
         });
-        for (const cardFile of cardFiles) await addArchiveFile(zip, manifestFiles, cardFile.path, cardFile.data, "text/html");
-        const workbook = createRecordsWorkbook(
+        for (const cardFile of cardFiles) await addArchiveFile(manifestFiles, archiveFiles, cardFile.path, cardFile.data, "text/html");
+        const workbook = await createRecordsWorkbook(
           archiveRecords,
           "",
           (record, photo) => exportedPhotoLinks.get(photo.id) || null,
           photoProfile === "compressed" ? { original: "照片連結" } : null
         );
         const workbookData = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-        await addArchiveFile(zip, manifestFiles, "records.xlsx", workbookData, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        await addArchiveFile(manifestFiles, archiveFiles, "records.xlsx", workbookData, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const readme = [
           archiveTitle,
           `匯出時間：${exportedAt}`,
@@ -7097,7 +7233,7 @@
           "manifest.json 會列出每個檔案的大小與 SHA-256，可在資料還原前重新檢查。",
           "records.json 可用於資料還原。還原前請先確認不會覆蓋現有資料。",
         ].join("\r\n");
-        await addArchiveFile(zip, manifestFiles, "README.txt", readme, "text/plain");
+        await addArchiveFile(manifestFiles, archiveFiles, "README.txt", readme, "text/plain");
 
         const manifest = {
           format: "taipower-inspection-backup-manifest",
@@ -7113,9 +7249,17 @@
           files: manifestFiles,
         };
         const manifestText = JSON.stringify(manifest, null, 2);
-        await addArchiveFile(zip, [], "manifest.json", manifestText, "application/json");
+        await addArchiveFile([], archiveFiles, "manifest.json", manifestText, "application/json");
 
-        const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+        let blob;
+        try {
+          blob = await generateZipViaWorker(archiveFiles);
+        } catch (e) {
+          console.warn("Worker 產生 ZIP 失敗，改用主線程：", e);
+          const zip = new JSZip();
+          for (const f of archiveFiles) zip.file(f.path, f.data);
+          blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+        }
         return {
           blob,
           photoCount,
@@ -7271,6 +7415,7 @@
 
       async function uploadRecordsWorkbookToDrive(workbook, fileName) {
         try {
+          await ensureXLSX();
           backupProgressUpdate(10, "上傳 Excel 至雲端…");
           const array = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
           const blob = new Blob([array], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -7341,11 +7486,12 @@
           "&include_granted_scopes=true";
         return new Promise(() => { /* 頁面跳轉後此 Promise 不再被消費 */ });
       }
-      function resumeDriveExport(resume) {
+      async function resumeDriveExport(resume) {
         if (resume.mode === "xlsx") {
           try {
-            const workbook = createRecordsWorkbook(resume.records, resume.fallbackFolderPath || "");
-            uploadRecordsWorkbookToDrive(workbook, resume.fileName);
+            await ensureXLSX();
+            const workbook = await createRecordsWorkbook(resume.records, resume.fallbackFolderPath || "");
+            await uploadRecordsWorkbookToDrive(workbook, resume.fileName);
           } catch (error) {
             GlobalModal.alert("Google 登入完成，但匯出資料無法續傳，請重新選擇匯出：" + error.message);
           }
@@ -7541,7 +7687,7 @@
         button.disabled = true;
         button.textContent = "☁️ 登入 Google 中";
         try {
-          if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
+          await ensureJSZip();
           backupProgressUpdate(2, "準備打包…");
           await getDriveAccessToken();
           normalizeInspectionState();
@@ -7719,10 +7865,7 @@
       }
 
       async function exportSystemBackup() {
-        if (!window.JSZip) {
-          GlobalModal.alert("完整備份元件尚未載入，請確認網路後重試。");
-          return;
-        }
+        try { await ensureJSZip(); } catch (e) { GlobalModal.alert(e.message); return; }
         await runSystemBackup("");
       }
 
@@ -7789,7 +7932,7 @@
       }
 
       async function mergeZipBackup(file) {
-        if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
+        await ensureJSZip();
         const imported = await importZipBackup(file);
         const existingFolderIds = new Set(state.folders.map(folder => folder.id));
         const existingRecordIds = new Set(state.records.map(record => record.id));
@@ -7863,7 +8006,7 @@
       }
 
       async function importZipBackup(file, onProgress = null) {
-        if (!window.JSZip) throw new Error("完整備份元件尚未載入，請確認網路後重試");
+        await ensureJSZip();
         const zip = await JSZip.loadAsync(file);
         const recordsEntry = zip.file("records.json");
         if (!recordsEntry) throw new Error("找不到 records.json，這不是照片版完整備份");
@@ -9658,24 +9801,40 @@ function renderDefectStats() {
 
       if ('serviceWorker' in navigator) {
         let refreshingForServiceWorker = false;
+        const pwaBanner = document.getElementById('pwaUpdateBanner');
+        const pwaReloadBtn = document.getElementById('pwaUpdateReload');
+        const pwaDismissBtn = document.getElementById('pwaUpdateDismiss');
+        let pendingRegistration = null;
+        function showPWAUpdateBanner(registration) {
+          if (!pwaBanner || pwaBanner.hidden === false) return;
+          if (sessionStorage.getItem('v2-pwa-dismissed')) return;
+          pendingRegistration = registration;
+          pwaBanner.hidden = false;
+        }
+        pwaDismissBtn?.addEventListener('click', () => {
+          if (pwaBanner) pwaBanner.hidden = true;
+          try { sessionStorage.setItem('v2-pwa-dismissed', '1'); } catch (e) {}
+        });
+        pwaReloadBtn?.addEventListener('click', () => {
+          if (pendingRegistration?.waiting) {
+            pendingRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          } else {
+            window.location.reload();
+          }
+        });
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (refreshingForServiceWorker) return;
           refreshingForServiceWorker = true;
-          if (sessionStorage.getItem('v2-sw-reloaded')) {
-            console.log('SW 更新循環防護：本次工作階段已重整過，跳過重整');
-            return;
-          }
-          sessionStorage.setItem('v2-sw-reloaded', '1');
           window.location.reload();
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker-v2.js?rev=8', { scope: './' })
+          navigator.serviceWorker.register('./service-worker-v2.js?rev=9', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 
               if (registration.waiting) {
-                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                showPWAUpdateBanner(registration);
               }
 
               registration.addEventListener('updatefound', () => {
@@ -9683,7 +9842,7 @@ function renderDefectStats() {
                 if (!worker) return;
                 worker.addEventListener('statechange', () => {
                   if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-                    worker.postMessage({ type: 'SKIP_WAITING' });
+                    showPWAUpdateBanner(registration);
                   }
                 });
               });

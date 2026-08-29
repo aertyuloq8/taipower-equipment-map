@@ -105,7 +105,8 @@
     receiving = null;
   }
 
-  function startHost() {
+  async function startHost() {
+    try { if (window.ensurePeerDeps) await window.ensurePeerDeps(); } catch (e) { setStatus("同步元件載入失敗：" + e.message, "error"); return; }
     destroyPeers();
     hostCode = genCode();
     codeEl.textContent = hostCode;
@@ -137,7 +138,8 @@
     });
   }
 
-  function join(code) {
+  async function join(code) {
+    try { if (window.ensurePeerDeps) await window.ensurePeerDeps(); } catch (e) { setStatus("同步元件載入失敗：" + e.message, "error"); return; }
     if (conn) {
       setStatus("已有連線，請先關閉面板重新開始。", "error");
       return;
@@ -375,14 +377,14 @@
     if (mapSearchToggle && mapSearchToggle.classList.contains("is-active")) mapSearchToggle.click();
   }
 
-  function openPanel() {
+  async function openPanel() {
     closeOtherFloatingPanels();
     panel.classList.add("is-open");
     panel.setAttribute("aria-hidden", "false");
     active = true;
     initMaxMb();
     refreshSnapshotUi();
-    startHost();
+    await startHost();
   }
 
   function closePanel() {

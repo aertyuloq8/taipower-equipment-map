@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2-r9";
+const CACHE_NAME = "equipment-map-photo-edition-v2-r10";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   "./cadastre-v2.css",
   "./address-search-v2.js",
   "./sync-v2.js",
+  "./archive-worker.js",
   "../data/meta.json",
   "../data/points.json",
   "../data/cadastral-dropdowns-tw.json",
@@ -66,9 +67,10 @@ self.addEventListener("fetch", (event) => {
   const isEquipmentData = /\/data\/(meta|points|cadastral-dropdowns-tw|addr-index|addr-variants)\.json$|\/data\/addr\/\d{2}\.json$/.test(url.pathname);
   const isCadastreAsset = /\/cadastre-(config-v2|v2)\.(js|css)$/.test(url.pathname);
   const isSyncAsset = /\/sync-v2\.js$/.test(url.pathname);
+  const isArchiveWorker = /\/archive-worker\.js$/.test(url.pathname);
   const isRemoteAsset = REMOTE_ASSETS.some(asset => asset === request.url);
   const isTileRequest = /^(https:\/\/wmts\.nlsc\.gov\.tw\/|https:\/\/[a-z]\.tile\.openstreetmap\.org\/)/.test(url.href);
-  if (!isV2Navigation && !isEquipmentData && !isCadastreAsset && !isSyncAsset && !isRemoteAsset && !isTileRequest) return;
+  if (!isV2Navigation && !isEquipmentData && !isCadastreAsset && !isSyncAsset && !isArchiveWorker && !isRemoteAsset && !isTileRequest) return;
 
   event.respondWith(
     (isV2Navigation
@@ -78,7 +80,7 @@ self.addEventListener("fetch", (event) => {
             return response;
           })
           .catch(() => caches.match(APP_SHELL))
-      : (isEquipmentData || isCadastreAsset || isSyncAsset)
+      : (isEquipmentData || isCadastreAsset || isSyncAsset || isArchiveWorker)
         ? fetch(request, { cache: "no-store" })
             .then((response) => {
               if (response.ok) {
