@@ -1415,7 +1415,9 @@
         box-shadow: 0 12px 30px rgba(22, 36, 52, 0.24);
         display: grid;
         gap: 6px;
+        max-height: calc(100dvh - 80px);
         min-width: 218px;
+        overflow-y: auto;
         padding: 8px;
         position: absolute;
         left: 0;
@@ -2560,6 +2562,8 @@
             <label for="baseMapSelect">底圖</label>
             <select id="baseMapSelect" title="選擇底圖；同一時間只顯示一種底圖">
               <option value="emap">臺灣通用電子地圖</option>
+              <option value="photo_mix">正射影像混合</option>
+              <option value="emap5">通用電子地圖(等高線+門牌)</option>
               <option value="osm">OpenStreetMap</option>
             </select>
           </div>
@@ -2574,6 +2578,23 @@
           <button id="routeLayerToggle" class="layer-menu-item" type="button" aria-pressed="false" title="顯示或隱藏路線圖層">
             <span class="layer-menu-item-name">路線圖層</span>
             <span id="routeLayerState" class="layer-menu-item-state">隱藏</span>
+          </button>
+          <div class="layer-menu-heading" style="margin-top:6px;">疊加圖層</div>
+          <button id="overlayLANDSECTToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加段籍圖">
+            <span class="layer-menu-item-name">段籍圖</span>
+            <span id="overlayLANDSECTState" class="layer-menu-item-state">隱藏</span>
+          </button>
+          <button id="overlayTOWNToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加鄉鎮界">
+            <span class="layer-menu-item-name">鄉鎮界</span>
+            <span id="overlayTOWNState" class="layer-menu-item-state">隱藏</span>
+          </button>
+          <button id="overlayVillageToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加村里界">
+            <span class="layer-menu-item-name">村里界</span>
+            <span id="overlayVillageState" class="layer-menu-item-state">隱藏</span>
+          </button>
+          <button id="overlayROADToggle" class="layer-menu-item" type="button" aria-pressed="false" title="疊加道路路網">
+            <span class="layer-menu-item-name">道路路網</span>
+            <span id="overlayROADState" class="layer-menu-item-state">隱藏</span>
           </button>
         </div>
       </div>
@@ -4957,6 +4978,26 @@
             crossOrigin: true,
           },
         },
+        photo_mix: {
+          label: "正射影像混合",
+          url: "https://wmts.nlsc.gov.tw/wmts/PHOTO_MIX/default/GoogleMapsCompatible/{z}/{y}/{x}",
+          options: {
+            maxZoom: 21,
+            maxNativeZoom: 19,
+            attribution: "© 國土測繪中心",
+            crossOrigin: true,
+          },
+        },
+        emap5: {
+          label: "通用電子地圖(等高線+門牌)",
+          url: "https://wmts.nlsc.gov.tw/wmts/EMAP5/default/GoogleMapsCompatible/{z}/{y}/{x}",
+          options: {
+            maxZoom: 21,
+            maxNativeZoom: 19,
+            attribution: "© 國土測繪中心",
+            crossOrigin: true,
+          },
+        },
         osm: {
           label: "OpenStreetMap",
           url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -4986,6 +5027,57 @@
       // 每次開啟 V2 都以臺灣通用電子地圖為預設；OSM 僅供本次操作手動切換。
       setBaseMap("emap");
       baseMapSelect?.addEventListener("change", event => setBaseMap(event.target.value));
+
+      // 疊加圖層（透明 WMS/WMTS，可與底圖同時顯示）
+      const overlayConfigs = {
+        LANDSECT: {
+          label: "段籍圖",
+          url: "https://wmts.nlsc.gov.tw/wmts/LANDSECT/default/GoogleMapsCompatible/{z}/{y}/{x}",
+          options: { maxZoom: 21, maxNativeZoom: 19, opacity: 0.65, attribution: "© 國土測繪中心", crossOrigin: true },
+        },
+        TOWN: {
+          label: "鄉鎮界",
+          url: "https://wmts.nlsc.gov.tw/wmts/TOWN/default/GoogleMapsCompatible/{z}/{y}/{x}",
+          options: { maxZoom: 21, maxNativeZoom: 19, opacity: 0.7, attribution: "© 國土測繪中心", crossOrigin: true },
+        },
+        Village: {
+          label: "村里界",
+          url: "https://wmts.nlsc.gov.tw/wmts/Village/default/GoogleMapsCompatible/{z}/{y}/{x}",
+          options: { maxZoom: 21, maxNativeZoom: 19, opacity: 0.7, attribution: "© 國土測繪中心", crossOrigin: true },
+        },
+        ROAD: {
+          label: "道路路網",
+          url: "https://wmts.nlsc.gov.tw/wmts/ROAD/default/GoogleMapsCompatible/{z}/{y}/{x}",
+          options: { maxZoom: 21, maxNativeZoom: 19, opacity: 0.7, attribution: "© 國土測繪中心", crossOrigin: true },
+        },
+      };
+      const overlayLayers = {};
+      function setOverlayVisible(key, visible) {
+        const config = overlayConfigs[key];
+        if (!config) return;
+        const btn = document.getElementById(`overlay${key}Toggle`);
+        const stateEl = document.getElementById(`overlay${key}State`);
+        if (visible) {
+          if (!overlayLayers[key]) {
+            overlayLayers[key] = L.tileLayer(config.url, config.options).on("tileerror", () => {
+              if (overlayLayers[key]) setOfflineNotice(`「${config.label}」疊加圖層暫時無法載入。`);
+            });
+          }
+          if (!map.hasLayer(overlayLayers[key])) overlayLayers[key].addTo(map);
+        } else {
+          if (overlayLayers[key] && map.hasLayer(overlayLayers[key])) map.removeLayer(overlayLayers[key]);
+        }
+        if (btn) btn.setAttribute("aria-pressed", String(visible));
+        if (stateEl) stateEl.textContent = visible ? "顯示" : "隱藏";
+        if (btn) btn.classList.toggle("is-active", visible);
+      }
+      ["LANDSECT", "TOWN", "Village", "ROAD"].forEach(key => {
+        const btn = document.getElementById(`overlay${key}Toggle`);
+        btn?.addEventListener("click", () => {
+          const isActive = btn.getAttribute("aria-pressed") === "true";
+          setOverlayVisible(key, !isActive);
+        });
+      });
 
       // ==========================================
       // 圖號座標網格圖層（顯示圖號座標對應網格）
