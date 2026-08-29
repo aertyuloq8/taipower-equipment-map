@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2-r10";
+const CACHE_NAME = "equipment-map-photo-edition-v2-r11";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
@@ -17,8 +17,6 @@ const STATIC_ASSETS = [
   "../data/meta.json",
   "../data/points.json",
   "../data/cadastral-dropdowns-tw.json",
-  "../data/addr-index.json",
-  "../data/addr-variants.json",
 ];
 const REMOTE_ASSETS = [
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
@@ -64,7 +62,7 @@ self.addEventListener("fetch", (event) => {
   const isV2Navigation = request.mode === "navigate"
     && new URL(request.url).pathname.endsWith("/indexV2.html");
   const url = new URL(request.url);
-  const isEquipmentData = /\/data\/(meta|points|cadastral-dropdowns-tw|addr-index|addr-variants)\.json$|\/data\/addr\/\d{2}\.json$/.test(url.pathname);
+  const isEquipmentData = /\/data\/(meta|points|cadastral-dropdowns-tw)\.json$/.test(url.pathname);
   const isCadastreAsset = /\/cadastre-(config-v2|v2)\.(js|css)$/.test(url.pathname);
   const isSyncAsset = /\/sync-v2\.js$/.test(url.pathname);
   const isArchiveWorker = /\/archive-worker\.js$/.test(url.pathname);

@@ -55,52 +55,6 @@
     return [];
   }
 
-  // ---- 本地精確庫（提供座標）----
-  let __localIndex = null, __localNorm = null;
-  function normalizeLocal(v){
-    const s=String(v||"").normalize("NFKC");
-    let out=""; for(const ch of s) out+=(__localNorm[ch]||ch);
-    return out.replace(/[()\[\]（）\s]+/g,"").replace(/[-–—－]/g,"之").replace(/號/g,"");
-  }
-  async function loadLocalBase(){
-    if(__localIndex) return;
-    const [idx, variant] = await Promise.all([
-      fetch("../data/addr-index.json").then(r=>r.json()),
-      fetch("../data/addr-variants.json").then(r=>r.json()).catch(()=>({variants:{}}))
-    ]);
-    __localIndex = idx; __localNorm = variant.variants||{};
-  }
-  async function localPlatesFor(q){
-    await loadLocalBase();
-    const qn = normalizeLocal(q);
-    const roads = __localIndex.roads||[];
-    const prefix = roads.find(r=> r.k.includes(qn)) ? qn : (()=>{ for(let e=qn.length-1;e>=2;e--){ const sub=qn.slice(0,e); if(roads.some(r=>r.k.includes(sub))) return sub; } return ""; })();
-    if(!prefix) return [];
-    const hitRoads = roads.filter(r=>r.k.includes(prefix));
-    const codes = [...new Set(hitRoads.map(r=>r.d))].slice(0,6);
-    const lists = await Promise.all(codes.map(c=> fetch(`../data/addr/${c}.json`).then(r=>r.json()).catch(()=>[])));
-    const all = lists.flat().map(p=>{
-      const d = __localIndex.districts?.[p.d]||p.d;
-      const kk = normalizeLocal(`臺南市${d}`)+normalizeLocal(p.r);
-      const plate={r:p.r, d, la:p.la, ln:p.ln, k:kk, addr:`臺南市${d}${p.r}`};
-      state.platesByKey.set(kk, plate);
-      return plate;
-    });
-    return all;
-  }
-  async function findLocalCoords(addrStr){
-    try{
-      const norm = normalizeLocal(addrStr);
-      // 抽路名（去 縣市/區/里/鄰 前綴）
-      const roadMatch = norm.match(/([^0-9]+)([0-9之].*)?$/);
-      const roadPart = roadMatch ? roadMatch[1] : norm;
-      const plates = await localPlatesFor(roadPart);
-      const hit = plates.find(p=> p.k.includes(norm)) || plates.find(p=> norm.includes(normalizeLocal(p.r)));
-      if(hit && Number.isFinite(hit.la) && Number.isFinite(hit.ln)) return hit;
-    }catch(e){ console.warn("本地座標失敗", e.message); }
-    return null;
-  }
-
   // ---- 國土測繪精確座標（點選地址後，QuerySearch 回傳 LOCATION）----
   async function nlscGeo(addr){
     try{
@@ -133,7 +87,7 @@
     }catch(e){ console.warn("ArcGIS 失敗", e.message); return []; }
   }
 
-  // ---- 主搜尋：NLSC(GAS) 精確清單優先，本地次之，ArcGIS 最後 ----
+  // ---- 主搜尋：NLSC(GAS) 精確清單優先，ArcGIS 備援 ----
   async function performSearch(){
     const raw = controls.input.value.trim();
     if(!raw){ controls.results.innerHTML=""; setStatus(""); return; }
@@ -141,9 +95,6 @@
     try{
       let plates = await fetchNLSC(raw);
       let isOnline = plates.length > 0;
-      if(!plates.length){
-        plates = (await localPlatesFor(raw)).filter(p=> p.k.includes(normalizeLocal(raw))).slice(0,10);
-      }
       if(!plates.length){
         setStatus("線上備援…");
         plates = await fetchArcGIS(raw);
@@ -181,7 +132,7 @@
     const marker = ensureMarker(map);
     marker.setLatLng([plate.la, plate.ln]);
     map.flyTo([plate.la, plate.ln], Math.max(map.getZoom(), 18), {duration:0.5});
-    const content = `<div class="v2-cadastre-popup"><strong>${escapeHtml(plate.r)}</strong><br><span>門牌定位（國土測繪/本地精確）</span><div class="v2-cadastre-popup-actions"><a class="popup-navigation-link" href="${googleNavUrl(plate.la, plate.ln)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" onclick="window.__v2AddressClearMarker()">✕ 清除</button></div></div>`;
+    const content = `<div class="v2-cadastre-popup"><strong>${escapeHtml(plate.r)}</strong><div class="v2-cadastre-popup-actions"><a class="popup-navigation-link" href="${googleNavUrl(plate.la, plate.ln)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" onclick="window.__v2AddressClearMarker()">✕ 清除</button></div></div>`;
     marker.bindPopup(content, {autoPanPadding:[10,10]});
     marker.on("click", ()=>marker.openPopup());
     setTimeout(()=>marker.openPopup(),520);
@@ -194,12 +145,8 @@
       const geo = await nlscGeo(plate.addr || plate.r);
       if(geo){ plate.la = geo.la; plate.ln = geo.ln; }
       else {
-        const hit = await findLocalCoords(plate.addr || plate.r);
-        if(hit){ plate.la = hit.la; plate.ln = hit.ln; }
-        else {
-          const list = await fetchArcGIS(plate.addr || plate.r);
-          if(list.length){ plate.la = list[0].la; plate.ln = list[0].ln; }
-        }
+        const list = await fetchArcGIS(plate.addr || plate.r);
+        if(list.length){ plate.la = list[0].la; plate.ln = list[0].ln; }
       }
     }
     if(!(Number.isFinite(plate.la) && Number.isFinite(plate.ln))){
