@@ -20,28 +20,46 @@
         font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, -apple-system, sans-serif;
       }
       .app {
-        display: grid;
-        grid-template-columns: minmax(320px, 420px) 1fr;
+        display: block;
         min-width: 0;
-        transition: grid-template-columns 180ms ease;
+        position: relative;
       }
-      .app.is-panel-collapsed { grid-template-columns: 0 1fr; }
+      .map-shell {
+        inset: 0;
+        position: fixed;
+      }
+      #map {
+        height: 100%;
+      }
       .panel {
         background: var(--panel);
-        border-right: 1px solid var(--line);
+        border: 1px solid var(--line);
+        border-radius: 12px;
         box-shadow: var(--shadow);
         display: grid;
         grid-template-rows: auto auto auto minmax(0, 1fr);
+        max-height: calc(100vh - 80px);
+        max-height: calc(100dvh - 80px);
         min-height: 0;
         overflow: hidden;
-        position: relative;
+        position: fixed;
+        left: 10px;
+        left: calc(10px + env(safe-area-inset-left, 0px));
+        top: calc(60px + env(safe-area-inset-top, 0px));
+        bottom: 10px;
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        width: min(420px, calc(100vw - 20px));
         z-index: 600;
+        transform: translateX(0);
+        transition: transform 200ms ease, opacity 200ms ease;
       }
       .panel.is-collapsed {
         background: transparent;
-        border-right: 0;
+        border: 0;
         box-shadow: none;
         pointer-events: none;
+        transform: translateX(-110%);
+        opacity: 0;
       }
       .panel.is-collapsed > * { display: none; }
       .panel-head {
