@@ -426,6 +426,13 @@
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
+  .v2-cadastre-panel {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    left: auto;
+    max-height: none;
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    top: calc(62px + env(safe-area-inset-top, 0px));
+  }
   .v2-address-panel {
     bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     left: auto;
