@@ -216,12 +216,10 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         const container = document.getElementById("defectGroupEditor");
         if (!container) return;
         const groups = cloneDefectGroups(DEFECT_GROUPS);
-        const usage = loadDefectUsage();
         const html = groups.map((group, groupIndex) => {
           const itemsHtml = group.items.map((item, itemIndex) => `
             <div style="display:flex; gap:6px; align-items:center; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:4px 6px;">
               <input type="text" data-defect-group="${groupIndex}" data-defect-item="${itemIndex}" value="${escapeHtml(item)}" style="flex:1; min-width:0; border:1px solid #cbd5e1; border-radius:4px; padding:4px 6px; font-size:12px;" placeholder="選項文字" />
-              <span style="font-size:10px; color:#64748b; white-space:nowrap;">使用 ${Number(usage[String(item)] || 0)} 次</span>
               <button type="button" data-defect-move="up" data-defect-group="${groupIndex}" data-defect-item="${itemIndex}" style="min-width:30px; min-height:30px; border:1px solid #cbd5e1; background:#e2e8f0; color:#1e293b; border-radius:4px; cursor:pointer; font-weight:bold;">↑</button>
               <button type="button" data-defect-move="down" data-defect-group="${groupIndex}" data-defect-item="${itemIndex}" style="min-width:30px; min-height:30px; border:1px solid #cbd5e1; background:#e2e8f0; color:#1e293b; border-radius:4px; cursor:pointer; font-weight:bold;">↓</button>
               <button type="button" data-defect-remove-item="${groupIndex}:${itemIndex}" style="min-width:30px; min-height:30px; border:1px solid #fecdd3; background:#fff1f2; color:#be123c; border-radius:4px; cursor:pointer; font-weight:bold;">✕</button>
@@ -296,13 +294,13 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           setStatus("已新增分類");
         });
         reset.addEventListener("click", () => {
-          GlobalModal.confirm("確定要還原為預設的常用/裸露/導線分類嗎？（使用次數將保留）", () => {
+          GlobalModal.confirm("確定要還原為預設的常用/裸露/導線/設計分類嗎？", () => {
             DEFECT_GROUPS.length = 0;
             cloneDefectGroups(DEFECT_GROUPS_DEFAULT).forEach(group => DEFECT_GROUPS.push(group));
             saveDefectGroups(DEFECT_GROUPS);
             renderDefectGroups();
             renderDefectGroupEditor();
-            setStatus("已還原為預設（已保留使用次數）");
+            setStatus("已還原為預設分類");
             closeDefectEditPanel();
           });
         });
@@ -2490,15 +2488,13 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       }
 
       const DEFECT_GROUPS_DEFAULT = [
-        { label: "常用", open: true,  items: ["樹木修剪", "藤蔓清除", "竹枝清除", "椰樹修剪", "鳥巢"] },
+        { label: "常用", open: true,  items: ["樹木修剪", "藤蔓清除", "竹枝清除", "椰樹修剪", "鳥巢", "桿上異物"] },
         { label: "裸露", open: false,  items: ["接線環裸露", "拉線夾板裸露", "FC裸露", "TR一次裸露", "電纜接頭裸露", "GS裸露"] },
         { label: "導線", open: false, items: ["防雷脫落", "低壓脫落"] },
         { label: "設計", open: false, items: ["不良設計", "游休TR設計", "橫擔腐蝕設計"] },
-        { label: "雜項", open: false, items: ["桿上異物"] },
       ];
 
       const DEFECT_GROUPS_STORAGE_KEY = "tp_defect_groups_v1";
-      const DEFECT_USAGE_STORAGE_KEY = "tp_defect_usage_v1";
 
       function cloneDefectGroups(source) {
         return (source || DEFECT_GROUPS_DEFAULT).map(group => ({ ...group, items: [...(group.items || [])] }));
@@ -2521,58 +2517,58 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       function saveDefectGroups(groups) {
         try { localStorage.setItem(DEFECT_GROUPS_STORAGE_KEY, JSON.stringify(groups)); } catch {}
       }
-      function loadDefectUsage() {
-        try {
-          const parsed = JSON.parse(localStorage.getItem(DEFECT_USAGE_STORAGE_KEY) || "{}");
-          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-          const out = {};
-          for (const [key, value] of Object.entries(parsed)) {
-            const count = Number(value);
-            if (key && Number.isFinite(count) && count > 0) out[String(key).trim()] = count;
-          }
-          return out;
-        } catch { return {}; }
-      }
-      function saveDefectUsage(usage) {
-        try { localStorage.setItem(DEFECT_USAGE_STORAGE_KEY, JSON.stringify(usage)); } catch {}
-      }
-      function recordDefectUsage(defectText) {
-        const key = String(defectText ?? "").trim();
-        if (!key) return;
-        const usage = loadDefectUsage();
-        usage[key] = (Number(usage[key]) || 0) + 1;
-        saveDefectUsage(usage);
-        renderDefectGroups();
-      }
-      function defectUsageRank(text) {
-        return Number(loadDefectUsage()[String(text ?? "").trim()]) || 0;
-      }
+      // 不良項目排序：依照使用者自訂順序（編輯選項內可上下移動），不再依使用次數自動排前。
       function orderedDefectItemsForGroup(group) {
-        const items = Array.isArray(group?.items) ? [...group.items] : [];
-        return items
-          .map((text, index) => ({ text, index, usage: defectUsageRank(text) }))
-          .sort((a, b) => (b.usage - a.usage) || (a.index - b.index))
-          .map(entry => entry.text);
+        return Array.isArray(group?.items) ? [...group.items] : [];
       }
-      function maybeBackfillDefectUsage() {
-        try {
-          const existing = loadDefectUsage();
-          if (Object.keys(existing).length > 0) return;
-          const counts = {};
-          for (const r of state.records || []) {
-            const d = String(r.defect || "").trim();
-            if (d) counts[d] = (counts[d] || 0) + 1;
+      // 一次性清理舊版累加器（tp_defect_usage_v1 已停用，預留空殼避免其他存錯路徑時崩潰）。
+      function purgeLegacyDefectUsageStorage() {
+        try { localStorage.removeItem("tp_defect_usage_v1"); } catch {}
+      }
+      // 一次性分類遷移：把「雜項」內的「桿上異物」併入「常用」並刪除「雜項」分類。
+      // 已用過的用戶 (localStorage 已有 tp_defect_groups_v1) 也會套用；新用戶直接吃 default 即可。
+      function migrateDefectGroups(groups) {
+        if (!Array.isArray(groups) || !groups.length) return groups;
+        const MIGRATED_KEY = "tp_defect_groups_migrated_v1";
+        if (localStorage.getItem(MIGRATED_KEY) === "1") return groups;
+        let changed = false;
+        const result = [];
+        let changelog = null;
+        for (const g of groups) {
+          const label = String(g?.label ?? "").trim();
+          if (label === "雜項") {
+            changelog = g;
+            changed = true;
+            continue; // 不加入 result，等下處理它的 items
           }
-          if (Object.keys(counts).length) {
-            saveDefectUsage(counts);
-            renderDefectGroups();
+          result.push(g);
+        }
+        if (changelog) {
+          const itemsToMove = (Array.isArray(changelog.items) ? changelog.items : []).map(s => String(s ?? "").trim()).filter(Boolean);
+          // 把 items 併入「常用」最尾端（避免打亂既有排序）
+          for (const g of result) {
+            if (String(g?.label ?? "").trim() === "常用") {
+              g.items = Array.isArray(g.items) ? [...g.items] : [];
+              for (const item of itemsToMove) {
+                if (!g.items.includes(item)) g.items.push(item);
+              }
+              break;
+            }
           }
-        } catch {}
+          // 雜項本身已被 continue 跳過，不會出現在 result
+        }
+        if (changed) {
+          try { localStorage.setItem(MIGRATED_KEY, "1"); } catch {}
+        }
+        return changed ? result : groups;
       }
 
       const DEFECT_GROUPS = (() => {
         const loaded = loadDefectGroups();
-        return loaded ? loaded : cloneDefectGroups(DEFECT_GROUPS_DEFAULT);
+        const base = loaded ? loaded : cloneDefectGroups(DEFECT_GROUPS_DEFAULT);
+        const migrated = migrateDefectGroups(base);
+        if (loaded && migrated !== base) saveDefectGroups(migrated);
+        return migrated;
       })();
       const LAST_SAVE_DATE_KEY = "tp_last_save_date";
       function getTodayLocalStr() {
@@ -5680,8 +5676,6 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
               correctCode
             });
 
-            if (defect) recordDefectUsage(defect);
-
             saveToLocalStorage();
             try { localStorage.setItem(LAST_SAVE_DATE_KEY, getTodayLocalStr()); } catch {}
             await clearEditDraft();
@@ -7047,7 +7041,7 @@ function renderDefectStats() {
       async function init() {
         setStatus("載入設備資料...");
 		initSidebarForm(); // ★ 加入這行，初始化編輯表單內容
-        loadFromLocalStorage(); maybeBackfillDefectUsage(); renderFolders(); renderDefectStats(); updateRecordMarkers(); refreshStorageStatus();
+        loadFromLocalStorage(); purgeLegacyDefectUsageStorage(); renderFolders(); renderDefectStats(); renderDefectGroups(); updateRecordMarkers(); refreshStorageStatus();
         syncMobileMapControls();
         try {
           const { meta, points } = await tryFetchData();
