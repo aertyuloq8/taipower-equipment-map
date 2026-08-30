@@ -2592,7 +2592,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             title: "每日提醒",
             content: `今天是 ${today.slice(5).replace("-", "/")}，上次使用資料夾「${escapeHtml(lastFolderName)}」（${escapeHtml(lastDateDisplay)}），是否更換？`,
             type: "confirm",
-            confirmText: "＋ 建立新夾",
+            confirmText: "+新增資料夾",
             cancelText: `沿用：${lastFolderName}`,
             discardText: "選其他",
             onConfirm: () => {
@@ -2886,8 +2886,27 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           });
         }
         buildOpts(null, 0);
+        html += '<option value="__CREATE_NEW__">＋ 新增資料夾</option>';
         return html;
       }
+      document.addEventListener("change", (e) => {
+        if (e.target && e.target.id === "sidebar-folder" && e.target.value === "__CREATE_NEW__") {
+          GlobalModal.prompt("請輸入新資料夾名稱：", "", (newName) => {
+            if (newName && newName.trim()) {
+              const newId = generateId();
+              state.folders.push({ id: newId, name: newName.trim(), parentId: null });
+              state.expandedFolders.add(newId);
+              saveToLocalStorage();
+              renderFolders();
+              e.target.innerHTML = getFolderOptionsHtml(newId);
+              e.target.value = newId;
+            } else {
+              e.target.innerHTML = getFolderOptionsHtml(state.lastFolderId);
+              e.target.value = state.lastFolderId || "";
+            }
+          });
+        }
+      });
 
       function isDescendant(targetParentId, folderId) {
         let curr = state.folders.find(f => f.id === targetParentId);
