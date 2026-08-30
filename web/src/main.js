@@ -43,6 +43,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             const valueToSelect = folderExists ? currentVal : state.lastFolderId;
             folderSelect.innerHTML = getFolderOptionsHtml(valueToSelect);
           }
+          setTimeout(() => maybeShowDailyFolderReminder(), 300);
         }
 
         window.setTimeout(() => map.invalidateSize(), 120);
@@ -1890,6 +1891,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         disableRouteLayerForTools();
         document.getElementById("editFormContainer").style.display = "flex";
         document.getElementById("sidebarSaveBtn").disabled = false;
+        setTimeout(() => maybeShowDailyFolderReminder(), 400);
 
         const existingRecord = state.records.find(r => r.id === point.id)
           || state.records.find(r => isSameMapPoint(r, point));
@@ -2572,6 +2574,60 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         const loaded = loadDefectGroups();
         return loaded ? loaded : cloneDefectGroups(DEFECT_GROUPS_DEFAULT);
       })();
+      const LAST_SAVE_DATE_KEY = "tp_last_save_date";
+      function getTodayLocalStr() {
+        const d = new Date();
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      }
+      function maybeShowDailyFolderReminder() {
+        try {
+          const today = getTodayLocalStr();
+          const lastDate = localStorage.getItem(LAST_SAVE_DATE_KEY) || "";
+          if (lastDate === today) return;
+          if (!state.records || state.records.length === 0) return;
+          const lastFolder = state.folders.find(f => f.id === state.lastFolderId);
+          const lastFolderName = lastFolder ? lastFolder.name : "（未選）";
+          const lastDateDisplay = lastDate ? lastDate.slice(5).replace("-", "/") : "先前";
+          GlobalModal.show({
+            title: "每日提醒",
+            content: `今天是 ${today.slice(5).replace("-", "/")}，上次使用資料夾「${escapeHtml(lastFolderName)}」（${escapeHtml(lastDateDisplay)}），是否更換？`,
+            type: "confirm",
+            confirmText: "＋ 建立新夾",
+            cancelText: `沿用：${lastFolderName}`,
+            discardText: "選其他",
+            onConfirm: () => {
+              GlobalModal.prompt("請輸入新資料夾名稱：", "", (newName) => {
+                if (newName && newName.trim()) {
+                  const newId = generateId();
+                  state.folders.push({ id: newId, name: newName.trim(), parentId: null });
+                  state.expandedFolders.add(newId);
+                  state.lastFolderId = newId;
+                  saveToLocalStorage();
+                  renderFolders();
+                  const sel = document.getElementById("sidebar-folder");
+                  if (sel) sel.innerHTML = getFolderOptionsHtml(newId);
+                  try { localStorage.setItem(LAST_SAVE_DATE_KEY, today); } catch {}
+                }
+              });
+            },
+            onCancel: () => {
+              try { localStorage.setItem(LAST_SAVE_DATE_KEY, today); } catch {}
+            },
+            onDiscard: () => {
+              const optionsHtml = getFolderOptionsHtml(state.lastFolderId);
+              GlobalModal.select("選擇資料夾", "請選擇要使用的資料夾：", optionsHtml, (selectedValue) => {
+                if (selectedValue) {
+                  state.lastFolderId = selectedValue;
+                  saveToLocalStorage();
+                  const sel = document.getElementById("sidebar-folder");
+                  if (sel) sel.innerHTML = getFolderOptionsHtml(selectedValue);
+                }
+                try { localStorage.setItem(LAST_SAVE_DATE_KEY, today); } catch {}
+              });
+            }
+          });
+        } catch {}
+      }
 
       function findOrCreateFolderByPath(pathStr) {
         const parts = pathStr.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
@@ -5608,6 +5664,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             if (defect) recordDefectUsage(defect);
 
             saveToLocalStorage();
+            try { localStorage.setItem(LAST_SAVE_DATE_KEY, getTodayLocalStr()); } catch {}
             await clearEditDraft();
             refreshStorageStatus();
             deleteRecordPhotos([{ photos: removedPhotoIds.map(id => ({ id })) }]).catch(error => console.warn("移除舊照片失敗：", error));
