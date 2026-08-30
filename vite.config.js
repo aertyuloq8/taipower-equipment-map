@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 // dev 專用：把 /data/* 代理到專案根目錄的 data/（在 web/ root 之外）
-// 讓 V2 的 ../data/*.json 在 dev 模式也能讀到（線上 GitHub Pages 無此限制）
+// 讓頁面的 ../data/*.json 在 dev 模式也能讀到（線上 GitHub Pages 無此限制）
 function dataDirPlugin() {
   const dataDir = path.join(projectRoot, "data");
   return {
@@ -36,7 +36,7 @@ export default defineConfig({
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
-      input: "web/V2/indexV2.html"
+      input: "web/index.html"
     }
   },
   server: {

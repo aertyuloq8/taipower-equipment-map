@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-v2-r14";
+const CACHE_NAME = "equipment-map-photo-edition-r15";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
@@ -8,11 +8,11 @@ const STATIC_ASSETS = [
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
-  "./cadastre-config-v2.js",
-  "./cadastre-v2.js",
-  "./cadastre-v2.css",
-  "./address-search-v2.js",
-  "./sync-v2.js",
+  "./cadastre-config.js",
+  "./cadastre.js",
+  "./cadastre.css",
+  "./address-search.js",
+  "./sync.js",
   "./archive-worker.js",
   // points.json 不預快取：由 Worker 以 networkFirst 載入，避免舊檔卡住
   "../data/meta.json",
@@ -65,8 +65,8 @@ self.addEventListener("fetch", (event) => {
   const isMetaData = /\/data\/meta\.json$/.test(url.pathname);
   const isPointsData = /\/data\/points\.json$/.test(url.pathname);
   const isDropdownData = /\/data\/cadastral-dropdowns-tw\.json$/.test(url.pathname);
-  const isCadastreAsset = /\/cadastre-(config-v2|v2)\.(js|css)$/.test(url.pathname);
-  const isSyncAsset = /\/sync-v2\.js$/.test(url.pathname);
+  const isCadastreAsset = /\/cadastre(-config)?\.(js|css)$/.test(url.pathname);
+  const isSyncAsset = /\/sync\.js$/.test(url.pathname);
   const isArchiveWorker = /\/archive-worker\.js$/.test(url.pathname);
   const isRemoteAsset = REMOTE_ASSETS.some(asset => asset === request.url);
   const isTileRequest = /^(https:\/\/wmts\.nlsc\.gov\.tw\/|https:\/\/[a-z]\.tile\.openstreetmap\.org\/)/.test(url.href);
