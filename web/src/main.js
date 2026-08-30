@@ -6552,7 +6552,7 @@ function renderDefectStats() {
         maximumAge: 3000,
         timeout: 15000,
       });
-      const LOCATION_FOLLOW_ZOOM = 18;
+      const LOCATION_FOLLOW_ZOOM = 19;
       const LOCATION_MIN_PAN_DISTANCE = 8;
       const LOCATION_PAN_INTERVAL = 900;
       const LOCATION_STALE_AFTER = 15000;
@@ -7110,7 +7110,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?rev=15', { scope: './' })
+          navigator.serviceWorker.register('./service-worker.js?rev=19', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 
