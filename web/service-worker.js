@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-r15";
+const CACHE_NAME = "equipment-map-photo-edition-r16";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
