@@ -1246,6 +1246,7 @@
         .popup-form { border-top: none; margin-top: 0; padding-top: 0; }
       }
        #defectEditBackdrop[hidden] { display: none !important; }
+      #defectEditBackdrop { z-index: 10060 !important; }
       .defect-edit-panel {
         position: fixed;
         left: 50%;
@@ -1261,7 +1262,7 @@
         display: none;
         flex-direction: column;
         box-shadow: 0 20px 48px rgba(15,23,42,0.28);
-        z-index: 60;
+        z-index: 10061;
         box-sizing: border-box;
       }
       .defect-edit-panel:not([hidden]) { display: flex; }
@@ -1286,10 +1287,13 @@
           right: auto;
           bottom: auto;
           transform: translate(-50%, -50%);
-          width: min(560px, calc(100vw - 20px));
-          max-height: min(520px, 85vh);
-          max-height: min(520px, 85dvh);
+          width: min(420px, calc(100vw - 20px));
+          max-height: min(420px, 82vh);
+          max-height: min(420px, 82dvh);
           border-radius: 12px;
+        }
+        .defect-edit-panel #defectGroupEditor {
+          padding: 8px;
         }
       }
       .custom-modal-overlay {
@@ -2299,12 +2303,18 @@
         }
 
         .top-controls {
-          align-items: flex-start;
+          align-items: center;
           display: flex;
-          gap: 6px;
+          gap: 4px;
           left: auto;
           right: calc(10px + env(safe-area-inset-right, 0px));
           top: calc(10px + env(safe-area-inset-top, 0px));
+          flex-wrap: nowrap;
+          justify-content: flex-end;
+          max-width: calc(100vw - 20px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+        }
+        body.is-panel-open .top-controls {
+          max-width: calc(48vw - 20px);
         }
 
         #panelToggle {
@@ -2331,7 +2341,12 @@
 
         .map-search-btn {
           border-radius: 8px;
-          min-width: 88px;
+          min-width: 72px;
+          padding: 0 8px;
+          font-size: 13px;
+        }
+        .icon-button {
+          min-width: 44px;
         }
 
         .map-search-panel {
