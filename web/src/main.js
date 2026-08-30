@@ -295,14 +295,13 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           setStatus("已新增分類");
         });
         reset.addEventListener("click", () => {
-          GlobalModal.confirm("確定要還原為預設的常用/裸露/導線分類嗎？", () => {
+          GlobalModal.confirm("確定要還原為預設的常用/裸露/導線分類嗎？（使用次數將保留）", () => {
             DEFECT_GROUPS.length = 0;
             cloneDefectGroups(DEFECT_GROUPS_DEFAULT).forEach(group => DEFECT_GROUPS.push(group));
             saveDefectGroups(DEFECT_GROUPS);
-            try { localStorage.removeItem(DEFECT_USAGE_STORAGE_KEY); } catch {}
             renderDefectGroups();
             renderDefectGroupEditor();
-            setStatus("已還原為預設");
+            setStatus("已還原為預設（已保留使用次數）");
             closeDefectEditPanel();
           });
         });
@@ -2552,6 +2551,21 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           .map((text, index) => ({ text, index, usage: defectUsageRank(text) }))
           .sort((a, b) => (b.usage - a.usage) || (a.index - b.index))
           .map(entry => entry.text);
+      }
+      function maybeBackfillDefectUsage() {
+        try {
+          const existing = loadDefectUsage();
+          if (Object.keys(existing).length > 0) return;
+          const counts = {};
+          for (const r of state.records || []) {
+            const d = String(r.defect || "").trim();
+            if (d) counts[d] = (counts[d] || 0) + 1;
+          }
+          if (Object.keys(counts).length) {
+            saveDefectUsage(counts);
+            renderDefectGroups();
+          }
+        } catch {}
       }
 
       const DEFECT_GROUPS = (() => {
@@ -6957,7 +6971,7 @@ function renderDefectStats() {
       async function init() {
         setStatus("載入設備資料...");
 		initSidebarForm(); // ★ 加入這行，初始化編輯表單內容
-        loadFromLocalStorage(); renderFolders(); renderDefectStats(); updateRecordMarkers(); refreshStorageStatus();
+        loadFromLocalStorage(); maybeBackfillDefectUsage(); renderFolders(); renderDefectStats(); updateRecordMarkers(); refreshStorageStatus();
         syncMobileMapControls();
         try {
           const { meta, points } = await tryFetchData();
