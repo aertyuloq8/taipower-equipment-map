@@ -10,6 +10,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       // ==========================================
       function switchTab(tabId, options = {}) {
         const currentTab = document.getElementById("panel")?.dataset.activeTab;
+        if (tabId !== "edit") closeDefectEditPanel();
         if (!options.skipEditGuard && tabId !== "edit" && currentTab === "edit" && hasUnsavedEditChanges()) {
           confirmBeforeLeavingEdit(() => switchTab(tabId, { skipEditGuard: true }));
           return false;
@@ -179,15 +180,20 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       // ==========================================
       // 初始化側邊欄的靜態表單選項
       // ==========================================
-      function initSidebarForm() {
-        const groupsHtml = ICON_GROUPS.map(group => {
-          const chipsHtml = group.icons.map(ico => `<button type="button" class="icon-chip-btn" data-icon="${escapeHtml(ico)}" title="${escapeHtml(ico)}">${ico}</button>`).join("");
-          return `<div style="display:flex; align-items:center; gap:3px; flex-wrap:wrap; margin-bottom:2px;"><span style="font-size:10px; color:var(--muted); width:28px; flex-shrink:0; text-align:right; padding-right:4px;">${escapeHtml(group.label)}</span>${chipsHtml}</div>`;
-        }).join("");
-        document.getElementById("sidebar-icon-groups").innerHTML = groupsHtml;
-
+      function closeDefectEditPanel() {
+        const panel = document.getElementById("defectEditPanel");
+        const toggle = document.getElementById("defectEditToggle");
+        const backdrop = document.getElementById("defectEditBackdrop");
+        if (!panel || panel.hasAttribute("hidden")) return;
+        panel.setAttribute("hidden", "");
+        panel.style.display = "none";
+        if (backdrop) backdrop.setAttribute("hidden", "");
+        if (toggle) toggle.textContent = "✎ 編輯選項";
+      }
+      function renderDefectGroups() {
         const defectGroupsHtml = DEFECT_GROUPS.map(group => {
-          const chipsHtml = group.items.map(opt => {
+          const orderedItems = orderedDefectItemsForGroup(group);
+          const chipsHtml = orderedItems.map(opt => {
              const len = opt.length;
              let line1 = escapeHtml(opt), line2 = "";
              if (len >= 3) { const cutIndex = Math.ceil(len / 2); line1 = escapeHtml(opt.substring(0, cutIndex)); line2 = escapeHtml(opt.substring(cutIndex)); }
@@ -204,6 +210,187 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
              </details>`;
         }).join("");
         document.getElementById("sidebar-defect-groups").innerHTML = defectGroupsHtml;
+      }
+      function renderDefectGroupEditor() {
+        const container = document.getElementById("defectGroupEditor");
+        if (!container) return;
+        const groups = cloneDefectGroups(DEFECT_GROUPS);
+        const usage = loadDefectUsage();
+        const html = groups.map((group, groupIndex) => {
+          const itemsHtml = group.items.map((item, itemIndex) => `
+            <div style="display:flex; gap:6px; align-items:center; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:4px 6px;">
+              <input type="text" data-defect-group="${groupIndex}" data-defect-item="${itemIndex}" value="${escapeHtml(item)}" style="flex:1; min-width:0; border:1px solid #cbd5e1; border-radius:4px; padding:4px 6px; font-size:12px;" placeholder="選項文字" />
+              <span style="font-size:10px; color:#64748b; white-space:nowrap;">使用 ${Number(usage[String(item)] || 0)} 次</span>
+              <button type="button" data-defect-move="up" data-defect-group="${groupIndex}" data-defect-item="${itemIndex}" style="min-width:30px; min-height:30px; border:1px solid #cbd5e1; background:#e2e8f0; color:#1e293b; border-radius:4px; cursor:pointer; font-weight:bold;">↑</button>
+              <button type="button" data-defect-move="down" data-defect-group="${groupIndex}" data-defect-item="${itemIndex}" style="min-width:30px; min-height:30px; border:1px solid #cbd5e1; background:#e2e8f0; color:#1e293b; border-radius:4px; cursor:pointer; font-weight:bold;">↓</button>
+              <button type="button" data-defect-remove-item="${groupIndex}:${itemIndex}" style="min-width:30px; min-height:30px; border:1px solid #fecdd3; background:#fff1f2; color:#be123c; border-radius:4px; cursor:pointer; font-weight:bold;">✕</button>
+            </div>`).join("") || `<div style="font-size:12px; color:#94a3b8; padding:4px 0;">尚無選項</div>`;
+          return `
+            <section style="border:1px solid #e2e8f0; border-radius:6px; background:#fff; padding:8px; display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input type="text" data-defect-group-label="${groupIndex}" value="${escapeHtml(group.label)}" style="flex:1; min-width:0; border:1px solid #cbd5e1; border-radius:4px; padding:6px 8px; font-size:12px; font-weight:bold;" placeholder="分類名稱" />
+                <button type="button" data-defect-group-move="up" data-defect-group="${groupIndex}" style="min-width:30px; min-height:30px; border:1px solid #cbd5e1; background:#e2e8f0; color:#1e293b; border-radius:4px; cursor:pointer; font-weight:bold;">↑</button>
+                <button type="button" data-defect-group-move="down" data-defect-group="${groupIndex}" style="min-width:30px; min-height:30px; border:1px solid #cbd5e1; background:#e2e8f0; color:#1e293b; border-radius:4px; cursor:pointer; font-weight:bold;">↓</button>
+                <button type="button" data-defect-remove-group="${groupIndex}" data-defect-group="${groupIndex}" style="min-width:30px; min-height:30px; border:1px solid #fecdd3; background:#fff1f2; color:#be123c; border-radius:4px; cursor:pointer; font-weight:bold;">✕</button>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">${itemsHtml}</div>
+              <div style="display:flex; gap:6px;">
+                <button type="button" data-defect-add-item="${groupIndex}" data-defect-group="${groupIndex}" style="flex:1; min-height:32px; border:1px dashed #94a3b8; background:#f8fafc; color:#475569; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">＋ 新增選項</button>
+              </div>
+            </section>`;
+        }).join("") || `<div style="font-size:12px; color:#94a3b8;">尚無分類，請新增分類</div>`;
+        container.innerHTML = html;
+      }
+      function syncDefectGroupsFromEditor(options = {}) {
+        const { renderEditor = true } = options;
+        const container = document.getElementById("defectGroupEditor");
+        if (!container) return;
+        const next = [];
+        container.querySelectorAll("section").forEach(section => {
+          const label = String(section.querySelector("[data-defect-group-label]")?.value ?? "").trim();
+          const items = [...section.querySelectorAll("[data-defect-item]")].map(input => String(input.value ?? "").trim()).filter(Boolean);
+          if (!label || !items.length) return;
+          next.push({ label, items, open: true });
+        });
+        DEFECT_GROUPS.length = 0;
+        next.forEach(group => DEFECT_GROUPS.push(group));
+        saveDefectGroups(DEFECT_GROUPS);
+        renderDefectGroups();
+        if (renderEditor) renderDefectGroupEditor();
+      }
+      function bindDefectEditorEvents() {
+        const panel = document.getElementById("defectEditPanel");
+        const toggle = document.getElementById("defectEditToggle");
+        const editor = document.getElementById("defectGroupEditor");
+        const addGroup = document.getElementById("defectAddGroupBtn");
+        const reset = document.getElementById("defectResetBtn");
+        const save = document.getElementById("defectSaveBtn");
+        const closeBtn = document.getElementById("defectEditClose");
+        const status = document.getElementById("defectEditStatus");
+        if (!panel || !toggle || !editor || !addGroup || !reset || !save) return;
+        const setStatus = (text) => { if (status) status.textContent = text; };
+        const backdrop = document.getElementById("defectEditBackdrop");
+        const openPanel = () => {
+          panel.removeAttribute("hidden");
+          panel.style.display = "flex";
+          if (backdrop) backdrop.removeAttribute("hidden");
+          toggle.textContent = "收合編輯";
+          renderDefectGroupEditor();
+          setStatus("");
+        };
+        toggle.addEventListener("click", () => {
+          if (panel.hasAttribute("hidden")) openPanel();
+          else closeDefectEditPanel();
+        });
+        closeBtn?.addEventListener("click", closeDefectEditPanel);
+        backdrop?.addEventListener("click", closeDefectEditPanel);
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && !panel.hasAttribute("hidden")) closeDefectEditPanel();
+        });
+        addGroup.addEventListener("click", () => {
+          DEFECT_GROUPS.push({ label: "新分類", items: ["新選項"], open: true });
+          saveDefectGroups(DEFECT_GROUPS);
+          renderDefectGroups();
+          renderDefectGroupEditor();
+          setStatus("已新增分類");
+        });
+        reset.addEventListener("click", () => {
+          GlobalModal.confirm("確定要還原為預設的常用/裸露/導線分類嗎？", () => {
+            DEFECT_GROUPS.length = 0;
+            cloneDefectGroups(DEFECT_GROUPS_DEFAULT).forEach(group => DEFECT_GROUPS.push(group));
+            saveDefectGroups(DEFECT_GROUPS);
+            try { localStorage.removeItem(DEFECT_USAGE_STORAGE_KEY); } catch {}
+            renderDefectGroups();
+            renderDefectGroupEditor();
+            setStatus("已還原為預設");
+            closeDefectEditPanel();
+          });
+        });
+        save.addEventListener("click", () => {
+          syncDefectGroupsFromEditor();
+          setStatus("已儲存（已同步到本機）");
+          closeDefectEditPanel();
+        });
+        editor.addEventListener("input", event => {
+          if (event.target instanceof HTMLElement && (event.target.hasAttribute("data-defect-group-label") || event.target.hasAttribute("data-defect-item"))) {
+            syncDefectGroupsFromEditor({ renderEditor: false });
+          }
+        });
+        editor.addEventListener("click", event => {
+          const target = event.target instanceof HTMLElement ? event.target.closest("button") : null;
+          if (!target) return;
+          const rawGroup = target.getAttribute("data-defect-group");
+          const hasGroupAttr = rawGroup !== null && rawGroup !== "";
+          const groupIndex = hasGroupAttr ? Number(rawGroup) : NaN;
+          if (target.hasAttribute("data-defect-add-item") && hasGroupAttr && Number.isFinite(groupIndex) && DEFECT_GROUPS[groupIndex]) {
+            DEFECT_GROUPS[groupIndex].items.push("新選項");
+            saveDefectGroups(DEFECT_GROUPS);
+            renderDefectGroups();
+            renderDefectGroupEditor();
+            setStatus("已新增選項");
+            return;
+          }
+          if (target.hasAttribute("data-defect-remove-group") && hasGroupAttr && Number.isFinite(groupIndex) && DEFECT_GROUPS[groupIndex]) {
+            DEFECT_GROUPS.splice(groupIndex, 1);
+            saveDefectGroups(DEFECT_GROUPS);
+            renderDefectGroups();
+            renderDefectGroupEditor();
+            setStatus("已移除分類");
+            return;
+          }
+          const removeItem = target.getAttribute("data-defect-remove-item");
+          if (removeItem && removeItem.includes(":")) {
+            const parts = removeItem.split(":");
+            if (parts.length === 2) {
+              const g = Number(parts[0]);
+              const i = Number(parts[1]);
+              if (Number.isFinite(g) && Number.isFinite(i) && DEFECT_GROUPS[g] && DEFECT_GROUPS[g].items[i] !== undefined) {
+                DEFECT_GROUPS[g].items.splice(i, 1);
+                saveDefectGroups(DEFECT_GROUPS);
+                renderDefectGroups();
+                renderDefectGroupEditor();
+                setStatus("已移除選項");
+              }
+            }
+            return;
+          }
+          const move = target.getAttribute("data-defect-move");
+          const itemIndexRaw = target.getAttribute("data-defect-item");
+          const hasItemAttr = itemIndexRaw !== null && itemIndexRaw !== "";
+          const itemIndex = hasItemAttr ? Number(itemIndexRaw) : NaN;
+          if (move && hasGroupAttr && Number.isFinite(groupIndex) && Number.isFinite(itemIndex) && DEFECT_GROUPS[groupIndex]) {
+            const items = DEFECT_GROUPS[groupIndex].items;
+            const nextIndex = move === "up" ? itemIndex - 1 : itemIndex + 1;
+            if (nextIndex < 0 || nextIndex >= items.length) return;
+            const [moved] = items.splice(itemIndex, 1);
+            items.splice(nextIndex, 0, moved);
+            saveDefectGroups(DEFECT_GROUPS);
+            renderDefectGroups();
+            renderDefectGroupEditor();
+            setStatus("已調整順序");
+            return;
+          }
+          const groupMove = target.getAttribute("data-defect-group-move");
+          if (groupMove && hasGroupAttr && Number.isFinite(groupIndex) && DEFECT_GROUPS[groupIndex]) {
+            const nextIndex = groupMove === "up" ? groupIndex - 1 : groupIndex + 1;
+            if (nextIndex < 0 || nextIndex >= DEFECT_GROUPS.length) return;
+            const [moved] = DEFECT_GROUPS.splice(groupIndex, 1);
+            DEFECT_GROUPS.splice(nextIndex, 0, moved);
+            saveDefectGroups(DEFECT_GROUPS);
+            renderDefectGroups();
+            renderDefectGroupEditor();
+            setStatus("已調整分類順序");
+          }
+        });
+      }
+      function initSidebarForm() {
+        renderDefectGroups();
+        bindDefectEditorEvents();
+        const groupsHtml = ICON_GROUPS.map(group => {
+          const chipsHtml = group.icons.map(ico => `<button type="button" class="icon-chip-btn" data-icon="${escapeHtml(ico)}" title="${escapeHtml(ico)}">${ico}</button>`).join("");
+          return `<div style="display:flex; align-items:center; gap:3px; flex-wrap:wrap; margin-bottom:2px;"><span style="font-size:10px; color:var(--muted); width:28px; flex-shrink:0; text-align:right; padding-right:4px;">${escapeHtml(group.label)}</span>${chipsHtml}</div>`;
+        }).join("");
+        document.getElementById("sidebar-icon-groups").innerHTML = groupsHtml;
 
         document.getElementById('editScrollTopBtn').addEventListener('click', () => { document.getElementById('editFormScrollArea').scrollTo({ top: 0, behavior: 'smooth' }); });
         document.getElementById('editScrollBotBtn').addEventListener('click', () => { const el = document.getElementById('editFormScrollArea'); el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); });
@@ -2301,13 +2488,76 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         return getAllRecordsInFolder(folderId).map(r => r.id);
       }
 
-      const DEFECT_GROUPS = [
+      const DEFECT_GROUPS_DEFAULT = [
         { label: "常用", open: true,  items: ["樹木修剪", "藤蔓清除", "竹枝清除", "椰樹修剪", "鳥巢"] },
         { label: "裸露", open: false,  items: ["接線環裸露", "拉線夾板裸露", "FC裸露", "TR一次裸露", "電纜接頭裸露", "GS裸露"] },
         { label: "導線", open: false, items: ["防雷脫落", "低壓脫落"] },
         { label: "設計", open: false, items: ["不良設計", "游休TR設計", "橫擔腐蝕設計"] },
         { label: "雜項", open: false, items: ["桿上異物"] },
       ];
+
+      const DEFECT_GROUPS_STORAGE_KEY = "tp_defect_groups_v1";
+      const DEFECT_USAGE_STORAGE_KEY = "tp_defect_usage_v1";
+
+      function cloneDefectGroups(source) {
+        return (source || DEFECT_GROUPS_DEFAULT).map(group => ({ ...group, items: [...(group.items || [])] }));
+      }
+      function loadDefectGroups() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(DEFECT_GROUPS_STORAGE_KEY) || "null");
+          if (!Array.isArray(parsed) || !parsed.length) return null;
+          const cleaned = parsed
+            .map(group => {
+              const label = String(group?.label ?? "").trim();
+              const items = Array.isArray(group?.items) ? group.items.map(item => String(item ?? "").trim()).filter(Boolean) : [];
+              if (!label || !items.length) return null;
+              return { label, items, open: Boolean(group?.open) };
+            })
+            .filter(Boolean);
+          return cleaned.length ? cleaned : null;
+        } catch { return null; }
+      }
+      function saveDefectGroups(groups) {
+        try { localStorage.setItem(DEFECT_GROUPS_STORAGE_KEY, JSON.stringify(groups)); } catch {}
+      }
+      function loadDefectUsage() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(DEFECT_USAGE_STORAGE_KEY) || "{}");
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+          const out = {};
+          for (const [key, value] of Object.entries(parsed)) {
+            const count = Number(value);
+            if (key && Number.isFinite(count) && count > 0) out[String(key).trim()] = count;
+          }
+          return out;
+        } catch { return {}; }
+      }
+      function saveDefectUsage(usage) {
+        try { localStorage.setItem(DEFECT_USAGE_STORAGE_KEY, JSON.stringify(usage)); } catch {}
+      }
+      function recordDefectUsage(defectText) {
+        const key = String(defectText ?? "").trim();
+        if (!key) return;
+        const usage = loadDefectUsage();
+        usage[key] = (Number(usage[key]) || 0) + 1;
+        saveDefectUsage(usage);
+        renderDefectGroups();
+      }
+      function defectUsageRank(text) {
+        return Number(loadDefectUsage()[String(text ?? "").trim()]) || 0;
+      }
+      function orderedDefectItemsForGroup(group) {
+        const items = Array.isArray(group?.items) ? [...group.items] : [];
+        return items
+          .map((text, index) => ({ text, index, usage: defectUsageRank(text) }))
+          .sort((a, b) => (b.usage - a.usage) || (a.index - b.index))
+          .map(entry => entry.text);
+      }
+
+      const DEFECT_GROUPS = (() => {
+        const loaded = loadDefectGroups();
+        return loaded ? loaded : cloneDefectGroups(DEFECT_GROUPS_DEFAULT);
+      })();
 
       function findOrCreateFolderByPath(pathStr) {
         const parts = pathStr.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
@@ -5104,6 +5354,13 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       // 全頁 click / input 事件委派
       // ==========================================
       document.addEventListener("click", async (e) => {
+        const editPanelEl = document.getElementById("defectEditPanel");
+        const editToggleEl = document.getElementById("defectEditToggle");
+        const isInsideEdit = e.target.closest?.("#defectEditPanel, #defectEditToggle");
+        if (!isInsideEdit && editPanelEl && !editPanelEl.hasAttribute("hidden")) {
+          const openAnother = e.target.closest?.("#v2AddressToggle, #mapSearchToggle, #layerMenuToggle, #v2CadastreToggle, #v2SyncToggle, #v2AddressPanel, #mapSearchPanel, #layerMenuPanel, #v2CadastrePanel, #v2SyncPanel");
+          if (openAnother) closeDefectEditPanel();
+        }
         const statHeader = e.target.closest('.defect-stat-header');
         if (statHeader) {
           const recordsDiv = statHeader.nextElementSibling, arrow = statHeader.querySelector('.defect-stat-arrow');
@@ -5333,6 +5590,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
               needCorrection,
               correctCode
             });
+
+            if (defect) recordDefectUsage(defect);
 
             saveToLocalStorage();
             await clearEditDraft();
