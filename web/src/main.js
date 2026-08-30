@@ -6628,7 +6628,9 @@ function renderDefectStats() {
               else reject(new Error(msg.error || "points 解析失敗"));
             };
             worker.onerror = (err) => { clearTimeout(timer); worker.terminate(); reject(new Error(err.message || "points Worker 錯誤")); };
-            worker.postMessage({ id: "points", urls: [urls.points] });
+            // 傳絕對 URL（基於頁面位置），避免 Worker 內 fetch 相對路徑解析錯誤
+            const absUrl = new URL(urls.points, window.location.href).href;
+            worker.postMessage({ id: "points", urls: [absUrl] });
           });
         } catch (e) {
           // Worker 失敗時退回主線程直接載入，確保功能不中斷
