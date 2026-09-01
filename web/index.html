@@ -164,6 +164,11 @@
           <span class="v2-cadastre-title">🗺️ 地籍圖查詢</span>
           <button id="v2CadastreClose" class="v2-cadastre-close" type="button" title="關閉地籍圖查詢" aria-label="關閉地籍圖查詢">×</button>
         </header>
+        <nav class="v2-bookmark-tabs" role="tablist" aria-label="地籍分頁">
+          <button class="v2-tab-btn is-active" data-tab="search" data-panel="cadastre" role="tab" aria-selected="true">🔍 查詢</button>
+          <button class="v2-tab-btn" data-tab="bookmarks" data-panel="cadastre" role="tab" aria-selected="false">⭐ 收藏 <span class="v2-tab-count" id="v2CadastreCount">0</span></button>
+        </nav>
+        <div class="v2-tab-pane is-active" data-pane="search" data-panel="cadastre">
         <p class="v2-cadastre-description">固定查詢臺南市。地段可輸入關鍵字或從清單選取，再輸入地號即可套繪地籍範圍。</p>
         <form id="v2CadastreForm" class="v2-cadastre-form" novalidate>
           <div class="v2-cadastre-field">
@@ -199,6 +204,16 @@
         </form>
         <p id="v2CadastreStatus" class="v2-cadastre-status" aria-live="polite"></p>
         <div id="v2CadastreResult" class="v2-cadastre-result" hidden></div>
+        </div>
+        <div class="v2-tab-pane" data-pane="bookmarks" data-panel="cadastre" hidden>
+          <div class="v2-bookmark-toolbar">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" id="v2CadastreSelectAll"> 全選</label>
+            <span class="v2-bookmark-count">已收藏 <strong id="v2CadastreBookmarksCount">0</strong> 筆</span>
+            <button id="v2CadastreBookmarksToggle" class="v2-bookmark-toggle" type="button">👁️ 全部隱藏</button>
+            <button id="v2CadastreBookmarksDelete" class="v2-bookmark-delete" type="button" disabled style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;min-height:28px;padding:4px 8px;font-size:12px;font-weight:800;cursor:pointer;">🗑️ 刪除所選</button>
+          </div>
+          <div id="v2CadastreBookmarks" class="v2-bookmark-list"></div>
+        </div>
         <p class="v2-cadastre-disclaimer">地籍圖資僅供參考，實際權利範圍與登記資料應以主管機關正式文件為準。</p>
       </div>
     </section>
@@ -209,10 +224,25 @@
           <span class="v2-address-title">🏠 門牌地址查詢</span>
           <button id="v2AddressClose" class="v2-address-close" type="button" title="關閉門牌地址查詢" aria-label="關閉門牌地址查詢">×</button>
         </header>
+        <nav class="v2-bookmark-tabs" role="tablist" aria-label="門牌分頁">
+          <button class="v2-tab-btn is-active" data-tab="search" data-panel="address" role="tab" aria-selected="true">🔍 查詢</button>
+          <button class="v2-tab-btn" data-tab="bookmarks" data-panel="address" role="tab" aria-selected="false">⭐ 收藏 <span class="v2-tab-count" id="v2AddressCount">0</span></button>
+        </nav>
+        <div class="v2-tab-pane is-active" data-pane="search" data-panel="address">
         <p class="v2-address-warning">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
         <input id="addrSearchInput" type="search" placeholder="搜尋門牌地址" autocomplete="off" aria-controls="addrSearchResults" />
         <p id="addrSearchStatus" class="v2-address-status" aria-live="polite"></p>
         <div id="addrSearchResults" class="v2-address-results" role="listbox"></div>
+        </div>
+        <div class="v2-tab-pane" data-pane="bookmarks" data-panel="address" hidden>
+          <div class="v2-bookmark-toolbar">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" id="v2AddressSelectAll"> 全選</label>
+            <span class="v2-bookmark-count">已收藏 <strong id="v2AddressBookmarksCount">0</strong> 筆</span>
+            <button id="v2AddressBookmarksToggle" class="v2-bookmark-toggle" type="button">👁️ 全部隱藏</button>
+            <button id="v2AddressBookmarksDelete" class="v2-bookmark-delete" type="button" disabled style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;min-height:28px;padding:4px 8px;font-size:12px;font-weight:800;cursor:pointer;">🗑️ 刪除所選</button>
+          </div>
+          <div id="v2AddressBookmarks" class="v2-bookmark-list"></div>
+        </div>
         <p class="v2-address-disclaimer">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
       </div>
     </section>

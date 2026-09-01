@@ -1,16 +1,18 @@
-.v2-cadastre-panel {
+.v2-cadastre-panel,
+.v2-address-panel {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
   display: none;
   flex-direction: column;
   left: calc(10px + env(safe-area-inset-left, 0px));
   max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px);
   overflow: hidden;
   position: fixed;
   top: calc(60px + env(safe-area-inset-top, 0px));
-  width: min(360px, calc(100vw - 20px));
+  width: min(420px, calc(100vw - 20px));
   z-index: calc(var(--control-z) + 20);
 }
 
@@ -18,9 +20,136 @@
 .v2-cadastre-inner {
   display: flex;
   flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  min-height: 0;
+  flex: 1;
+}
+.v2-bookmark-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.v2-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 32px;
+  cursor: pointer;
+}
+.v2-tab-btn.is-active {
+  background: #fff;
+  border-color: var(--line);
+  color: var(--accent-dark);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.v2-tab-pane {
+  display: none;
+  flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  min-height: 0;
+  flex: 1;
   padding: 12px;
+}
+.v2-tab-pane.is-active {
+  display: flex;
+}
+.v2-bookmark-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.v2-bookmark-list {
+  display: grid;
+  gap: 6px;
+}
+.v2-bookmark-item {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+.v2-bookmark-item {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.v2-bookmark-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15,23,42,0.08);
+  border-color: #94a3b8;
+}
+.v2-bookmark-item:active {
+  transform: translateY(0);
+}
+.address-marker-icon,
+.address-bookmark-icon {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+}
+.address-marker-icon div,
+.address-bookmark-icon div {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.address-marker-icon:hover div,
+.address-bookmark-icon:hover div {
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
+}
+.v2-bookmark-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+.v2-bookmark-item-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.4;
+}
+.v2-bookmark-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.v2-bookmark-item-actions button {
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.v2-bookmark-item-actions button:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+}
+.v2-bookmark-item-actions button:active {
+  transform: translateY(0);
+  filter: brightness(0.92);
+}
+[data-cadastre-retain],
+[data-cadastre-retain-popup],
+[data-address-retain] {
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+[data-cadastre-retain]:hover,
+[data-cadastre-retain-popup]:hover,
+[data-address-retain]:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
 }
 .v2-cadastre-head {
   align-items: center;
@@ -294,16 +423,17 @@
 .v2-address-panel {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
   display: none;
   flex-direction: column;
   left: calc(10px + env(safe-area-inset-left, 0px));
   max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px);
   overflow: hidden;
   position: fixed;
   top: calc(60px + env(safe-area-inset-top, 0px));
-  width: min(360px, calc(100vw - 20px));
+  width: min(420px, calc(100vw - 20px));
   z-index: calc(var(--control-z) + 20);
 }
 .v2-address-panel.is-open { display: flex; }

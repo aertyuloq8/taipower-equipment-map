@@ -294,13 +294,13 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           setStatus("已新增分類");
         });
         reset.addEventListener("click", () => {
-          GlobalModal.confirm("確定要還原為預設的常用/裸露/導線/設計分類嗎？", () => {
+          GlobalModal.confirm("確定要還原為預設的常用/裸露/導線/設計分類嗎？（使用次數將保留）", () => {
             DEFECT_GROUPS.length = 0;
             cloneDefectGroups(DEFECT_GROUPS_DEFAULT).forEach(group => DEFECT_GROUPS.push(group));
             saveDefectGroups(DEFECT_GROUPS);
             renderDefectGroups();
             renderDefectGroupEditor();
-            setStatus("已還原為預設分類");
+            setStatus("已還原為預設（已保留使用次數）");
             closeDefectEditPanel();
           });
         });
@@ -2517,13 +2517,51 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       function saveDefectGroups(groups) {
         try { localStorage.setItem(DEFECT_GROUPS_STORAGE_KEY, JSON.stringify(groups)); } catch {}
       }
+      const DEFECT_USAGE_STORAGE_KEY = "tp_defect_usage_v1";
+      function loadDefectUsage() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(DEFECT_USAGE_STORAGE_KEY) || "{}");
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+          const out = {};
+          for (const [key, value] of Object.entries(parsed)) {
+            const count = Number(value);
+            if (key && Number.isFinite(count) && count > 0) out[String(key).trim()] = count;
+          }
+          return out;
+        } catch { return {}; }
+      }
+      function saveDefectUsage(usage) {
+        try { localStorage.setItem(DEFECT_USAGE_STORAGE_KEY, JSON.stringify(usage)); } catch {}
+      }
+      function recordDefectUsage(defectText) {
+        const key = String(defectText ?? "").trim();
+        if (!key) return;
+        const usage = loadDefectUsage();
+        usage[key] = (Number(usage[key]) || 0) + 1;
+        saveDefectUsage(usage);
+        renderDefectGroups();
+      }
+      function defectUsageRank(text) {
+        return Number(loadDefectUsage()[String(text ?? "").trim()]) || 0;
+      }
       // 不良項目排序：依照使用者自訂順序（編輯選項內可上下移動），不再依使用次數自動排前。
       function orderedDefectItemsForGroup(group) {
         return Array.isArray(group?.items) ? [...group.items] : [];
       }
-      // 一次性清理舊版累加器（tp_defect_usage_v1 已停用，預留空殼避免其他存錯路徑時崩潰）。
-      function purgeLegacyDefectUsageStorage() {
-        try { localStorage.removeItem("tp_defect_usage_v1"); } catch {}
+      function maybeBackfillDefectUsage() {
+        try {
+          const existing = loadDefectUsage();
+          if (Object.keys(existing).length > 0) return;
+          const counts = {};
+          for (const r of state.records || []) {
+            const d = String(r.defect || "").trim();
+            if (d) counts[d] = (counts[d] || 0) + 1;
+          }
+          if (Object.keys(counts).length) {
+            saveDefectUsage(counts);
+            renderDefectGroups();
+          }
+        } catch {}
       }
       // 一次性分類遷移：把「雜項」內的「桿上異物」併入「常用」並刪除「雜項」分類。
       // 已用過的用戶 (localStorage 已有 tp_defect_groups_v1) 也會套用；新用戶直接吃 default 即可。
@@ -7041,7 +7079,7 @@ function renderDefectStats() {
       async function init() {
         setStatus("載入設備資料...");
 		initSidebarForm(); // ★ 加入這行，初始化編輯表單內容
-        loadFromLocalStorage(); purgeLegacyDefectUsageStorage(); renderFolders(); renderDefectStats(); renderDefectGroups(); updateRecordMarkers(); refreshStorageStatus();
+        loadFromLocalStorage(); maybeBackfillDefectUsage(); renderFolders(); renderDefectStats(); renderDefectGroups(); updateRecordMarkers(); refreshStorageStatus();
         syncMobileMapControls();
         try {
           const { meta, points } = await tryFetchData();
