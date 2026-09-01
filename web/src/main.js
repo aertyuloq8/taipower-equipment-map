@@ -4485,6 +4485,12 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           records: archiveRecords,
         }, null, 2);
         await addArchiveFile(manifestFiles, archiveFiles, "records.json", recordsJson, "application/json");
+        try {
+          const cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+          const addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          await addArchiveFile(manifestFiles, archiveFiles, "cadastre-bookmarks.json", JSON.stringify(cadastreBM, null, 2), "application/json");
+          await addArchiveFile(manifestFiles, archiveFiles, "address-bookmarks.json", JSON.stringify(addressBM, null, 2), "application/json");
+        } catch {}
         await addArchiveFile(manifestFiles, archiveFiles, INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards, folders), "text/html");
         inspectionCards.forEach(card => {
           cardFiles.push({ path: card.cardPath, data: createInspectionCardDetailHtml(card) });
@@ -5188,9 +5194,16 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         }
       }
 
-      async function restoreBackupData(parsed, photoEntries = [], replacePhotos = true) {
+      async function restoreBackupData(parsed, photoEntries = [], replacePhotos = true, extra = {}) {
         if (!parsed || !Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("備份格式錯誤");
         if (replacePhotos) await replacePhotoStore(photoEntries);
+        // Restore bookmarks if present in backup (optional, not in old backups)
+        try {
+          if (Array.isArray(extra.cadastreBookmarks)) localStorage.setItem("tp_cadastre_bookmarks_v1", JSON.stringify(extra.cadastreBookmarks));
+          if (Array.isArray(extra.addressBookmarks)) localStorage.setItem("tp_address_bookmarks_v1", JSON.stringify(extra.addressBookmarks));
+          // Try to refresh bookmark UIs if already loaded
+          try { window.dispatchEvent(new CustomEvent("bookmarksRestored")); } catch {}
+        } catch {}
         state.folders = parsed.folders;
         state.records = parsed.records;
         state.lastFolderId = state.records.length > 0 ? state.records[state.records.length - 1].folderId : null;
@@ -5294,6 +5307,16 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         const manifest = manifestEntry ? JSON.parse(await manifestEntry.async("string")) : null;
         const integrity = await verifyZipManifest(zip, manifest);
         if (!integrity.valid) throw new Error(`完整性檢查失敗：${integrity.errors.slice(0, 4).join("、")}`);
+        // Try to read bookmark backups (optional, for new backups)
+        let cadastreBookmarks = null, addressBookmarks = null;
+        try {
+          const cEntry = zip.file("cadastre-bookmarks.json");
+          if (cEntry) cadastreBookmarks = JSON.parse(await cEntry.async("string"));
+        } catch {}
+        try {
+          const aEntry = zip.file("address-bookmarks.json");
+          if (aEntry) addressBookmarks = JSON.parse(await aEntry.async("string"));
+        } catch {}
 
         const metaById = new Map(parsed.records.flatMap(record => (record.photos || []).map(photo => [photo.id, photo])));
         const photoPrefixes = [...metaById.keys()].map(id => [id + "_", id]).sort((a, b) => b[0].length - a[0].length);
@@ -5317,6 +5340,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           photoEntries,
           manifest,
           integrity,
+          cadastreBookmarks,
+          addressBookmarks,
           summary: {
             fileBytes: Number(file.size) || 0,
             folderCount: parsed.folders.length,
@@ -5387,7 +5412,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           cancelText: "取消",
           onConfirm: async () => {
             try {
-              await restoreBackupData(imported.parsed, imported.photoEntries || [], isZip);
+              await restoreBackupData(imported.parsed, imported.photoEntries || [], isZip, { cadastreBookmarks: imported.cadastreBookmarks, addressBookmarks: imported.addressBookmarks });
               GlobalModal.alert(isZip ? "完整備份還原成功！" : "紀錄還原成功！JSON 不含照片，現有照片已保留。");
             } catch (error) {
               console.error("還原失敗：", error);

@@ -827,6 +827,23 @@
       if (!currentCadastreData || !currentCadastrePayload) { setStatus("無可保留的資料", { error: true }); return; }
       addCadastreBookmark(currentCadastreData.town, currentCadastreData.section, currentCadastreData.number, currentCadastrePayload);
     });
+    document.addEventListener("click", (e) => {
+      if (!controls.panel?.classList.contains("is-open")) return;
+      if (e.target.closest("#v2CadastrePanel") || e.target.closest("#v2CadastreToggle") || e.target.closest(".v2-bookmark-tabs")) return;
+      // Clicked outside the panel content, switch bookmarks tab back to search
+      const activeBookmarkTab = document.querySelector('.v2-tab-btn[data-panel="cadastre"][data-tab="bookmarks"].is-active');
+      if (activeBookmarkTab) {
+        document.querySelectorAll('.v2-tab-btn[data-panel="cadastre"]').forEach(b => {
+          b.classList.toggle("is-active", b.dataset.tab === "search");
+          b.setAttribute("aria-selected", String(b.dataset.tab === "search"));
+        });
+        document.querySelectorAll('.v2-tab-pane[data-panel="cadastre"]').forEach(pane => {
+          const isActive = pane.dataset.pane === "search";
+          pane.classList.toggle("is-active", isActive);
+          pane.hidden = !isActive;
+        });
+      }
+    });
     controls.toggle?.addEventListener("click", () => setPanelOpen(!controls.panel?.classList.contains("is-open")));
     controls.close?.addEventListener("click", () => setPanelOpen(false));
     controls.form?.addEventListener("submit", submit);
@@ -914,6 +931,11 @@
     }
     bindEvents();
     renderCadastreBookmarks();
+    const map = getMap();
+    if (map) {
+      map.on("click", () => { if (controls.panel?.classList.contains("is-open")) setPanelOpen(false); });
+      map.on("dragstart zoomstart", () => { if (controls.panel?.classList.contains("is-open")) setPanelOpen(false); });
+    }
   }
 
   boot();

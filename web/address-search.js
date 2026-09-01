@@ -135,12 +135,15 @@
   }
   function ensureMarker(map){
     if(!state.marker){
-      const icon = L.divIcon({ className: "address-marker-icon", html: '<div style="width:14px;height:14px;background:#ef4444;border:3px solid #b91c1c;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>', iconSize: [30,30], iconAnchor: [15,15], popupAnchor: [0,-15] });
-      state.marker = L.marker([0,0], { icon, interactive:true, bubblingMouseEvents:true, zIndexOffset: 1000 });
+      const icon = L.divIcon({ className: "address-marker-icon", html: '<div style="width:16px;height:16px;background:#ef4444;border:3px solid #b91c1c;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>', iconSize: [40,40], iconAnchor: [20,20], popupAnchor: [0,-20] });
+      state.marker = L.marker([0,0], { icon, interactive:true, bubblingMouseEvents:true, keyboard:true, zIndexOffset: 1000 });
       state.marker.on("click", ()=> { if(map.hasLayer(state.marker)) state.marker.openPopup(); });
+      state.marker.on("add", ()=> { const el=state.marker.getElement(); if(el) el.style.cursor='pointer'; });
     }
     if(!map.hasLayer(state.marker)) state.marker.addTo(map);
     if(state.marker.bringToFront) state.marker.bringToFront();
+    // Ensure popup is correctly bound and interactive
+    if(state.marker.getPopup()) state.marker.getPopup().options.autoClose = false;
     return state.marker;
   }
   let currentAddressPlate = null;
@@ -412,6 +415,11 @@
   renderAddressBookmarks();
   (function bootAddressBookmarks(attempt=0){
     if (!getMap() && attempt<40) { setTimeout(()=>bootAddressBookmarks(attempt+1),100); return; }
-    if (getMap()) updateAddressBookmarkLayers();
+    if (getMap()) {
+      updateAddressBookmarkLayers();
+      const map = getMap();
+      map.on("click", ()=> { if(controls.panel?.classList.contains("is-open")) setPanelOpen(false); });
+      map.on("dragstart zoomstart", ()=> { if(controls.panel?.classList.contains("is-open")) setPanelOpen(false); });
+    }
   })();
 })();
