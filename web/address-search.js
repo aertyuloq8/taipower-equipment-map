@@ -368,6 +368,11 @@
       renderAddressBookmarks();
       getMap()?.closePopup();
     });
+    document.addEventListener("click", (e) => {
+      const retainBtn = e.target.closest("[data-address-retain]");
+      if (!retainBtn) return;
+      if (currentAddressPlate) addAddressBookmark(currentAddressPlate);
+    });
     document.getElementById("v2AddressSelectAll")?.addEventListener("change", (e) => {
       if (e.target.checked) addressBookmarks.forEach(b => addressSelectedIds.add(b.id));
       else addressSelectedIds.clear();
