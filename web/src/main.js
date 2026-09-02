@@ -2798,9 +2798,10 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       function saveToLocalStorage() {
         try {
           normalizeInspectionState();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            folders: state.folders, records: state.records, lastFolderId: state.lastFolderId,
-          }));
+          const data = { folders: state.folders, records: state.records, lastFolderId: state.lastFolderId };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          // Dual-write to IndexedDB (async, non-blocking)
+          if (window.__inspectionDB) window.__inspectionDB.saveInspectionRecords(STORAGE_KEY, data).catch(() => {});
         } catch (e) {
           console.error("儲存失敗:", e);
           GlobalModal.alert("⚠️ 儲存失敗！<br><br>可能是瀏覽器儲存空間已達上限 (約 5MB)。請立即點擊「資料備份」下載您的紀錄，並清理不需要的資料夾。");
@@ -2843,6 +2844,33 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             if (!localStorage.getItem(STORAGE_KEY)) saveToLocalStorage();
           }
         } catch (e) { console.error("讀取 localStorage 失敗:", e); }
+      }
+
+      async function migrateInspectionToIdb() {
+        if (!window.__inspectionDB) return;
+        try {
+          const idbData = await window.__inspectionDB.loadInspectionRecords(STORAGE_KEY, LEGACY_STORAGE_KEYS);
+          if (idbData && Array.isArray(idbData.folders) && Array.isArray(idbData.records)) {
+            // IDB has data — check if it's newer or different
+            const currentJson = JSON.stringify({ folders: state.folders, records: state.records, lastFolderId: state.lastFolderId });
+            const idbJson = JSON.stringify(idbData);
+            if (currentJson !== idbJson) {
+              // IDB data is different — use it (IDB is more persistent)
+              state.folders = idbData.folders || [];
+              state.records = idbData.records || [];
+              state.lastFolderId = idbData.lastFolderId || null;
+              state.folders.forEach(f => { if (typeof f.parentId === "undefined") f.parentId = null; });
+              normalizeInspectionState();
+              saveToLocalStorage(); // sync back to localStorage
+              renderFolders(); renderDefectStats(); renderDefectGroups(); updateRecordMarkers();
+            }
+          } else if (localStorage.getItem(STORAGE_KEY)) {
+            // No IDB data, but localStorage has data — migrate to IDB
+            await window.__inspectionDB.saveInspectionRecords(STORAGE_KEY, {
+              folders: state.folders, records: state.records, lastFolderId: state.lastFolderId,
+            });
+          }
+        } catch (e) { console.error("IndexedDB 遷移失敗:", e); }
       }
 
       function normalizeInspectionState() {
@@ -7134,6 +7162,8 @@ function renderDefectStats() {
         setStatus("載入設備資料...");
 		initSidebarForm(); // ★ 加入這行，初始化編輯表單內容
         loadFromLocalStorage(); maybeBackfillDefectUsage(); renderFolders(); renderDefectStats(); renderDefectGroups(); updateRecordMarkers(); refreshStorageStatus();
+        // Async: upgrade from localStorage to IndexedDB if needed
+        migrateInspectionToIdb();
         syncMobileMapControls();
         try {
           const { meta, points } = await tryFetchData();
