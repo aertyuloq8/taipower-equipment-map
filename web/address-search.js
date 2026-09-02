@@ -1,5 +1,21 @@
 (() => {
   "use strict";
+
+  function showToast(msg, type) {
+    const el = document.createElement("div");
+    el.textContent = msg;
+    Object.assign(el.style, {
+      position:"fixed",bottom:"80px",left:"50%",transform:"translateX(-50%)",
+      padding:"10px 20px",borderRadius:"8px",fontSize:"14px",fontWeight:"600",
+      color:"#fff",zIndex:"99999",opacity:"0",transition:"opacity 0.3s ease",
+      pointerEvents:"none",maxWidth:"90vw",textAlign:"center",
+      background: type==="error" ? "#dc2626" : type==="dup" ? "#d97706" : "#0f766e",
+    });
+    document.body.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = "1"; });
+    setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 300); }, 1800);
+  }
+
   const controls = {
     panel: document.getElementById("v2AddressPanel"),
     toggle: document.getElementById("v2AddressToggle"),
@@ -274,15 +290,15 @@
     });
   }
   function addAddressBookmark(plate) {
-    if (!plate || !Number.isFinite(plate.la) || !Number.isFinite(plate.ln)) { setStatus("無可收藏的座標", { error: true }); return; }
+    if (!plate || !Number.isFinite(plate.la) || !Number.isFinite(plate.ln)) { showToast("無可收藏的座標", "error"); return; }
     const addrKey = plate.r || plate.addr;
     const exists = addressBookmarks.some(b => b.addr === addrKey && Math.abs(b.la - plate.la) < 1e-6 && Math.abs(b.ln - plate.ln) < 1e-6);
-    if (exists) { setStatus(`已收藏過 ${addrKey}`, { error: true }); return; }
+    if (exists) { showToast(`已收藏過 ${addrKey}`, "dup"); return; }
     const id = `${plate.k || plate.addr}_${Date.now()}`;
     addressBookmarks.push({ id, addr: addrKey, la: plate.la, ln: plate.ln, visible: true, createdAt: new Date().toISOString() });
     saveAddressBookmarks();
     renderAddressBookmarks();
-    setStatus(`已收藏 ${addrKey}`);
+    showToast(`已收藏 ${addrKey}`);
   }
   function bindAddressBookmarkTabs() {
     document.querySelectorAll(".v2-tab-btn[data-panel='address']").forEach(btn => {
@@ -327,6 +343,8 @@
       }
       const item = e.target.closest(".v2-bookmark-item");
       if (!item) return;
+      // Checkbox / button clicks should not trigger flyto
+      if (e.target.closest("[data-address-check]") || e.target.closest("button")) return;
       const id = item.dataset.id;
       const bm = addressBookmarks.find(b => b.id === id);
       const map = getMap();
