@@ -17,6 +17,8 @@
   }
   function saveAddressBookmarks() {
     try { localStorage.setItem(ADDRESS_BOOKMARKS_KEY, JSON.stringify(addressBookmarks)); } catch {}
+    // Also write to IndexedDB (async, non-blocking)
+    if (window.__bookmarkDB) window.__bookmarkDB.saveBookmarks("address", addressBookmarks).catch(() => {});
   }
   let addressBookmarks = loadAddressBookmarks();
   let addressBookmarkLayers = new Map();
@@ -26,6 +28,12 @@
     addressSelectedIds.clear();
     renderAddressBookmarks();
   });
+  // Async migration: load from IndexedDB if available, update in-memory array
+  if (window.__bookmarkDB) {
+    window.__bookmarkDB.loadBookmarks("address").then(data => {
+      if (Array.isArray(data)) { addressBookmarks = data; renderAddressBookmarks(); }
+    }).catch(() => {});
+  }
   const state = {
     marker: null,
     timer: null,

@@ -4486,8 +4486,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         }, null, 2);
         await addArchiveFile(manifestFiles, archiveFiles, "records.json", recordsJson, "application/json");
         try {
-          const cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
-          const addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          let cadastreBM = [], addressBM = [];
+          if (window.__bookmarkDB) {
+            try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
+            try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
+          } else {
+            cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+            addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          }
           await addArchiveFile(manifestFiles, archiveFiles, "cadastre-bookmarks.json", JSON.stringify(cadastreBM, null, 2), "application/json");
           await addArchiveFile(manifestFiles, archiveFiles, "address-bookmarks.json", JSON.stringify(addressBM, null, 2), "application/json");
         } catch {}
@@ -4995,8 +5001,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash: archive.manifestHash,
           });
-          const cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
-          const addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          let cadastreBM = [], addressBM = [];
+          if (window.__bookmarkDB) {
+            try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
+            try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
+          } else {
+            cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+            addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          }
           const bmInfo = (cadastreBM.length + addressBM.length > 0) ? "<br>收藏：" + cadastreBM.length + " 筆地籍、" + addressBM.length + " 筆門牌" : "";
           GlobalModal.alert("已備份到個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
             state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + formatStorageBytes(archive.blob.size) + "）。" + bmInfo + "<br>" +
@@ -5205,8 +5217,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         if (replacePhotos) await replacePhotoStore(photoEntries);
         // Restore bookmarks if present in backup (optional, not in old backups)
         try {
-          if (Array.isArray(extra.cadastreBookmarks)) localStorage.setItem("tp_cadastre_bookmarks_v1", JSON.stringify(extra.cadastreBookmarks));
-          if (Array.isArray(extra.addressBookmarks)) localStorage.setItem("tp_address_bookmarks_v1", JSON.stringify(extra.addressBookmarks));
+          if (Array.isArray(extra.cadastreBookmarks)) {
+            localStorage.setItem("tp_cadastre_bookmarks_v1", JSON.stringify(extra.cadastreBookmarks));
+            if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks("cadastre", extra.cadastreBookmarks);
+          }
+          if (Array.isArray(extra.addressBookmarks)) {
+            localStorage.setItem("tp_address_bookmarks_v1", JSON.stringify(extra.addressBookmarks));
+            if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks("address", extra.addressBookmarks);
+          }
           // Try to refresh bookmark UIs if already loaded
           try { window.dispatchEvent(new CustomEvent("bookmarksRestored")); } catch {}
         } catch {}

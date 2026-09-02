@@ -30,6 +30,8 @@
   }
   function saveCadastreBookmarks() {
     try { localStorage.setItem(CADASTRE_BOOKMARKS_KEY, JSON.stringify(cadastreBookmarks)); } catch {}
+    // Also write to IndexedDB (async, non-blocking)
+    if (window.__bookmarkDB) window.__bookmarkDB.saveBookmarks("cadastre", cadastreBookmarks).catch(() => {});
   }
   const state = {
     city: null,
@@ -46,6 +48,12 @@
     cadastreSelectedIds.clear();
     renderCadastreBookmarks();
   });
+  // Async migration: load from IndexedDB if available, update in-memory array
+  if (window.__bookmarkDB) {
+    window.__bookmarkDB.loadBookmarks("cadastre").then(data => {
+      if (Array.isArray(data)) { cadastreBookmarks = data; renderCadastreBookmarks(); }
+    }).catch(() => {});
+  }
 
   function normalizeText(value) {
     return String(value || "").normalize("NFKC").replace(/\s+/g, "").toUpperCase();
