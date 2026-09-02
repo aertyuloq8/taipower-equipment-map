@@ -134,16 +134,18 @@
     setStatus(`找到 ${plateCount} 筆`);
   }
   function ensureMarker(map){
+    // Always create marker if not exists
     if(!state.marker){
       const icon = L.divIcon({ className: "address-marker-icon", html: '<div style="width:16px;height:16px;background:#ef4444;border:3px solid #b91c1c;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>', iconSize: [40,40], iconAnchor: [20,20], popupAnchor: [0,-20] });
       state.marker = L.marker([0,0], { icon, interactive:true, bubblingMouseEvents:true, keyboard:true, zIndexOffset: 1000 });
-      state.marker.on("click", ()=> { if(map.hasLayer(state.marker)) state.marker.openPopup(); });
-      state.marker.on("add", ()=> { const el=state.marker.getElement(); if(el) el.style.cursor='pointer'; });
     }
-    if(!map.hasLayer(state.marker)) state.marker.addTo(map);
+    // Re‑attach click handler every time (avoids stale marker reference after query rebuild)
+    state.marker.off("click").on("click", ()=> { if(map.hasLayer(state.marker)) state.marker.openPopup(); });
+    // Ensure cursor and bringToFront
     if(state.marker.bringToFront) state.marker.bringToFront();
-    // Ensure popup is correctly bound and interactive
-    if(state.marker.getPopup()) state.marker.getPopup().options.autoClose = false;
+    if(!map.hasLayer(state.marker)) state.marker.addTo(map);
+    // Keep popup autoClose behaviour (true = close when clicking map, false = stay open)
+    if(state.marker.getPopup()) state.marker.getPopup().options.autoClose = true;
     return state.marker;
   }
   let currentAddressPlate = null;
