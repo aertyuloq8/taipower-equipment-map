@@ -2022,10 +2022,12 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
 
         baseTileLayer = nextTileLayer;
         if (baseMapSelect) baseMapSelect.value = key;
+        try { localStorage.setItem("taipower_baseMap", key); } catch {}
       }
 
-      // 每次開啟 V2 都以臺灣通用電子地圖為預設；OSM 僅供本次操作手動切換。
-      setBaseMap("emap");
+      // Restore last-used base layer; default to "emap"
+      const savedBaseMap = (() => { try { return localStorage.getItem("taipower_baseMap"); } catch {} return null; })();
+      setBaseMap(savedBaseMap || "emap");
       baseMapSelect?.addEventListener("change", event => setBaseMap(event.target.value));
 
       // 疊加圖層（透明 WMS/WMTS，可與底圖同時顯示）
