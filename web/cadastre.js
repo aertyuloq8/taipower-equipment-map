@@ -733,6 +733,7 @@
     cadastreListEl?.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-cadastre-action]");
       if (btn) {
+        e.stopPropagation();
         const id = btn.dataset.id;
         const action = btn.dataset.cadastreAction;
         const bm = cadastreBookmarks.find(b => b.id === id);
@@ -931,6 +932,11 @@
     }
     bindEvents();
     renderCadastreBookmarks();
+    window.addEventListener("bookmarksRestored", () => {
+      cadastreBookmarks = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+      cadastreSelectedIds.clear();
+      renderCadastreBookmarks();
+    });
     const map = getMap();
     if (map) {
       map.on("click", () => { if (controls.panel?.classList.contains("is-open")) setPanelOpen(false); });

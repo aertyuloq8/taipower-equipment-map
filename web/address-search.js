@@ -283,6 +283,7 @@
     addressListEl?.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-address-action]");
       if (btn) {
+        e.stopPropagation();
         const id = btn.dataset.id;
         const action = btn.dataset.addressAction;
         const bm = addressBookmarks.find(b => b.id === id);
@@ -432,6 +433,11 @@
   });
   bindAddressBookmarkTabs();
   renderAddressBookmarks();
+  window.addEventListener("bookmarksRestored", () => {
+    addressBookmarks = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+    addressSelectedIds.clear();
+    renderAddressBookmarks();
+  });
   (function bootAddressBookmarks(attempt=0){
     if (!getMap() && attempt<40) { setTimeout(()=>bootAddressBookmarks(attempt+1),100); return; }
     if (getMap()) {
