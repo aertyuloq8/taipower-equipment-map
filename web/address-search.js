@@ -21,6 +21,11 @@
   let addressBookmarks = loadAddressBookmarks();
   let addressBookmarkLayers = new Map();
   let addressSelectedIds = new Set();
+  window.addEventListener("bookmarksRestored", () => {
+    addressBookmarks = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+    addressSelectedIds.clear();
+    renderAddressBookmarks();
+  });
   const state = {
     marker: null,
     timer: null,
@@ -433,11 +438,6 @@
   });
   bindAddressBookmarkTabs();
   renderAddressBookmarks();
-  window.addEventListener("bookmarksRestored", () => {
-    addressBookmarks = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
-    addressSelectedIds.clear();
-    renderAddressBookmarks();
-  });
   (function bootAddressBookmarks(attempt=0){
     if (!getMap() && attempt<40) { setTimeout(()=>bootAddressBookmarks(attempt+1),100); return; }
     if (getMap()) {

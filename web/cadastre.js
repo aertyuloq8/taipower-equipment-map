@@ -41,6 +41,11 @@
   let cadastreBookmarks = loadCadastreBookmarks();
   let cadastreBookmarkLayers = new Map();
   let cadastreSelectedIds = new Set();
+  window.addEventListener("bookmarksRestored", () => {
+    cadastreBookmarks = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+    cadastreSelectedIds.clear();
+    renderCadastreBookmarks();
+  });
 
   function normalizeText(value) {
     return String(value || "").normalize("NFKC").replace(/\s+/g, "").toUpperCase();
@@ -932,11 +937,6 @@
     }
     bindEvents();
     renderCadastreBookmarks();
-    window.addEventListener("bookmarksRestored", () => {
-      cadastreBookmarks = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
-      cadastreSelectedIds.clear();
-      renderCadastreBookmarks();
-    });
     const map = getMap();
     if (map) {
       map.on("click", () => { if (controls.panel?.classList.contains("is-open")) setPanelOpen(false); });
