@@ -44,9 +44,16 @@
   let cadastreBookmarkLayers = new Map();
   let cadastreSelectedIds = new Set();
   window.addEventListener("bookmarksRestored", () => {
-    cadastreBookmarks = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
-    cadastreSelectedIds.clear();
-    renderCadastreBookmarks();
+    // Try IndexedDB first, fallback to localStorage
+    if (window.__bookmarkDB) {
+      window.__bookmarkDB.loadBookmarks("cadastre").then(data => {
+        if (Array.isArray(data)) { cadastreBookmarks = data; cadastreSelectedIds.clear(); renderCadastreBookmarks(); }
+      }).catch(() => {});
+    } else {
+      cadastreBookmarks = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+      cadastreSelectedIds.clear();
+      renderCadastreBookmarks();
+    }
   });
   // Async migration: load from IndexedDB if available, update in-memory array
   if (window.__bookmarkDB) {

@@ -24,9 +24,16 @@
   let addressBookmarkLayers = new Map();
   let addressSelectedIds = new Set();
   window.addEventListener("bookmarksRestored", () => {
-    addressBookmarks = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
-    addressSelectedIds.clear();
-    renderAddressBookmarks();
+    // Try IndexedDB first, fallback to localStorage
+    if (window.__bookmarkDB) {
+      window.__bookmarkDB.loadBookmarks("address").then(data => {
+        if (Array.isArray(data)) { addressBookmarks = data; addressSelectedIds.clear(); renderAddressBookmarks(); }
+      }).catch(() => {});
+    } else {
+      addressBookmarks = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+      addressSelectedIds.clear();
+      renderAddressBookmarks();
+    }
   });
   // Async migration: load from IndexedDB if available, update in-memory array
   if (window.__bookmarkDB) {

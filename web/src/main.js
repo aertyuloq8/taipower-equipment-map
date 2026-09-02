@@ -2796,16 +2796,19 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       // LocalStorage
       // ==========================================
       function saveToLocalStorage() {
+        let saveOk = false;
         try {
           normalizeInspectionState();
           const data = { folders: state.folders, records: state.records, lastFolderId: state.lastFolderId };
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          saveOk = true;
           // Dual-write to IndexedDB (async, non-blocking)
           if (window.__inspectionDB) window.__inspectionDB.saveInspectionRecords(STORAGE_KEY, data).catch(() => {});
         } catch (e) {
           console.error("儲存失敗:", e);
           GlobalModal.alert("⚠️ 儲存失敗！<br><br>可能是瀏覽器儲存空間已達上限 (約 5MB)。請立即點擊「資料備份」下載您的紀錄，並清理不需要的資料夾。");
         }
+        if (!saveOk) return;
 
         renderFolders();
         updateRecordMarkers();

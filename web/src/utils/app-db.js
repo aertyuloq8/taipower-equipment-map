@@ -54,7 +54,7 @@ async function idbPutInspection(value) {
  * Load inspection records from IndexedDB, falling back to localStorage.
  * Migrates to IndexedDB if only localStorage has data.
  */
-export async function loadInspectionRecords(storageKey, legacyKeys) {
+async function loadInspectionRecords(storageKey, legacyKeys) {
   // Try IndexedDB first
   try {
     const data = await idbGetInspection();
@@ -80,7 +80,7 @@ export async function loadInspectionRecords(storageKey, legacyKeys) {
 /**
  * Save inspection records to both IndexedDB and localStorage.
  */
-export async function saveInspectionRecords(storageKey, data) {
+async function saveInspectionRecords(storageKey, data) {
   try { await idbPutInspection(data); } catch {}
   try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch {}
 }

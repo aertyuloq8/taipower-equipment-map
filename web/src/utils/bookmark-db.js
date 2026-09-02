@@ -37,7 +37,6 @@ async function getDb() {
 }
 
 async function idbGet(key) {
-  const PHOTO_DB_NAME = window.PHOTO_DB_NAME || "taipower_inspection_photos_v2";
   const APP_DATA_STORE_NAME = window.APP_DATA_STORE_NAME || "appData";
   const db = await getDb();
   return new Promise((resolve, reject) => {
@@ -49,7 +48,6 @@ async function idbGet(key) {
 }
 
 async function idbPut(key, value) {
-  const PHOTO_DB_NAME = window.PHOTO_DB_NAME || "taipower_inspection_photos_v2";
   const APP_DATA_STORE_NAME = window.APP_DATA_STORE_NAME || "appData";
   const db = await getDb();
   return new Promise((resolve, reject) => {
@@ -64,7 +62,7 @@ async function idbPut(key, value) {
  * Load bookmarks from IndexedDB, falling back to localStorage.
  * Migrates to IndexedDB if only localStorage has data.
  */
-export async function loadBookmarks(type) {
+async function loadBookmarks(type) {
   const idbKey = BOOKMARK_KEYS[type];
   const lsKey = LS_KEYS[type];
   let data = null;
@@ -84,7 +82,7 @@ export async function loadBookmarks(type) {
 /**
  * Save bookmarks to both IndexedDB and localStorage (dual-write for safety).
  */
-export async function saveBookmarks(type, data) {
+async function saveBookmarks(type, data) {
   const idbKey = BOOKMARK_KEYS[type];
   const lsKey = LS_KEYS[type];
   try { await idbPut(idbKey, data); } catch {}
@@ -93,9 +91,8 @@ export async function saveBookmarks(type, data) {
 
 /**
  * Load bookmarks synchronously from localStorage (for initial render).
- * Returns null if no localStorage data (caller should use async loadBookmarks).
  */
-export function loadBookmarksSync(type) {
+function loadBookmarksSync(type) {
   const lsKey = LS_KEYS[type];
   try {
     const raw = JSON.parse(localStorage.getItem(lsKey) || "[]");
