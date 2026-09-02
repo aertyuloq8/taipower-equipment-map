@@ -140,7 +140,17 @@
       state.marker = L.marker([0,0], { icon, interactive:true, bubblingMouseEvents:true, keyboard:true, zIndexOffset: 1000 });
     }
     // Re‑attach click handler every time (avoids stale marker reference after query rebuild)
-    state.marker.off("click").on("click", ()=> { if(map.hasLayer(state.marker)) state.marker.openPopup(); });
+    state.marker.off("click").on("click", ()=> {
+      if(!map.hasLayer(state.marker)) return;
+      const popup = state.marker.getPopup();
+      if(popup && popup.isOpen()){
+        popup.close();
+      } else if(currentAddressPlate){
+        state.marker.unbindPopup();
+        state.marker.bindPopup(buildAddressPopupContent(currentAddressPlate), {autoPanPadding:[10,10]});
+        state.marker.openPopup();
+      }
+    });
     // Ensure cursor and bringToFront
     if(state.marker.bringToFront) state.marker.bringToFront();
     if(!map.hasLayer(state.marker)) state.marker.addTo(map);
@@ -150,20 +160,22 @@
   }
   let currentAddressPlate = null;
   function googleNavUrl(lat,lng){ return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat.toFixed(6)+","+lng.toFixed(6))}`; }
+  function buildAddressPopupContent(plate){
+    return `<div class="v2-cadastre-popup"><strong>${escapeHtml(plate.r)}</strong><div class="v2-cadastre-popup-actions"><a class="popup-navigation-link" href="${googleNavUrl(plate.la, plate.ln)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" onclick="window.__v2AddressClearMarker()">✕ 清除</button><button type="button" data-address-retain style="background:#ecfeff;color:#0f766e;border:1px solid #0f766e;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">⭐ 收藏</button></div></div>`;
+  }
   function showPlate(map, plate){
     currentAddressPlate = plate;
     const marker = ensureMarker(map);
     marker.setLatLng([plate.la, plate.ln]);
     if (!map.hasLayer(marker)) marker.addTo(map);
     map.flyTo([plate.la, plate.ln], Math.max(map.getZoom(), 19), {duration:0.5});
-    const content = `<div class="v2-cadastre-popup"><strong>${escapeHtml(plate.r)}</strong><div class="v2-cadastre-popup-actions"><a class="popup-navigation-link" href="${googleNavUrl(plate.la, plate.ln)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" onclick="window.__v2AddressClearMarker()">✕ 清除</button><button type="button" data-address-retain style="background:#ecfeff;color:#0f766e;border:1px solid #0f766e;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">⭐ 保留</button></div></div>`;
-    marker.bindPopup(content, {autoPanPadding:[10,10]});
-    setTimeout(()=>{ if(map.hasLayer(marker)) marker.openPopup(); },520);
-    // Handle retain button in popup
-    setTimeout(()=>{
-      const btn = document.querySelector("[data-address-retain]");
-      if (btn) btn.onclick = () => addAddressBookmark(currentAddressPlate);
-    }, 600);
+    marker.unbindPopup();
+    marker.bindPopup(buildAddressPopupContent(plate), {autoPanPadding:[10,10]});
+    marker.openPopup();
+    const onPopupClose = () => {
+      marker.off("popupclose", onPopupClose);
+    };
+    marker.on("popupclose", onPopupClose);
   }
   // 點擊時解析座標（NLSC AutoComplete 只給地址字串，用 QuerySearch 精確定位）
   async function handlePlateClick(plate){
@@ -206,7 +218,7 @@
     if (deleteBtn) deleteBtn.disabled = addressSelectedIds.size === 0;
     if (selectAllCb) selectAllCb.checked = addressSelectedIds.size > 0 && addressSelectedIds.size === addressBookmarks.length;
     if (!addressBookmarks.length) {
-      list.innerHTML = '<p style="color:#999;font-size:12px;padding:12px;text-align:center;">尚無收藏，搜尋後點選門牌並按「保留」即可加入</p>';
+      list.innerHTML = '<p style="color:#999;font-size:12px;padding:12px;text-align:center;">尚無收藏，搜尋後點選門牌並按「收藏」即可加入</p>';
       updateAddressBookmarkLayers();
       return;
     }
@@ -242,15 +254,15 @@
     });
   }
   function addAddressBookmark(plate) {
-    if (!plate || !Number.isFinite(plate.la) || !Number.isFinite(plate.ln)) { setStatus("無可保留的座標", { error: true }); return; }
+    if (!plate || !Number.isFinite(plate.la) || !Number.isFinite(plate.ln)) { setStatus("無可收藏的座標", { error: true }); return; }
     const addrKey = plate.r || plate.addr;
     const exists = addressBookmarks.some(b => b.addr === addrKey && Math.abs(b.la - plate.la) < 1e-6 && Math.abs(b.ln - plate.ln) < 1e-6);
-    if (exists) { setStatus(`已保留過 ${addrKey}`, { error: true }); return; }
+    if (exists) { setStatus(`已收藏過 ${addrKey}`, { error: true }); return; }
     const id = `${plate.k || plate.addr}_${Date.now()}`;
     addressBookmarks.push({ id, addr: addrKey, la: plate.la, ln: plate.ln, visible: true, createdAt: new Date().toISOString() });
     saveAddressBookmarks();
     renderAddressBookmarks();
-    setStatus(`已保留 ${addrKey}`);
+    setStatus(`已收藏 ${addrKey}`);
   }
   function bindAddressBookmarkTabs() {
     document.querySelectorAll(".v2-tab-btn[data-panel='address']").forEach(btn => {

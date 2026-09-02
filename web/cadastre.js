@@ -524,7 +524,7 @@
     const area = featureProperty(feature, ["area", "AREA"]);
     const evolution = resolutionText(resolution);
     const navigationUrl = googleNavigationUrl(featureMapCenter(feature));
-    const actions = `<div class="v2-cadastre-popup-actions">${navigationUrl ? `<a class="popup-navigation-link" href="${navigationUrl}" target="_blank" rel="noopener">🗺️ 導航</a>` : ""}<button type="button" data-cadastre-retain-popup style="background:#ecfeff;color:#0f766e;border:1px solid #0f766e;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">⭐ 保留</button><button class="popup-clear-location-button" type="button" data-clear-cadastre-overlay>✕ 清除</button></div>`;
+    const actions = `<div class="v2-cadastre-popup-actions">${navigationUrl ? `<a class="popup-navigation-link" href="${navigationUrl}" target="_blank" rel="noopener">🗺️ 導航</a>` : ""}<button type="button" data-cadastre-retain-popup style="background:#ecfeff;color:#0f766e;border:1px solid #0f766e;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">⭐ 收藏</button><button class="popup-clear-location-button" type="button" data-clear-cadastre-overlay>✕ 清除</button></div>`;
     return `<div class="v2-cadastre-popup"><strong>${escapeHtml(sectionName)} ${escapeHtml(parcel)} 地號</strong><br><span>${escapeHtml(featureTown)} · ${escapeHtml(sectionCode)}</span>${evolution ? `<br><span class="v2-cadastre-popup-evolution">↳ ${escapeHtml(evolution)}</span>` : ""}${area ? `<br><span>面積：${escapeHtml(formatCadastreValue({ key: "AREA" }, area))}</span>` : ""}<details class="v2-cadastre-popup-details"><summary>詳細屬性</summary><dl class="v2-cadastre-detail-list">${detailRowsHtml(feature)}</dl></details>${actions}</div>`;
   }
 
@@ -656,7 +656,7 @@
     if (deleteBtn) deleteBtn.disabled = cadastreSelectedIds.size === 0;
     if (selectAllCb) selectAllCb.checked = cadastreSelectedIds.size > 0 && cadastreSelectedIds.size === cadastreBookmarks.length;
     if (!cadastreBookmarks.length) {
-      list.innerHTML = '<p style="color:#999;font-size:12px;padding:12px;text-align:center;">尚無收藏，查詢後按「保留」即可加入</p>';
+      list.innerHTML = '<p style="color:#999;font-size:12px;padding:12px;text-align:center;">尚無收藏，查詢後按「收藏」即可加入</p>';
       updateCadastreBookmarkLayers();
       return;
     }
@@ -705,13 +705,13 @@
   function addCadastreBookmark(town, section, number, payload) {
     try {
       const exists = cadastreBookmarks.some(b => b.townCode === town.code && b.section === section.code && b.number === number);
-      if (exists) { setStatus(`已保留過 ${section.name} ${formatParcel(number)}`, { error: true }); return; }
+      if (exists) { setStatus(`已收藏過 ${section.name} ${formatParcel(number)}`, { error: true }); return; }
       const geojson = geoJsonCollection(payload);
       const id = `${town.code}_${section.code}_${number}_${Date.now()}`;
       cadastreBookmarks.push({ id, town: town.name, townCode: town.code, section: section.code, sectionName: section.name, number, geojson, visible: true, createdAt: new Date().toISOString() });
       saveCadastreBookmarks();
       renderCadastreBookmarks();
-      setStatus(`已保留 ${section.name} ${formatParcel(number)}`);
+      setStatus(`已收藏 ${section.name} ${formatParcel(number)}`);
     } catch (e) { setStatus("保留失敗：" + e.message, { error: true }); }
   }
   function bindBookmarkTabs() {
