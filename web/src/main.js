@@ -4690,7 +4690,10 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash,
           });
-          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + cloudName + "）。" : ""}`);
+          const cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+          const addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          const bookmarkInfo = (cadastreBM.length + addressBM.length > 0) ? `、收藏 ${cadastreBM.length} 筆地籍 + ${addressBM.length} 筆門牌` : "";
+          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片${bookmarkInfo}（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + cloudName + "）。" : ""}`);
         } catch (error) {
           console.error("ZIP 匯出失敗：", error);
           GlobalModal.alert("ZIP 匯出失敗：" + error.message);
@@ -4992,8 +4995,11 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash: archive.manifestHash,
           });
+          const cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+          const addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          const bmInfo = (cadastreBM.length + addressBM.length > 0) ? "<br>收藏：" + cadastreBM.length + " 筆地籍、" + addressBM.length + " 筆門牌" : "";
           GlobalModal.alert("已備份到個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
-            state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + formatStorageBytes(archive.blob.size) + "）。<br>" +
+            state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + formatStorageBytes(archive.blob.size) + "）。" + bmInfo + "<br>" +
             "其他裝置可在「☁️ 從 Drive 還原」選取此檔。<small>備份檔未加密，請勿放入機密照片。</small>");
         } catch (error) {
           console.error("Drive 備份失敗：", error);
@@ -5395,13 +5401,16 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           ? "<br><strong style='color:#b91c1c'>警告：照片預估容量超過目前可用空間，請先清理或改用壓縮版備份。</strong>"
           : "";
         const photoProfile = summary.profile === "compressed" ? "壓縮版" : summary.profile === "original" ? "原圖" : "未標示";
+        const bmPreview = (imported.cadastreBookmarks?.length || imported.addressBookmarks?.length)
+          ? `<br>收藏：${imported.cadastreBookmarks?.length || 0} 筆地籍、${imported.addressBookmarks?.length || 0} 筆門牌`
+          : "";
         GlobalModal.show({
           title: "還原前資料預覽",
           content: `<strong>${escapeHtml(fileName)}</strong><br><br>
             資料夾數：${summary.folderCount}<br>
             紀錄數：${summary.recordCount}<br>
             照片數：${summary.photoCount}${summary.metadataPhotoCount && summary.metadataPhotoCount !== summary.photoCount ? `（索引 ${summary.metadataPhotoCount} 張）` : ""}<br>
-            照片版本：${photoProfile}<br>
+            照片版本：${photoProfile}${bmPreview}<br>
             ZIP 大小：${formatStorageBytes(summary.fileBytes || 0)}<br>
             解壓後照片預估：${formatStorageBytes(summary.photoBytes || 0)}<br>
             ${capacityText}<br>
@@ -5413,7 +5422,9 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           onConfirm: async () => {
             try {
               await restoreBackupData(imported.parsed, imported.photoEntries || [], isZip, { cadastreBookmarks: imported.cadastreBookmarks, addressBookmarks: imported.addressBookmarks });
-              GlobalModal.alert(isZip ? "完整備份還原成功！" : "紀錄還原成功！JSON 不含照片，現有照片已保留。");
+              const bmCount = (imported.cadastreBookmarks?.length || 0) + (imported.addressBookmarks?.length || 0);
+              const bmInfo = bmCount > 0 ? `<br>已還原收藏：${imported.cadastreBookmarks?.length || 0} 筆地籍、${imported.addressBookmarks?.length || 0} 筆門牌` : "";
+              GlobalModal.alert((isZip ? "完整備份還原成功！" : "紀錄還原成功！JSON 不含照片，現有照片已保留。") + bmInfo);
             } catch (error) {
               console.error("還原失敗：", error);
               GlobalModal.alert("還原失敗：" + error.message);
