@@ -463,6 +463,12 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             openStoredPhoto(image.dataset.photoOpen);
             return;
           }
+          // Edit-record tab photo thumbnails → open viewer
+          const editImage = event.target.closest("[data-photo-image]");
+          if (editImage) {
+            openStoredPhoto(editImage.dataset.photoImage);
+            return;
+          }
           if (event.target.closest("[data-photo-select]")) return;
           const card = event.target.closest("[data-photo-record]");
           if (!card) return;

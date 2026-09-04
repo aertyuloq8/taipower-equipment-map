@@ -439,6 +439,9 @@
         object-fit: cover;
         width: 100%;
       }
+      .photo-thumb[data-photo-image] {
+        cursor: pointer;
+      }
       .photo-card figcaption {
         color: var(--text);
         font-size: 10px;
