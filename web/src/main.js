@@ -3896,17 +3896,30 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
     .card { background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(22, 36, 52, 0.13); overflow: hidden; }
     .card-head { background: var(--accent); color: #fff; padding: 14px 20px; }
     .card-head h1 { font-size: 22px; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }
-    .photo-frame { background: #fff; padding: 8px; text-align: center; }
-    .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 82vh; max-width: 100%; object-fit: contain; }
+    .photo-frame { background: #fff; padding: 8px; text-align: center; flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .photo-frame img { display: block; height: 100%; max-height: 100%; width: auto; max-width: 100%; object-fit: contain; }
     .details { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 20px 12px; }
     .detail { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; flex: 1 1 160px; }
-    .stamp-boxes { display: flex; gap: 12px; flex: 0 0 auto; }
-    .stamp-box { border: 2px solid #aaa; border-radius: 4px; width: 72px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #999; }
+    .stamp-boxes { display: flex; gap: 0; flex: 0 0 auto; border: 2px solid #333; }
+    .stamp-box { width: 80px; height: 56px; display: flex; flex-direction: column; }
+    .stamp-box + .stamp-box { border-left: 2px solid #333; }
+    .stamp-label { text-align: center; font-size: 13px; font-weight: 700; color: #333; border-bottom: 2px solid #333; padding: 4px 0; }
+    .stamp-area { flex: 1; }
     .screen-actions { display: flex; gap: 8px; margin-bottom: 14px; }
     .back, .print-card { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; padding: 8px 12px; text-decoration: none; }
     .print-card { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
-    @media print { :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { background: #fff; } main { max-width: none; padding: 0; } .screen-actions { display: none !important; } .card { border: 0; box-shadow: none; } .card-head { background: #087f8c !important; color: #fff !important; } .photo-frame img { max-height: 88vh; } }
-    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 12px 14px; } .card-head h1 { font-size: 18px; } .photo-frame { padding: 6px; } .details { padding: 8px 14px; } .detail { font-size: 14px; } .stamp-box { width: 60px; height: 42px; font-size: 12px; } .screen-actions { flex-wrap: wrap; } }
+    @media print {
+      :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { background: #fff; margin: 0; }
+      main { max-width: none; padding: 0; }
+      .screen-actions { display: none !important; }
+      .card { border: 0; box-shadow: none; display: flex; flex-direction: column; height: 100vh; height: 100dvh; page-break-after: always; page-break-inside: avoid; break-after: page; break-inside: avoid; }
+      .card-head { background: #087f8c !important; color: #fff !important; flex: 0 0 auto; }
+      .photo-frame { flex: 1 1 0; min-height: 0; }
+      .photo-frame img { max-height: 100%; }
+      .details { flex: 0 0 auto; }
+    }
+    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .card-head { padding: 12px 14px; } .card-head h1 { font-size: 18px; } .photo-frame { padding: 6px; } .details { padding: 8px 14px; } .detail { font-size: 14px; } .stamp-box { width: 64px; height: 46px; } .stamp-label { font-size: 12px; } .screen-actions { flex-wrap: wrap; } }
   </style>
 </head>
 <body>
@@ -3950,7 +3963,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       details.append(text("div", "改善事項：" + (card.defect || "未填寫"), "detail"));
       const stampBoxes = document.createElement("div");
       stampBoxes.className = "stamp-boxes";
-      stampBoxes.innerHTML = '<div class="stamp-box">巡視</div><div class="stamp-box">改修</div>';
+      stampBoxes.innerHTML = '<div class="stamp-box"><div class="stamp-label">巡視</div><div class="stamp-area"></div></div><div class="stamp-box"><div class="stamp-label">改修</div><div class="stamp-area"></div></div>';
       details.append(stampBoxes);
       section.append(head, photoFrame, details);
       app.append(actions, section);
@@ -4012,15 +4025,29 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
     .inspection-card { background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(22, 36, 52, 0.13); margin-bottom: 18px; overflow: hidden; }
     .card-head { background: var(--accent); color: #fff; padding: 14px 20px; }
     .card-head h2 { font-size: 22px; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }
-    .photo-frame { background: #fff; padding: 8px; text-align: center; }
-    .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 82vh; max-width: 100%; object-fit: contain; }
+    .photo-frame { background: #fff; padding: 8px; text-align: center; flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .photo-frame img { display: block; height: 100%; max-height: 100%; width: auto; max-width: 100%; object-fit: contain; }
     .details { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 20px 12px; }
     .detail { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; flex: 1 1 160px; }
-    .stamp-boxes { display: flex; gap: 12px; flex: 0 0 auto; }
-    .stamp-box { border: 2px solid #aaa; border-radius: 4px; width: 72px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #999; }
+    .stamp-boxes { display: flex; gap: 0; flex: 0 0 auto; border: 2px solid #333; }
+    .stamp-box { width: 80px; height: 56px; display: flex; flex-direction: column; }
+    .stamp-box + .stamp-box { border-left: 2px solid #333; }
+    .stamp-label { text-align: center; font-size: 13px; font-weight: 700; color: #333; border-bottom: 2px solid #333; padding: 4px 0; }
+    .stamp-area { flex: 1; }
     .back { background: #fff; border: 1px solid var(--line); color: #075d67; display: inline-block; font-weight: 800; padding: 8px 12px; text-decoration: none; }
-    @media print { :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { background: #fff; } main { max-width: none; padding: 0; } .screen-toolbar, .screen-actions, .folder-group, .print-view-title { display: none !important; } .inspection-card { border: 0; box-shadow: none; break-after: page; margin: 0; } .inspection-card:last-child { break-after: auto; } .card-head { background: #087f8c !important; color: #fff !important; } .photo-frame img { max-height: 88vh; } }
-    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .screen-toolbar { align-items: stretch; } .screen-toolbar h1 { font-size: 20px; } .screen-toolbar-actions { width: 100%; } .screen-toolbar button { flex: 1 1 140px; } .folder-group.depth-1 { margin-left: 10px; } .folder-group.depth-2 { margin-left: 20px; } .folder-record { padding: 9px; } .card-head { padding: 12px 14px; } .card-head h2 { font-size: 18px; } .photo-frame { padding: 6px; } .details { padding: 8px 14px; } .detail { font-size: 14px; } .stamp-box { width: 60px; height: 42px; font-size: 12px; } }
+    @media print {
+      :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { background: #fff; margin: 0; }
+      main { max-width: none; padding: 0; }
+      .screen-toolbar, .screen-actions, .folder-group, .print-view-title { display: none !important; }
+      .inspection-card { border: 0; box-shadow: none; display: flex; flex-direction: column; height: 100vh; height: 100dvh; margin: 0; page-break-after: always; page-break-inside: avoid; break-after: page; break-inside: avoid; }
+      .inspection-card:last-child { page-break-after: auto; break-after: auto; }
+      .card-head { background: #087f8c !important; color: #fff !important; flex: 0 0 auto; }
+      .photo-frame { flex: 1 1 0; min-height: 0; }
+      .photo-frame img { max-height: 100%; }
+      .details { flex: 0 0 auto; }
+    }
+    @media (max-width: 600px) { main { padding: 12px 10px 28px; } .screen-toolbar { align-items: stretch; } .screen-toolbar h1 { font-size: 20px; } .screen-toolbar-actions { width: 100%; } .screen-toolbar button { flex: 1 1 140px; } .folder-group.depth-1 { margin-left: 10px; } .folder-group.depth-2 { margin-left: 20px; } .folder-record { padding: 9px; } .card-head { padding: 12px 14px; } .card-head h2 { font-size: 18px; } .photo-frame { padding: 6px; } .details { padding: 8px 14px; } .detail { font-size: 14px; } .stamp-box { width: 64px; height: 46px; } .stamp-label { font-size: 12px; } }
   </style>
 </head>
 <body>
@@ -4083,7 +4110,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         details.append(text("div", "改善事項：" + (card.defect || "未填寫"), "detail"));
         const stampBoxes = document.createElement("div");
         stampBoxes.className = "stamp-boxes";
-        stampBoxes.innerHTML = '<div class="stamp-box">巡視</div><div class="stamp-box">改修</div>';
+        stampBoxes.innerHTML = '<div class="stamp-box"><div class="stamp-label">巡視</div><div class="stamp-area"></div></div><div class="stamp-box"><div class="stamp-label">改修</div><div class="stamp-area"></div></div>';
         details.append(stampBoxes);
         article.append(head, photoFrame, details);
         return article;
