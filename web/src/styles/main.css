@@ -775,6 +775,9 @@
         color: var(--muted);
         flex-wrap: wrap;
         font-size: 12px;
+        position: relative;
+        z-index: 1;
+        background: #fff;
       }
       .photo-viewer-foot > span {
         flex: 1 1 100%;
@@ -788,6 +791,8 @@
         flex-wrap: wrap;
         gap: 6px;
         justify-content: flex-end;
+        position: relative;
+        z-index: 2;
       }
       .photo-viewer-actions [hidden] {
         display: none !important;
