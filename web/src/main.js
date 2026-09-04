@@ -5264,6 +5264,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           const dateStr = new Date().toISOString().slice(0, 10);
           const fileName = `設備地圖收藏_${label}_${dateStr}.json`;
           try {
+            clearDriveAccessToken();
             await getDriveAccessToken();
           } catch (e) {
             if (e.message.includes("已取消")) return;
@@ -5281,6 +5282,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           const label = type === "cadastre" ? "地籍" : "門牌";
           const key = type === "cadastre" ? "tp_cadastre_bookmarks_v1" : "tp_address_bookmarks_v1";
           try {
+            clearDriveAccessToken();
             await getDriveAccessToken();
           } catch (e) {
             if (e.message.includes("已取消")) return;
@@ -5348,6 +5350,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         async deleteCloud(type) {
           const label = type === "cadastre" ? "地籍" : "門牌";
           try {
+            clearDriveAccessToken();
             await getDriveAccessToken();
           } catch (e) {
             if (e.message.includes("已取消")) return;
@@ -5358,36 +5361,50 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             const query = encodeURIComponent(`name contains '設備地圖收藏_${label}_' and trashed = false`);
             const resp = await driveFetch(
               "https://www.googleapis.com/drive/v3/files?q=" + query +
-              "&orderBy=createdTime desc&pageSize=50&fields=files(id,name,createdTime)"
+              "&orderBy=createdTime desc&pageSize=50&fields=files(id,name,size,createdTime)"
             );
             const files = (await resp.json()).files || [];
             if (!files.length) { GlobalModal.alert("雲端硬碟沒有" + label + "收藏備份。"); return; }
-            const optionsHtml = files.map(f => {
-              const date = f.createdTime ? new Date(f.createdTime).toLocaleDateString("zh-TW") : "";
-              return `<option value="${f.id}">${f.name}（${date}）</option>`;
-            }).join("") + `<option value="__all__">全部刪除（${files.length} 個檔案）</option>`;
-            GlobalModal.select(
-              "🗑 刪除雲端" + label + "備份",
-              "選擇要刪除的備份：",
-              optionsHtml,
-              async (selectedValue) => {
-                if (!selectedValue) return;
-                const toDelete = selectedValue === "__all__" ? files : files.filter(f => f.id === selectedValue);
-                GlobalModal.confirm(
-                  `確定要刪除雲端硬碟上 ${toDelete.length} 個${label}收藏備份嗎？此動作無法復原。`,
-                  async () => {
-                    let deleted = 0;
-                    for (const f of toDelete) {
-                      try {
-                        await driveFetch("https://www.googleapis.com/drive/v3/files/" + f.id, { method: "DELETE" });
-                        deleted++;
-                      } catch { /* skip failed */ }
-                    }
-                    GlobalModal.alert(`已刪除 ${deleted} / ${toDelete.length} 個雲端備份。`);
-                  }
-                );
-              }
-            );
+            const rows = files.map((f, i) =>
+              '<label style="display:block; padding:6px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
+              '<input type="checkbox" name="bookmarkDrivePick" value="' + f.id + '"> ' +
+              "<strong>" + escapeHtml(f.name) + "</strong><br>" +
+              '<span style="font-size:12px; color:#64748b; margin-left:20px;">' +
+              (f.createdTime ? new Date(f.createdTime).toLocaleString("zh-TW") : "") +
+              (f.size ? " · " + formatStorageBytes(Number(f.size)) : "") + "</span></label>"
+            ).join("");
+            const pickedIds = await new Promise(resolve => {
+              GlobalModal.show({
+                title: "選擇要刪除的雲端" + label + "備份",
+                content: rows + '<div style="margin-top:8px; font-size:12px; color:#64748b;">可勾選多個備份一次刪除，刪除後無法從雲端還原，本機資料不受影響。</div>',
+                type: "confirm",
+                confirmText: "刪除",
+                cancelText: "取消",
+                onConfirm: () => {
+                  const checked = [...document.querySelectorAll('input[name="bookmarkDrivePick"]:checked')];
+                  resolve(checked.map(c => c.value));
+                },
+                onCancel: () => resolve([]),
+              });
+            });
+            if (!pickedIds.length) { GlobalModal.alert("未勾選任何備份。"); return; }
+            const pickedList = files.filter(f => pickedIds.includes(f.id));
+            const confirmed = await new Promise(resolve => {
+              GlobalModal.confirm(
+                "確定刪除所選的 <strong>" + pickedList.length + "</strong> 個" + label + "備份？<br>此操作無法復原（本機資料不受影響）。",
+                () => resolve(true),
+                () => resolve(false)
+              );
+            });
+            if (!confirmed) return;
+            let deleted = 0;
+            for (const f of pickedList) {
+              try {
+                await driveFetch("https://www.googleapis.com/drive/v3/files/" + f.id, { method: "DELETE" });
+                deleted++;
+              } catch { /* skip failed */ }
+            }
+            GlobalModal.alert("已刪除 " + deleted + " / " + pickedList.length + " 個雲端" + label + "備份。");
           } catch (e) {
             GlobalModal.alert("查詢雲端備份失敗：" + e.message);
           }
