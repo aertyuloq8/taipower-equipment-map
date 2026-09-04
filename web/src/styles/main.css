@@ -1735,7 +1735,7 @@
         left: calc(10px + env(safe-area-inset-left, 0px));
         top: calc(60px + env(safe-area-inset-top, 0px));
         z-index: calc(var(--control-z) + 20);
-        width: min(360px, calc(100vw - 20px));
+        width: min(420px, calc(100vw - 20px));
         background: #fff;
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -2233,7 +2233,7 @@
           max-height: calc(100dvh - 74px - env(safe-area-inset-top, 0px));
           right: auto;
           top: calc(64px + env(safe-area-inset-top, 0px));
-          width: min(370px, calc(100vw - 20px));
+          width: min(420px, calc(100vw - 20px));
         }
 
         .map-search-inner {
@@ -2390,7 +2390,7 @@
           max-height: none;
           top: calc(62px + env(safe-area-inset-top, 0px));
           right: calc(10px + env(safe-area-inset-right, 0px));
-          width: min(360px, calc(100vw - 20px));
+          width: min(420px, calc(100vw - 20px));
         }
         .layer-menu-panel { left: auto; right: 0; }
 
