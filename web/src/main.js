@@ -417,6 +417,12 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           if (files.length) await addPendingPhotoFiles(files);
         });
         document.getElementById("photoStrip").addEventListener("click", (event) => {
+          // Click photo thumbnail → open viewer
+          const editImage = event.target.closest("[data-photo-image]");
+          if (editImage) {
+            openStoredPhoto(editImage.dataset.photoImage);
+            return;
+          }
           const button = event.target.closest("[data-remove-photo]");
           if (!button) return;
           const { removePhoto, photoSource } = button.dataset;
@@ -461,12 +467,6 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           const image = event.target.closest("[data-photo-open]");
           if (image) {
             openStoredPhoto(image.dataset.photoOpen);
-            return;
-          }
-          // Edit-record tab photo thumbnails → open viewer
-          const editImage = event.target.closest("[data-photo-image]");
-          if (editImage) {
-            openStoredPhoto(editImage.dataset.photoImage);
             return;
           }
           if (event.target.closest("[data-photo-select]")) return;
