@@ -431,6 +431,12 @@
       saveAddressBookmarks();
       renderAddressBookmarks();
     });
+    document.getElementById("v2AddressDriveUpload")?.addEventListener("click", () => {
+      window.__bookmarkDrive?.upload("address");
+    });
+    document.getElementById("v2AddressDriveRestore")?.addEventListener("click", () => {
+      window.__bookmarkDrive?.restore("address");
+    });
   }
 
   function closeOtherFloatingPanels(){

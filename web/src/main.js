@@ -5249,6 +5249,104 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         await runSystemBackup("");
       }
 
+      // --- Bookmark Drive Sync ---
+      const bookmarkDrive = {
+        async upload(type) {
+          const label = type === "cadastre" ? "地籍" : "門牌";
+          const key = type === "cadastre" ? "tp_cadastre_bookmarks_v1" : "tp_address_bookmarks_v1";
+          let bookmarks;
+          try {
+            bookmarks = JSON.parse(localStorage.getItem(key) || "[]");
+          } catch { bookmarks = []; }
+          if (!bookmarks.length) { GlobalModal.alert("目前沒有" + label + "收藏可上傳。"); return; }
+          const blob = new Blob([JSON.stringify(bookmarks, null, 2)], { type: "application/json" });
+          const dateStr = new Date().toISOString().slice(0, 10);
+          const fileName = `設備地圖收藏_${label}_${dateStr}.json`;
+          try {
+            await getDriveAccessToken();
+          } catch (e) {
+            if (e.message.includes("已取消")) return;
+            GlobalModal.alert("Google 登入失敗：" + e.message);
+            return;
+          }
+          try {
+            await uploadZipToDrive(blob, fileName, null, "application/json");
+            GlobalModal.alert(`已上傳${label}收藏（${bookmarks.length} 筆）到雲端硬碟：<strong>${fileName}</strong>`);
+          } catch (e) {
+            GlobalModal.alert(label + "收藏上傳失敗：" + e.message);
+          }
+        },
+        async restore(type) {
+          const label = type === "cadastre" ? "地籍" : "門牌";
+          const key = type === "cadastre" ? "tp_cadastre_bookmarks_v1" : "tp_address_bookmarks_v1";
+          try {
+            await getDriveAccessToken();
+          } catch (e) {
+            if (e.message.includes("已取消")) return;
+            GlobalModal.alert("Google 登入失敗：" + e.message);
+            return;
+          }
+          try {
+            const query = encodeURIComponent(`name contains '設備地圖收藏_${label}_' and trashed = false`);
+            const resp = await driveFetch(
+              "https://www.googleapis.com/drive/v3/files?q=" + query +
+              "&orderBy=createdTime desc&pageSize=20&fields=files(id,name,size,createdTime)"
+            );
+            const files = (await resp.json()).files || [];
+            if (!files.length) { GlobalModal.alert("雲端硬碟沒有" + label + "收藏備份。"); return; }
+            let currentBookmarks = [];
+            try { currentBookmarks = JSON.parse(localStorage.getItem(key) || "[]"); } catch { /* ignore */ }
+            const optionsHtml = files.map(f => {
+              const date = f.createdTime ? new Date(f.createdTime).toLocaleDateString("zh-TW") : "";
+              const sizeKB = f.size ? Math.round(f.size / 1024) : "?";
+              return `<option value="${f.id}" data-name="${f.name}">${f.name}（${date}，${sizeKB}KB）</option>`;
+            }).join("") +
+              (currentBookmarks.length ? `<option value="__merge__">合併到現有（保留現有 + 雲端新增）</option>` : "") +
+              `<option value="__replace__">完全取代現有</option>`;
+            GlobalModal.select(
+              "⬇️ 還原" + label + "收藏",
+              "選擇要還原的備份（目前已有 " + currentBookmarks.length + " 筆）：",
+              optionsHtml,
+              async (selectedValue) => {
+                if (!selectedValue) return;
+                let mergedBookmarks;
+                if (selectedValue === "__merge__") {
+                  mergedBookmarks = currentBookmarks;
+                } else if (selectedValue === "__replace__") {
+                  mergedBookmarks = [];
+                } else {
+                  const file = files.find(f => f.id === selectedValue);
+                  if (!file) return;
+                  const downloadResp = await driveFetch(
+                    "https://www.googleapis.com/drive/v3/files/" + selectedValue + "?alt=media"
+                  );
+                  const text = await downloadResp.text();
+                  let downloaded;
+                  try { downloaded = JSON.parse(text); } catch { GlobalModal.alert("檔案格式錯誤，無法解析。"); return; }
+                  if (!Array.isArray(downloaded)) { GlobalModal.alert("檔案格式錯誤：不是 JSON 陣列。"); return; }
+                  if (selectedValue === "__replace__") {
+                    mergedBookmarks = downloaded;
+                  } else {
+                    const existIds = new Set(currentBookmarks.map(b => b.id || b.address || JSON.stringify(b)));
+                    const newItems = downloaded.filter(b => !existIds.has(b.id || b.address || JSON.stringify(b)));
+                    mergedBookmarks = [...currentBookmarks, ...newItems];
+                  }
+                }
+                localStorage.setItem(key, JSON.stringify(mergedBookmarks));
+                if (window.__bookmarkDB) {
+                  try { await window.__bookmarkDB.saveBookmarks(type, mergedBookmarks); } catch { /* ignore */ }
+                }
+                window.dispatchEvent(new CustomEvent("bookmarksRestored"));
+                GlobalModal.alert(`已還原${label}收藏：共 ${mergedBookmarks.length} 筆。`);
+              }
+            );
+          } catch (e) {
+            GlobalModal.alert(label + "收藏還原失敗：" + e.message);
+          }
+        }
+      };
+      window.__bookmarkDrive = bookmarkDrive;
+
       async function runSystemBackup(password = "") {
         const button = document.getElementById("exportSystemBtn");
         const originalText = button.textContent;

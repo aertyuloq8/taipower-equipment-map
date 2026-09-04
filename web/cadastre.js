@@ -856,6 +856,12 @@
       saveCadastreBookmarks();
       renderCadastreBookmarks();
     });
+    document.getElementById("v2CadastreDriveUpload")?.addEventListener("click", () => {
+      window.__bookmarkDrive?.upload("cadastre");
+    });
+    document.getElementById("v2CadastreDriveRestore")?.addEventListener("click", () => {
+      window.__bookmarkDrive?.restore("cadastre");
+    });
   }
 
   function bindEvents() {
