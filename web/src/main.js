@@ -5299,50 +5299,71 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             if (!files.length) { GlobalModal.alert("雲端硬碟沒有" + label + "收藏備份。"); return; }
             let currentBookmarks = [];
             try { currentBookmarks = JSON.parse(localStorage.getItem(key) || "[]"); } catch { /* ignore */ }
-            const optionsHtml = files.map(f => {
-              const date = f.createdTime ? new Date(f.createdTime).toLocaleDateString("zh-TW") : "";
-              const sizeKB = f.size ? Math.round(f.size / 1024) : "?";
-              return `<option value="${f.id}" data-name="${f.name}">${f.name}（${date}，${sizeKB}KB）</option>`;
-            }).join("") +
-              (currentBookmarks.length ? `<option value="__merge__">合併到現有（保留現有 + 雲端新增）</option>` : "") +
-              `<option value="__replace__">完全取代現有</option>`;
-            GlobalModal.select(
-              "⬇️ 還原" + label + "收藏",
-              "選擇要還原的備份（目前已有 " + currentBookmarks.length + " 筆）：",
-              optionsHtml,
-              async (selectedValue) => {
-                if (!selectedValue) return;
-                let mergedBookmarks;
-                if (selectedValue === "__merge__") {
-                  mergedBookmarks = currentBookmarks;
-                } else if (selectedValue === "__replace__") {
-                  mergedBookmarks = [];
-                } else {
-                  const file = files.find(f => f.id === selectedValue);
-                  if (!file) return;
-                  const downloadResp = await driveFetch(
-                    "https://www.googleapis.com/drive/v3/files/" + selectedValue + "?alt=media"
-                  );
-                  const text = await downloadResp.text();
-                  let downloaded;
-                  try { downloaded = JSON.parse(text); } catch { GlobalModal.alert("檔案格式錯誤，無法解析。"); return; }
-                  if (!Array.isArray(downloaded)) { GlobalModal.alert("檔案格式錯誤：不是 JSON 陣列。"); return; }
-                  if (selectedValue === "__replace__") {
-                    mergedBookmarks = downloaded;
-                  } else {
-                    const existIds = new Set(currentBookmarks.map(b => b.id || b.address || JSON.stringify(b)));
-                    const newItems = downloaded.filter(b => !existIds.has(b.id || b.address || JSON.stringify(b)));
-                    mergedBookmarks = [...currentBookmarks, ...newItems];
-                  }
-                }
-                localStorage.setItem(key, JSON.stringify(mergedBookmarks));
-                if (window.__bookmarkDB) {
-                  try { await window.__bookmarkDB.saveBookmarks(type, mergedBookmarks); } catch { /* ignore */ }
-                }
-                window.dispatchEvent(new CustomEvent("bookmarksRestored"));
-                GlobalModal.alert(`已還原${label}收藏：共 ${mergedBookmarks.length} 筆。`);
-              }
+            // Step 1: select backup file
+            const fileRows = files.map((f, i) =>
+              '<label style="display:block; padding:6px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
+              '<input type="radio" name="bookmarkRestorePick" value="' + f.id + '"' + (i === 0 ? " checked" : "") + "> " +
+              "<strong>" + escapeHtml(f.name) + "</strong><br>" +
+              '<span style="font-size:12px; color:#64748b; margin-left:20px;">' +
+              (f.createdTime ? new Date(f.createdTime).toLocaleString("zh-TW") : "") +
+              (f.size ? " · " + formatStorageBytes(Number(f.size)) : "") + "</span></label>"
+            ).join("");
+            const pickedId = await new Promise(resolve => {
+              GlobalModal.show({
+                title: "⬇️ 還原" + label + "收藏",
+                content: "選擇要還原的備份（目前已有 <strong>" + currentBookmarks.length + "</strong> 筆）：<br><br>" + fileRows,
+                type: "confirm",
+                confirmText: "還原",
+                cancelText: "取消",
+                onConfirm: () => {
+                  const checked = document.querySelector('input[name="bookmarkRestorePick"]:checked');
+                  resolve(checked ? checked.value : "");
+                },
+                onCancel: () => resolve(""),
+              });
+            });
+            if (!pickedId) return;
+            // Download selected file
+            const file = files.find(f => f.id === pickedId);
+            if (!file) return;
+            const downloadResp = await driveFetch(
+              "https://www.googleapis.com/drive/v3/files/" + pickedId + "?alt=media"
             );
+            const text = await downloadResp.text();
+            let downloaded;
+            try { downloaded = JSON.parse(text); } catch { GlobalModal.alert("檔案格式錯誤，無法解析。"); return; }
+            if (!Array.isArray(downloaded)) { GlobalModal.alert("檔案格式錯誤：不是 JSON 陣列。"); return; }
+            if (downloaded.length === 0) { GlobalModal.alert("備份檔案為空（0 筆）。"); return; }
+            // Step 2: choose merge or replace (if local data exists)
+            let mergedBookmarks;
+            if (currentBookmarks.length) {
+              const mode = await new Promise(resolve => {
+                GlobalModal.show({
+                  title: "還原方式",
+                  content: "備份有 <strong>" + downloaded.length + "</strong> 筆，目前已有 <strong>" + currentBookmarks.length + "</strong> 筆。選擇還原方式：",
+                  type: "confirm",
+                  confirmText: "合併到現有",
+                  cancelText: "完全取代現有",
+                  onConfirm: () => resolve("merge"),
+                  onCancel: () => resolve("replace"),
+                });
+              });
+              if (mode === "replace") {
+                mergedBookmarks = downloaded;
+              } else {
+                const existIds = new Set(currentBookmarks.map(b => b.id || b.address || JSON.stringify(b)));
+                const newItems = downloaded.filter(b => !existIds.has(b.id || b.address || JSON.stringify(b)));
+                mergedBookmarks = [...currentBookmarks, ...newItems];
+              }
+            } else {
+              mergedBookmarks = downloaded;
+            }
+            localStorage.setItem(key, JSON.stringify(mergedBookmarks));
+            if (window.__bookmarkDB) {
+              try { await window.__bookmarkDB.saveBookmarks(type, mergedBookmarks); } catch { /* ignore */ }
+            }
+            window.dispatchEvent(new CustomEvent("bookmarksRestored"));
+            GlobalModal.alert(`已還原${label}收藏：共 ${mergedBookmarks.length} 筆。`);
           } catch (e) {
             GlobalModal.alert(label + "收藏還原失敗：" + e.message);
           }
