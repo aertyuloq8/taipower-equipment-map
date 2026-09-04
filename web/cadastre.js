@@ -862,6 +862,9 @@
     document.getElementById("v2CadastreDriveRestore")?.addEventListener("click", () => {
       window.__bookmarkDrive?.restore("cadastre");
     });
+    document.getElementById("v2CadastreDriveDelete")?.addEventListener("click", () => {
+      window.__bookmarkDrive?.deleteCloud("cadastre");
+    });
   }
 
   function bindEvents() {
@@ -873,7 +876,7 @@
     });
     document.addEventListener("click", (e) => {
       if (!controls.panel?.classList.contains("is-open")) return;
-      if (e.target.closest("#v2CadastrePanel") || e.target.closest("#v2CadastreToggle") || e.target.closest(".v2-bookmark-tabs")) return;
+      if (e.target.closest("#v2CadastrePanel") || e.target.closest("#v2CadastreToggle") || e.target.closest(".v2-bookmark-tabs") || e.target.closest("#globalModal") || e.target.closest(".photo-viewer")) return;
       // Clicked outside the panel content, switch bookmarks tab back to search
       const activeBookmarkTab = document.querySelector('.v2-tab-btn[data-panel="cadastre"][data-tab="bookmarks"].is-active');
       if (activeBookmarkTab) {

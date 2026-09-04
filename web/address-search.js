@@ -437,6 +437,9 @@
     document.getElementById("v2AddressDriveRestore")?.addEventListener("click", () => {
       window.__bookmarkDrive?.restore("address");
     });
+    document.getElementById("v2AddressDriveDelete")?.addEventListener("click", () => {
+      window.__bookmarkDrive?.deleteCloud("address");
+    });
   }
 
   function closeOtherFloatingPanels(){

@@ -4937,6 +4937,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           const client = google.accounts.oauth2.initTokenClient({
             client_id: clientId,
             scope: DRIVE_SCOPE,
+            prompt: "select_account",
             callback: (resp) => {
               clearTimeout(timeoutId);
               if (resp.error) return finish(reject, new Error("Google 登入失敗：" + (resp.error_description || resp.error)));
@@ -5342,6 +5343,53 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             );
           } catch (e) {
             GlobalModal.alert(label + "收藏還原失敗：" + e.message);
+          }
+        },
+        async deleteCloud(type) {
+          const label = type === "cadastre" ? "地籍" : "門牌";
+          try {
+            await getDriveAccessToken();
+          } catch (e) {
+            if (e.message.includes("已取消")) return;
+            GlobalModal.alert("Google 登入失敗：" + e.message);
+            return;
+          }
+          try {
+            const query = encodeURIComponent(`name contains '設備地圖收藏_${label}_' and trashed = false`);
+            const resp = await driveFetch(
+              "https://www.googleapis.com/drive/v3/files?q=" + query +
+              "&orderBy=createdTime desc&pageSize=50&fields=files(id,name,createdTime)"
+            );
+            const files = (await resp.json()).files || [];
+            if (!files.length) { GlobalModal.alert("雲端硬碟沒有" + label + "收藏備份。"); return; }
+            const optionsHtml = files.map(f => {
+              const date = f.createdTime ? new Date(f.createdTime).toLocaleDateString("zh-TW") : "";
+              return `<option value="${f.id}">${f.name}（${date}）</option>`;
+            }).join("") + `<option value="__all__">全部刪除（${files.length} 個檔案）</option>`;
+            GlobalModal.select(
+              "🗑 刪除雲端" + label + "備份",
+              "選擇要刪除的備份：",
+              optionsHtml,
+              async (selectedValue) => {
+                if (!selectedValue) return;
+                const toDelete = selectedValue === "__all__" ? files : files.filter(f => f.id === selectedValue);
+                GlobalModal.confirm(
+                  `確定要刪除雲端硬碟上 ${toDelete.length} 個${label}收藏備份嗎？此動作無法復原。`,
+                  async () => {
+                    let deleted = 0;
+                    for (const f of toDelete) {
+                      try {
+                        await driveFetch("https://www.googleapis.com/drive/v3/files/" + f.id, { method: "DELETE" });
+                        deleted++;
+                      } catch { /* skip failed */ }
+                    }
+                    GlobalModal.alert(`已刪除 ${deleted} / ${toDelete.length} 個雲端備份。`);
+                  }
+                );
+              }
+            );
+          } catch (e) {
+            GlobalModal.alert("查詢雲端備份失敗：" + e.message);
           }
         }
       };
