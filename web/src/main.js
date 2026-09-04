@@ -5171,8 +5171,35 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           backupProgressUpdate(5, "下載備份…");
           const blob = await downloadDriveFile(pickedId, (pct) => backupProgressUpdate(5 + Math.round(pct * 0.6), "下載備份 " + pct + "%…"));
           backupProgressUpdate(68, "解壓與檢查備份…");
-          await processBackupImport(new File([blob], picked.name, { type: "application/zip" }), "", (done, total) => backupProgressUpdate(68 + Math.round((done / Math.max(1, total)) * 28), "解壓照片 " + done + " / " + total + "…"));
-          backupProgressUpdate(100, "完成");
+          // Check if local data exists → ask merge or replace
+          const hasLocalData = state.records.length > 0 || state.folders.length > 0;
+          if (hasLocalData) {
+            backupProgressHide();
+            const mode = await new Promise(resolve => {
+              GlobalModal.show({
+                title: "還原方式",
+                content: "目前已有 <strong>" + state.records.length + "</strong> 筆紀錄。選擇還原方式：",
+                type: "confirm",
+                confirmText: "合併到現有",
+                cancelText: "完全取代現有",
+                onConfirm: () => resolve("merge"),
+                onCancel: () => resolve("replace"),
+              });
+            });
+            if (mode === "merge") {
+              backupProgressUpdate(5, "合併備份中…");
+              const result = await mergeZipBackup(new File([blob], picked.name, { type: "application/zip" }));
+              backupProgressUpdate(100, "完成");
+              const bmInfo = result.bookmarksAdded > 0 ? `<br>收藏合併：新增 ${result.bookmarksAdded} 筆` : "";
+              GlobalModal.alert("已合併到現有：新增 " + result.folderCount + " 個資料夾、" + result.recordCount + " 筆紀錄，照片新增 " + result.photoAdded + " 張。" + bmInfo);
+            } else {
+              await processBackupImport(new File([blob], picked.name, { type: "application/zip" }), "", (done, total) => backupProgressUpdate(68 + Math.round((done / Math.max(1, total)) * 28), "解壓照片 " + done + " / " + total + "…"));
+              backupProgressUpdate(100, "完成");
+            }
+          } else {
+            await processBackupImport(new File([blob], picked.name, { type: "application/zip" }), "", (done, total) => backupProgressUpdate(68 + Math.round((done / Math.max(1, total)) * 28), "解壓照片 " + done + " / " + total + "…"));
+            backupProgressUpdate(100, "完成");
+          }
         } catch (error) {
           console.error("Drive 還原失敗：", error);
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 還原失敗：" + error.message);
@@ -5556,7 +5583,25 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
-        return { folderCount: newFolders.length, recordCount: newRecords.length, photoMergedRecords, photoAdded, photoSkipped };
+        // Merge bookmarks
+        let bookmarksAdded = 0;
+        for (const [bmType, bmKey] of [["cadastreBookmarks", "tp_cadastre_bookmarks_v1"], ["addressBookmarks", "tp_address_bookmarks_v1"]]) {
+          const remoteBm = imported[bmType];
+          if (!Array.isArray(remoteBm) || !remoteBm.length) continue;
+          let localBm = [];
+          try { localBm = JSON.parse(localStorage.getItem(bmKey) || "[]"); } catch {}
+          const localIds = new Set(localBm.map(b => b.id || b.address || JSON.stringify(b)));
+          const newBm = remoteBm.filter(b => !localIds.has(b.id || b.address || JSON.stringify(b)));
+          if (newBm.length) {
+            localBm.push(...newBm);
+            bookmarksAdded += newBm.length;
+            localStorage.setItem(bmKey, JSON.stringify(localBm));
+            const bmTypeShort = bmKey.includes("cadastre") ? "cadastre" : "address";
+            if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks(bmTypeShort, localBm);
+          }
+        }
+        if (bookmarksAdded) window.dispatchEvent(new CustomEvent("bookmarksRestored"));
+        return { folderCount: newFolders.length, recordCount: newRecords.length, photoMergedRecords, photoAdded, photoSkipped, bookmarksAdded };
       }
 
       async function verifyZipManifest(zip, manifest) {
