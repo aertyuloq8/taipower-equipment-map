@@ -20,9 +20,9 @@
 .v2-cadastre-inner {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  overflow: hidden;
-  padding: 0;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 12px;
   min-height: 0;
   flex: 1;
 }
