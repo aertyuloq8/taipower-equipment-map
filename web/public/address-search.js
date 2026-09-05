@@ -87,8 +87,8 @@
 
   // ---- 國土測繪精確門牌清單（經 GAS 代理，與 maps.nlsc.gov.tw 一致）----
   async function fetchNLSC(q){
-    let addr = q.trim();
-    if(!addr.startsWith("臺南") && !addr.startsWith("台南")) addr = "臺南市" + addr;
+    const addr = q.trim();
+    if(!addr) return [];
     try{
       const data = await gasJsonp({ action: "addr", word: addr });
       const list = (data && Array.isArray(data.results)) ? data.results : [];
