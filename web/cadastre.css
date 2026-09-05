@@ -468,6 +468,8 @@
   gap: 10px;
   overflow-y: auto;
   padding: 12px;
+  min-height: 0;
+  flex: 1;
 }
 .v2-address-head {
   align-items: center;
