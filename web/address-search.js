@@ -91,7 +91,7 @@
     if(!addr) return [];
     try{
       const data = await gasJsonp({ action: "addr", word: addr });
-      const list = (data && Array.isArray(data.results)) ? data.results : [];
+      const list = (data && Array.isArray(data.results)) ? data.results.reverse() : [];
       if(list.length){
         return list.map((addrStr, i)=>{
           const key = `nlsc_${i}_${addrStr}`;
