@@ -580,6 +580,7 @@
 }
 
 @media (max-width: 768px) {
+  .v2-cadastre-panel,
   .v2-address-panel {
     max-height: calc(100dvh - 74px);
     top: calc(64px + env(safe-area-inset-top, 0px));
