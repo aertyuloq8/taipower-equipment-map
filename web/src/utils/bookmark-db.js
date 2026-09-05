@@ -16,6 +16,8 @@ const LS_KEYS = {
 };
 
 async function getDb() {
+  // Reuse shared handle from app-db.js to avoid dual-handle race condition
+  if (window.__getSharedDb) return window.__getSharedDb();
   if (window.__bookmarkDb) return window.__bookmarkDb;
   const PHOTO_DB_NAME = window.PHOTO_DB_NAME || "taipower_inspection_photos_v2";
   const APP_DATA_STORE_NAME = window.APP_DATA_STORE_NAME || "appData";
@@ -102,3 +104,4 @@ function loadBookmarksSync(type) {
 
 // Expose to window for non-module scripts (cadastre.js, address-search.js)
 window.__bookmarkDB = { loadBookmarks, saveBookmarks, loadBookmarksSync };
+window.__BOOKMARK_LS_KEYS = LS_KEYS;

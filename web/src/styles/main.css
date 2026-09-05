@@ -27,7 +27,6 @@
       .map-shell {
         height: 100vh;
         height: 100dvh;
-        inset: 0;
         position: fixed;
         width: 100vw;
       }
@@ -95,7 +94,7 @@
         font-weight: 800;
         padding: 0 12px;
       }
-      button:hover { background: #e8f1f2; }
+      button:hover:not([style*="background"]):not(.v2-bookmark-drive):not(.v2-bookmark-delete):not(.popup-clear-location-button) { background: #e8f1f2; }
       button:disabled { cursor: progress; opacity: 0.7; }
       .icon-button {
         align-items: center;
@@ -1118,7 +1117,7 @@
         padding: 10px 12px;
         position: fixed;
         transform: translateX(-50%);
-        z-index: 600;
+        z-index: 700;
       }
       .pwa-update-banner[hidden] { display: none !important; }
       .pwa-update-banner button {

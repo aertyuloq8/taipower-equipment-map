@@ -28,6 +28,9 @@ async function getAppDb() {
   });
 }
 
+// Expose shared DB handle for bookmark-db.js to reuse
+window.__getSharedDb = getAppDb;
+
 async function idbGetInspection() {
   const APP_DATA_STORE_NAME = window.APP_DATA_STORE_NAME || "appData";
   const db = await getAppDb();

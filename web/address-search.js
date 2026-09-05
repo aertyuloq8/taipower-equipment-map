@@ -46,7 +46,7 @@
         if (Array.isArray(data)) { addressBookmarks = data; addressSelectedIds.clear(); renderAddressBookmarks(); }
       }).catch(() => {});
     } else {
-      addressBookmarks = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+      addressBookmarks = JSON.parse(localStorage.getItem(ADDRESS_BOOKMARKS_KEY) || "[]");
       addressSelectedIds.clear();
       renderAddressBookmarks();
     }
@@ -62,7 +62,6 @@
     timer: null,
     platesByKey: new Map(),
   };
-  if (!controls.panel || !controls.toggle || !controls.input) return;
   function getMap() { return window.__v2LeafletMap || null; }
   function escapeHtml(v){ return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c])); }
   function setStatus(m){ controls.status.textContent = m; }
@@ -197,7 +196,7 @@
   let currentAddressPlate = null;
   function googleNavUrl(lat,lng){ return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat.toFixed(6)+","+lng.toFixed(6))}`; }
   function buildAddressPopupContent(plate){
-    return `<div class="v2-cadastre-popup"><strong>${escapeHtml(plate.r)}</strong><div class="v2-cadastre-popup-actions"><a class="popup-navigation-link" href="${googleNavUrl(plate.la, plate.ln)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" onclick="window.__v2AddressClearMarker()">✕ 清除</button><button type="button" data-address-retain style="background:#ecfeff;color:#0f766e;border:1px solid #0f766e;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">⭐ 收藏</button></div></div>`;
+    return `<div class="v2-cadastre-popup"><strong>${escapeHtml(plate.r)}</strong><div class="v2-cadastre-popup-actions"><a class="popup-navigation-link" href="${googleNavUrl(plate.la, plate.ln)}" target="_blank" rel="noopener">🗺️ 導航</a><button class="popup-clear-location-button" type="button" data-clear-address-marker>✕ 清除</button><button type="button" data-address-retain style="background:#ecfeff;color:#0f766e;border:1px solid #0f766e;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">⭐ 收藏</button></div></div>`;
   }
   function showPlate(map, plate){
     currentAddressPlate = plate;
@@ -408,6 +407,12 @@
       getMap()?.closePopup();
     });
     document.addEventListener("click", (e) => {
+      const clearBtn = e.target.closest("[data-clear-address-marker]");
+      if (clearBtn) {
+        e.preventDefault();
+        window.__v2AddressClearMarker();
+        return;
+      }
       const retainBtn = e.target.closest("[data-address-retain]");
       if (!retainBtn) return;
       if (currentAddressPlate) addAddressBookmark(currentAddressPlate);
@@ -443,12 +448,14 @@
   }
 
   function closeOtherFloatingPanels(){
-    const s=document.getElementById("mapSearchPanel"), st=document.getElementById("mapSearchToggle"), lp=document.getElementById("layerMenuPanel"), lt=document.getElementById("layerMenuToggle"), cp=document.getElementById("v2CadastrePanel"), ct=document.getElementById("v2CadastreToggle");
+    const s=document.getElementById("mapSearchPanel"), st=document.getElementById("mapSearchToggle"), lp=document.getElementById("layerMenuPanel"), lt=document.getElementById("layerMenuToggle"), cp=document.getElementById("v2CadastrePanel"), ct=document.getElementById("v2CadastreToggle"), sp=document.getElementById("v2SyncPanel"), spt=document.getElementById("v2SyncToggle");
     s?.classList.remove("is-open"); st?.classList.remove("is-active"); st?.setAttribute("aria-expanded","false");
     if(lp) lp.hidden=true; lt?.classList.remove("is-active"); lt?.setAttribute("aria-expanded","false");
     cp?.classList.remove("is-open"); cp?.setAttribute("aria-hidden","true"); ct?.classList.remove("is-active"); ct?.setAttribute("aria-expanded","false");
+    sp?.classList.remove("is-open"); sp?.setAttribute("aria-hidden","true"); spt?.classList.remove("is-active"); spt?.setAttribute("aria-expanded","false");
   }
   function setPanelOpen(open){
+    if(!controls.panel || !controls.toggle || !controls.input) return;
     if(!controls.panel || !controls.toggle) return;
     if(open && !controls.panel.classList.contains("is-open")){
       const e=new CustomEvent("v2-address-open",{cancelable:true});

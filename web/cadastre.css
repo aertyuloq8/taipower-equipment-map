@@ -461,22 +461,6 @@
 }
 
 /* ============ 門牌地址查詢面板（address-search-v2.js） ============ */
-.v2-address-panel {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  display: none;
-  flex-direction: column;
-  left: calc(10px + env(safe-area-inset-left, 0px));
-  max-height: calc(100vh - 80px);
-  max-height: calc(100dvh - 80px);
-  overflow: hidden;
-  position: fixed;
-  top: calc(60px + env(safe-area-inset-top, 0px));
-  width: min(420px, calc(100vw - 20px));
-  z-index: calc(var(--control-z) + 20);
-}
 .v2-address-panel.is-open { display: flex; }
 .v2-address-inner {
   display: flex;
@@ -627,6 +611,7 @@
   flex-direction: column;
   left: calc(10px + env(safe-area-inset-left, 0px));
   max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px);
   overflow: hidden;
   position: fixed;
   top: calc(60px + env(safe-area-inset-top, 0px));

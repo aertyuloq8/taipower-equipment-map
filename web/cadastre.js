@@ -65,7 +65,7 @@
         if (Array.isArray(data)) { cadastreBookmarks = data; cadastreSelectedIds.clear(); renderCadastreBookmarks(); }
       }).catch(() => {});
     } else {
-      cadastreBookmarks = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
+      cadastreBookmarks = JSON.parse(localStorage.getItem(CADASTRE_BOOKMARKS_KEY) || "[]");
       cadastreSelectedIds.clear();
       renderCadastreBookmarks();
     }
@@ -157,6 +157,8 @@
     const layerToggle = document.getElementById("layerMenuToggle");
     const addrPanel = document.getElementById("v2AddressPanel");
     const addrToggle = document.getElementById("v2AddressToggle");
+    const syncPanel = document.getElementById("v2SyncPanel");
+    const syncToggle = document.getElementById("v2SyncToggle");
     search?.classList.remove("is-open");
     searchToggle?.classList.remove("is-active");
     searchToggle?.setAttribute("aria-expanded", "false");
@@ -167,6 +169,10 @@
     addrPanel?.setAttribute("aria-hidden", "true");
     addrToggle?.classList.remove("is-active");
     addrToggle?.setAttribute("aria-expanded", "false");
+    syncPanel?.classList.remove("is-open");
+    syncPanel?.setAttribute("aria-hidden", "true");
+    syncToggle?.classList.remove("is-active");
+    syncToggle?.setAttribute("aria-expanded", "false");
   }
 
   function setPanelOpen(open) {

@@ -2820,6 +2820,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
 
         renderFolders();
         updateRecordMarkers();
+        if (window.__renderer) window.__renderer.redraw();
 
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) {
@@ -4774,8 +4775,9 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash,
           });
-          const cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
-          const addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+          const cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
+          const addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
           const bookmarkInfo = (cadastreBM.length + addressBM.length > 0) ? `、收藏 ${cadastreBM.length} 筆地籍 + ${addressBM.length} 筆門牌` : "";
           GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片${bookmarkInfo}（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + cloudName + "）。" : ""}`);
         } catch (error) {
@@ -5085,8 +5087,9 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
             try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
           } else {
-            cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
-            addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
+            const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+            cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
+            addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
           }
           const bmInfo = (cadastreBM.length + addressBM.length > 0) ? "<br>收藏：" + cadastreBM.length + " 筆地籍、" + addressBM.length + " 筆門牌" : "";
           GlobalModal.alert("已備份到個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
@@ -5281,7 +5284,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       const bookmarkDrive = {
         async upload(type) {
           const label = type === "cadastre" ? "地籍" : "門牌";
-          const key = type === "cadastre" ? "tp_cadastre_bookmarks_v1" : "tp_address_bookmarks_v1";
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+          const key = lsKeys[type];
           let bookmarks;
           try {
             bookmarks = JSON.parse(localStorage.getItem(key) || "[]");
@@ -5307,7 +5311,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         },
         async restore(type) {
           const label = type === "cadastre" ? "地籍" : "門牌";
-          const key = type === "cadastre" ? "tp_cadastre_bookmarks_v1" : "tp_address_bookmarks_v1";
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+          const key = lsKeys[type];
           try {
             clearDriveAccessToken();
             await getDriveAccessToken();
@@ -5506,12 +5511,13 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         if (replacePhotos) await replacePhotoStore(photoEntries);
         // Restore bookmarks if present in backup (optional, not in old backups)
         try {
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
           if (Array.isArray(extra.cadastreBookmarks)) {
-            localStorage.setItem("tp_cadastre_bookmarks_v1", JSON.stringify(extra.cadastreBookmarks));
+            localStorage.setItem(lsKeys.cadastre, JSON.stringify(extra.cadastreBookmarks));
             if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks("cadastre", extra.cadastreBookmarks);
           }
           if (Array.isArray(extra.addressBookmarks)) {
-            localStorage.setItem("tp_address_bookmarks_v1", JSON.stringify(extra.addressBookmarks));
+            localStorage.setItem(lsKeys.address, JSON.stringify(extra.addressBookmarks));
             if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks("address", extra.addressBookmarks);
           }
           // Try to refresh bookmark UIs if already loaded
@@ -5585,7 +5591,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
         // Merge bookmarks
         let bookmarksAdded = 0;
-        for (const [bmType, bmKey] of [["cadastreBookmarks", "tp_cadastre_bookmarks_v1"], ["addressBookmarks", "tp_address_bookmarks_v1"]]) {
+        const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+        for (const [bmType, bmKey] of [["cadastreBookmarks", lsKeys.cadastre], ["addressBookmarks", lsKeys.address]]) {
           const remoteBm = imported[bmType];
           if (!Array.isArray(remoteBm) || !remoteBm.length) continue;
           let localBm = [];
@@ -6479,6 +6486,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
         },
       });
       const renderer = new canvasLayer().addTo(map);
+      window.__renderer = renderer;
 
       function circularHueDistance(a, b) { const diff = Math.abs(a - b) % 360; return Math.min(diff, 360 - diff); }
       function colorContrastScore(color, usedNeighborColors) {
