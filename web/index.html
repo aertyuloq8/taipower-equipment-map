@@ -235,7 +235,10 @@
         </nav>
         <div class="v2-tab-pane is-active" data-pane="search" data-panel="address">
         <p class="v2-address-warning">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
-        <input id="addrSearchInput" type="search" placeholder="搜尋門牌地址" autocomplete="off" aria-controls="addrSearchResults" />
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input id="addrSearchInput" type="search" placeholder="搜尋門牌地址" autocomplete="off" aria-controls="addrSearchResults" style="flex:1;min-width:0;" />
+          <button id="addrSearchBtn" type="button" style="flex-shrink:0;background:#0f766e;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">搜尋</button>
+        </div>
         <p id="addrSearchStatus" class="v2-address-status" aria-live="polite"></p>
         <div id="addrSearchResults" class="v2-address-results" role="listbox"></div>
         </div>
