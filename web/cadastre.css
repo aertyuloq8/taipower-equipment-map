@@ -56,7 +56,9 @@
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
+  min-width: 0;
   flex: 1;
   padding: 12px;
 }
@@ -119,6 +121,7 @@
 .v2-bookmark-list {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 .v2-bookmark-item {
   background: #f8fafc;
@@ -128,6 +131,7 @@
   display: grid;
   gap: 6px;
   cursor: pointer;
+  min-width: 0;
 }
 .v2-bookmark-item.is-hidden {
   opacity: 0.6;
@@ -169,6 +173,7 @@
   justify-content: space-between;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 .v2-bookmark-item-head > label {
   display: flex;
