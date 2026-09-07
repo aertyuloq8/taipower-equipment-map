@@ -3759,16 +3759,24 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         const reader = new FileReader();
         reader.onload = async function (event) {
           try {
+            backupProgressUpdate(2, "讀取 Excel…");
             await ensureXLSX();
             const data = new Uint8Array(event.target.result);
             const workbook = XLSX.read(data, { type: "array" });
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false });
 
             // [修改] 新增 reverseResolvedCount 計數器
-            let importedCount = 0, skippedCount = 0, reverseResolvedCount = 0, manualCount = 0, skipHeader = true;
+            let importedCount = 0, skippedCount = 0, reverseResolvedCount = 0, manualCount = 0;
+            const dataRowCount = Math.max(0, rows.length - 1);
+            const IMPORT_CHUNK = 200;
 
-            for (const row of rows) {
-              if (skipHeader) { skipHeader = false; continue; }
+            for (let ri = 1; ri < rows.length; ri++) {
+              // 每處理一段讓出 UI 線程並更新進度，避免大檔卡死無回饋
+              if (ri % IMPORT_CHUNK === 0 || ri === rows.length - 1) {
+                backupProgressUpdate(5 + Math.round((ri / Math.max(1, rows.length)) * 90), `匯入 Excel ${ri} / ${dataRowCount} 列…`);
+                await new Promise(resolve => setTimeout(resolve, 0));
+              }
+              const row = rows[ri];
               if (!row || row.length < 3) continue;
               const folderPath = String(row[0] || "").trim(), name = String(row[1] || "").trim(), code = String(row[2] || "").trim(), defect = String(row[3] || "").trim(), urgency = String(row[4] || "C").trim();
 
@@ -3824,8 +3832,10 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
             if (reverseResolvedCount > 0) msg += `\n📐 有 ${reverseResolvedCount} 筆不在資料庫，已用圖號反推座標自動補全。`;
             if (skippedCount > 0) msg += `\n⚠️ 有 ${skippedCount} 筆圖號無法解析，已略過。`;
 
+            backupProgressUpdate(100, "完成");
             GlobalModal.alert(msg);
           } catch (err) { GlobalModal.alert("讀取檔案失敗！請確認格式是否正確。\n" + err.message); }
+          finally { backupProgressHide(); }
           e.target.value = "";
         };
         reader.readAsArrayBuffer(file);
@@ -4839,7 +4849,12 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
 
       async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original", destination = "local", cloudBaseName = "") {
         try {
-          const { blob, photoCount, manifestHash } = await createPhotoArchive(records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile);
+          backupProgressUpdate(2, "準備打包…");
+          const { blob, photoCount, manifestHash } = await createPhotoArchive(
+            records, folders, "土木設備分布地圖照片版巡檢匯出", photoProfile,
+            (done, total) => backupProgressUpdate(3 + Math.round((done / Math.max(1, total)) * 57), "打包照片 " + done + " / " + total + "…")
+          );
+          backupProgressUpdate(65, "產生 ZIP…");
           const fileName = fileBaseName + ".zip";
           if (destination === "local" || destination === "both") downloadBlob(blob, fileName);
           const toCloud = destination === "drive" || destination === "both";
@@ -4847,10 +4862,10 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           if (toCloud) {
             window.__v2DriveResume = { type: "export", mode: "zip", records, folders, fileBaseName, photoProfile, destination, cloudBase: cloudBaseName };
             cloudName = (cloudBaseName || fileBaseName) + ".zip";
-            backupProgressUpdate(10, "上傳 ZIP 至雲端…");
-            await uploadZipToDrive(blob, cloudName, (pct) => backupProgressUpdate(10 + Math.round(pct * 0.85), "上傳 ZIP " + pct + "%…"));
-            backupProgressUpdate(100, "完成");
+            backupProgressUpdate(66, "上傳 ZIP 至雲端…");
+            await uploadZipToDrive(blob, cloudName, (pct) => backupProgressUpdate(66 + Math.round(pct * 0.32), "上傳 ZIP " + pct + "%…"));
           }
+          backupProgressUpdate(100, "完成");
           saveBackupSummary({
             exportedAt: new Date().toISOString(),
             folders: folders.length,
@@ -4869,6 +4884,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         } catch (error) {
           console.error("ZIP 匯出失敗：", error);
           GlobalModal.alert("ZIP 匯出失敗：" + error.message);
+        } finally {
+          backupProgressHide();
         }
       }
 
