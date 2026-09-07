@@ -1441,6 +1441,13 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         const imageWidth = Math.max(1, Math.round(image.naturalWidth * imageScale));
         const imageHeight = Math.max(1, Math.round(image.naturalHeight * imageScale));
         const title = record.name || record.code || "巡檢紀錄";
+        // 與 ZIP 網頁版巡檢卡同結構：左文案 + 右蓋章表格（巡視/改修）
+        const FONT_TITLE = '700 34px "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif';
+        const FONT_DETAIL = '400 28px "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif';
+        const FONT_STAMP = '700 30px "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif';
+        const STAMP_W = 180, STAMP_GAP = 0, STAMP_LABEL_H = 46, STAMP_AREA_H = 110, STAMP_BORDER = 4;
+        const stampsWidth = STAMP_W * 2 + STAMP_GAP;
+        const textWidth = contentWidth - stampsWidth - 32;
         const details = [
           `圖號：${record.code || "未填寫"}`,
           `改善事項：${record.defect || "未填寫"}`,
@@ -1448,12 +1455,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
 
         const measureCanvas = document.createElement("canvas");
         const measure = measureCanvas.getContext("2d");
-        measure.font = "700 34px system-ui, sans-serif";
+        measure.font = FONT_TITLE;
         const titleLines = wrapCanvasText(measure, title, contentWidth);
-        measure.font = "400 28px system-ui, sans-serif";
-        const detailLines = details.flatMap(detail => wrapCanvasText(measure, detail, contentWidth));
+        measure.font = FONT_DETAIL;
+        const detailLines = details.flatMap(detail => wrapCanvasText(measure, detail, textWidth));
         const headerHeight = 26 + titleLines.length * 42 + 22;
-        const detailHeight = 34 + detailLines.length * 42 + 26;
+        const textBlockHeight = 34 + detailLines.length * 42 + 26;
+        const stampsHeight = STAMP_LABEL_H + STAMP_AREA_H + STAMP_BORDER;
+        const detailHeight = Math.max(textBlockHeight, stampsHeight + 16);
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = headerHeight + imageHeight + detailHeight + padding * 2;
@@ -1464,7 +1473,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         context.fillStyle = "#087f8c";
         context.fillRect(0, 0, canvas.width, headerHeight);
         context.fillStyle = "#ffffff";
-        context.font = "700 34px system-ui, sans-serif";
+        context.font = FONT_TITLE;
         let titleY = 50;
         titleLines.forEach(line => {
           context.fillText(line, padding, titleY);
@@ -1481,12 +1490,32 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         context.fillStyle = "#ffffff";
         context.fillRect(padding - 8, detailY - 16, contentWidth + 16, detailHeight + 16);
         context.fillStyle = "#17202a";
-        context.font = "400 28px system-ui, sans-serif";
+        context.font = FONT_DETAIL;
         let textY = detailY + 18;
         detailLines.forEach(line => {
           context.fillText(line, padding, textY);
           textY += 42;
         });
+        // 蓋章表格（對齊網頁版 .stamp-boxes：巡視 / 改修）
+        const stampY = detailY;
+        const stampX = padding + textWidth + 32;
+        context.strokeStyle = "#333333";
+        context.lineWidth = STAMP_BORDER;
+        context.strokeRect(stampX, stampY, stampsWidth, STAMP_LABEL_H + STAMP_AREA_H);
+        context.beginPath();
+        context.moveTo(stampX + STAMP_W, stampY);
+        context.lineTo(stampX + STAMP_W, stampY + STAMP_LABEL_H + STAMP_AREA_H);
+        context.moveTo(stampX, stampY + STAMP_LABEL_H);
+        context.lineTo(stampX + STAMP_W, stampY + STAMP_LABEL_H);
+        context.moveTo(stampX + STAMP_W, stampY + STAMP_LABEL_H);
+        context.lineTo(stampX + stampsWidth, stampY + STAMP_LABEL_H);
+        context.stroke();
+        context.fillStyle = "#333333";
+        context.font = FONT_STAMP;
+        context.textAlign = "center";
+        context.fillText("巡視", stampX + STAMP_W / 2, stampY + 36);
+        context.fillText("改修", stampX + STAMP_W + STAMP_GAP + STAMP_W / 2, stampY + 36);
+        context.textAlign = "left";
         return canvasToBlob(canvas, "image/png");
       }
 
