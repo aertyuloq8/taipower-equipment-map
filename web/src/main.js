@@ -7648,7 +7648,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?rev=21', { scope: './' })
+          navigator.serviceWorker.register('./service-worker.js?rev=22', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 

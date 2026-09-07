@@ -1,7 +1,7 @@
-const CACHE_NAME = "equipment-map-photo-edition-r30";
+const CACHE_NAME = "equipment-map-photo-edition-r31";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
-const TILE_CACHE_MAX = 2500;
-const TILE_CACHE_TRIM = 2000;
+const TILE_CACHE_MAX = 5000;
+const TILE_CACHE_TRIM = 4000;
 const APP_SHELLS = ["./index.html"];
 const STATIC_ASSETS = [
   ...APP_SHELLS,
@@ -70,7 +70,26 @@ self.addEventListener("fetch", (event) => {
   const isArchiveWorker = /\/archive-worker\.js$/.test(url.pathname);
   const isRemoteAsset = REMOTE_ASSETS.some(asset => asset === request.url);
   const isTileRequest = /^(https:\/\/wmts\.nlsc\.gov\.tw\/|https:\/\/[a-z]\.tile\.openstreetmap\.org\/)/.test(url.href);
-  if (!isV2Navigation && !isMetaData && !isPointsData && !isDropdownData && !isCadastreAsset && !isSyncAsset && !isArchiveWorker && !isRemoteAsset && !isTileRequest) return;
+  // 本站 src 下的程式檔（main.js / modules / utils / styles）：SWR——有快取直接用、
+  // 背景更新供下次載入，離線也能開 App；跨站 JSONP（GAS）不受影響（非同源）
+  const isSrcAsset = url.origin === self.location.origin && /\/src\/.+\.(js|css)$/.test(url.pathname);
+  if (!isV2Navigation && !isMetaData && !isPointsData && !isDropdownData && !isCadastreAsset && !isSyncAsset && !isArchiveWorker && !isRemoteAsset && !isTileRequest && !isSrcAsset) return;
+
+  // stale-while-revalidate：快取命中立刻回傳 + 背景更新；未命中則等網路並寫入快取
+  const staleWhileRevalidate = (req) => caches.open(CACHE_NAME).then(cache => cache.match(req.url).then(cached => {
+    const networkUpdate = fetch(req).then((response) => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        return cache.put(req, copy).catch(() => {}).then(() => response);
+      }
+      return response;
+    }).catch(() => cached);
+    if (cached) {
+      event.waitUntil(networkUpdate.catch(() => {}));
+      return cached;
+    }
+    return networkUpdate.then(netResp => netResp || new Response("", { status: 503, statusText: "Offline" }));
+  }));
 
   event.respondWith(
     (isV2Navigation
@@ -88,7 +107,8 @@ self.addEventListener("fetch", (event) => {
           .catch(() => caches.match(request).then(cached => cached || caches.match("./index.html")))
       : isPointsData
         // points.json：networkFirst + cacheFallback（Worker 載入用，確保拿最新）
-        ? fetch(request, { cache: "no-store" })
+        // 8 秒拿不到就用快取：弱網時不用乾等瀏覽器預設超時
+        ? fetch(request, { cache: "no-store", signal: AbortSignal.timeout(8000) })
             .then((response) => {
               if (response.ok) {
                 const clone = response.clone();
@@ -126,6 +146,8 @@ self.addEventListener("fetch", (event) => {
                   }
                   return response;
                 }))
+          : isSrcAsset
+          ? staleWhileRevalidate(request)
           : caches.match(request.url).then(cached => cached || fetch(request).then(response => {
               if (response && response.ok) {
                 const copy = response.clone();
