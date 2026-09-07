@@ -175,7 +175,7 @@
   align-items: center;
   min-width: 0;
 }
-.v2-bookmark-item-head > label {
+.v2-bookmark-item-label {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -183,7 +183,7 @@
   flex: 1;
   min-width: 0;
 }
-.v2-bookmark-item-head > label > input[type="checkbox"] {
+.v2-bookmark-item-label > input[type="checkbox"] {
   accent-color: #0f766e;
   width: 16px;
   height: 16px;

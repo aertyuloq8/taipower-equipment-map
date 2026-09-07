@@ -707,7 +707,7 @@
       return `
       <div class="v2-bookmark-item${hidden ? " is-hidden" : ""}" data-id="${escapeHtml(b.id)}">
         <div class="v2-bookmark-item-head">
-          <label><input type="checkbox" data-cadastre-check="${escapeHtml(b.id)}" ${cadastreSelectedIds.has(b.id)?"checked":""}> <span class="v2-bookmark-item-title" title="${escapeHtml(fullTitle)}">${escapeHtml(fullTitle)}</span></label>
+          <span class="v2-bookmark-item-label"><input type="checkbox" data-cadastre-check="${escapeHtml(b.id)}" ${cadastreSelectedIds.has(b.id)?"checked":""}> <span class="v2-bookmark-item-title" title="${escapeHtml(fullTitle)}">${escapeHtml(fullTitle)}</span></span>
           <div class="v2-bookmark-item-actions">
             <button type="button" data-cadastre-action="toggle" data-id="${escapeHtml(b.id)}" title="${hidden ? "顯示" : "隱藏"}" aria-label="${hidden ? "顯示" : "隱藏"}">${hidden ? "🙈" : "👁️"}</button>
             <button type="button" data-cadastre-action="remove" data-id="${escapeHtml(b.id)}" title="刪除" aria-label="刪除">🗑️</button>
@@ -813,8 +813,11 @@
       if (!layer) return;
       try {
         map.fitBounds(layer.getBounds(), { padding: [32, 32], maxZoom: 19 });
-        setTimeout(() => layer.getLayers()[0]?.openPopup(), 400);
+        // 重抓圖層再開 popup：中間若發生重渲染，舊引用已失效
+        setTimeout(() => cadastreBookmarkLayers.get(id)?.getLayers()[0]?.openPopup(), 400);
       } catch {}
+      // 手機上飛過去後把面板收起來，才看得到地圖
+      if (window.matchMedia("(max-width: 768px)").matches) setPanelOpen(false);
     });
     cadastreListEl?.addEventListener("mouseenter", (e) => {
       const item = e.target.closest(".v2-bookmark-item");

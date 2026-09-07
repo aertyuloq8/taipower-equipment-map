@@ -236,7 +236,7 @@
       return `
       <div class="v2-bookmark-item${hidden ? " is-hidden" : ""}" data-id="${escapeHtml(b.id)}">
         <div class="v2-bookmark-item-head">
-          <label><input type="checkbox" data-address-check="${escapeHtml(b.id)}" ${addressSelectedIds.has(b.id)?"checked":""}> <span class="v2-bookmark-item-title" title="${escapeHtml(b.addr)}">${escapeHtml(b.addr)}</span></label>
+          <span class="v2-bookmark-item-label"><input type="checkbox" data-address-check="${escapeHtml(b.id)}" ${addressSelectedIds.has(b.id)?"checked":""}> <span class="v2-bookmark-item-title" title="${escapeHtml(b.addr)}">${escapeHtml(b.addr)}</span></span>
           <div class="v2-bookmark-item-actions">
             <button type="button" data-address-action="toggle" data-id="${escapeHtml(b.id)}" title="${hidden ? "顯示" : "隱藏"}" aria-label="${hidden ? "顯示" : "隱藏"}">${hidden ? "🙈" : "👁️"}</button>
             <button type="button" data-address-action="remove" data-id="${escapeHtml(b.id)}" title="刪除" aria-label="刪除">🗑️</button>
@@ -330,11 +330,18 @@
         renderAddressBookmarks();
       }
       const layer = addressBookmarkLayers.get(id);
+      const collapseForMap = () => {
+        // 手機上飛過去後把面板收起來，才看得到地圖
+        if (window.matchMedia("(max-width: 768px)").matches) setPanelOpen(false);
+      };
       if (layer) {
         map.flyTo([bm.la, bm.ln], Math.max(map.getZoom(), 19), { duration: 0.5 });
-        setTimeout(() => layer.openPopup(), 500);
+        // 重抓圖層再開 popup：中間若發生重渲染，舊引用已失效
+        setTimeout(() => addressBookmarkLayers.get(id)?.openPopup(), 500);
+        collapseForMap();
       } else if (Number.isFinite(bm.la) && Number.isFinite(bm.ln)) {
         // Bookmark was hidden, now visible but layer not yet created, re-render will create it
+        collapseForMap();
         setTimeout(() => {
           const newLayer = addressBookmarkLayers.get(id);
           if (newLayer) {
