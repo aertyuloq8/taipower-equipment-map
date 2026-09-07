@@ -701,18 +701,20 @@
       updateCadastreBookmarkLayers();
       return;
     }
-    list.innerHTML = cadastreBookmarks.map(b => `
-      <div class="v2-bookmark-item" data-id="${escapeHtml(b.id)}" style="cursor:pointer;transition:transform 0.12s ease, box-shadow 0.12s ease;">
+    list.innerHTML = cadastreBookmarks.map(b => {
+      const fullTitle = `${b.town} ${b.sectionName} ${formatParcel(b.number)}`;
+      const hidden = b.visible === false;
+      return `
+      <div class="v2-bookmark-item${hidden ? " is-hidden" : ""}" data-id="${escapeHtml(b.id)}">
         <div class="v2-bookmark-item-head">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" data-cadastre-check="${escapeHtml(b.id)}" ${cadastreSelectedIds.has(b.id)?"checked":""} style="accent-color:#0f766e;width:16px;height:16px;"> <span class="v2-bookmark-item-title">${escapeHtml(b.town)} ${escapeHtml(b.sectionName)} ${escapeHtml(formatParcel(b.number))}</span></label>
-          <span style="font-size:10px;color:#999;">${escapeHtml(b.town)} ${escapeHtml(b.section)}</span>
-        </div>
-        <div class="v2-bookmark-item-actions">
-          <button type="button" data-cadastre-action="toggle" data-id="${escapeHtml(b.id)}" style="background:${b.visible===false?'#f8fafc':'#ecfeff'};color:${b.visible===false?'#64748b':'#0f766e'};border:1px solid ${b.visible===false?'#cbd5e1':'#0f766e'};">${b.visible===false?'🙈 顯示':'👁️ 隱藏'}</button>
-          <button type="button" data-cadastre-action="remove" data-id="${escapeHtml(b.id)}" style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;">🗑️ 刪除</button>
+          <label><input type="checkbox" data-cadastre-check="${escapeHtml(b.id)}" ${cadastreSelectedIds.has(b.id)?"checked":""}> <span class="v2-bookmark-item-title" title="${escapeHtml(fullTitle)}">${escapeHtml(fullTitle)}</span></label>
+          <div class="v2-bookmark-item-actions">
+            <button type="button" data-cadastre-action="toggle" data-id="${escapeHtml(b.id)}" title="${hidden ? "顯示" : "隱藏"}" aria-label="${hidden ? "顯示" : "隱藏"}">${hidden ? "🙈" : "👁️"}</button>
+            <button type="button" data-cadastre-action="remove" data-id="${escapeHtml(b.id)}" title="刪除" aria-label="刪除">🗑️</button>
+          </div>
         </div>
       </div>
-    `).join("");
+    `;}).join("");
     updateCadastreBookmarkLayers();
   }
   function updateCadastreBookmarkLayers() {
