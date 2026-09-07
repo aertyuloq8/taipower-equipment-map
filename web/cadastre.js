@@ -812,9 +812,9 @@
       }
       if (!layer) return;
       try {
-        map.fitBounds(layer.getBounds(), { padding: [32, 32], maxZoom: 19 });
+        map.flyToBounds(layer.getBounds(), { padding: [32, 32], maxZoom: 19, duration: 0.5 });
         // 重抓圖層再開 popup：中間若發生重渲染，舊引用已失效
-        setTimeout(() => cadastreBookmarkLayers.get(id)?.getLayers()[0]?.openPopup(), 400);
+        setTimeout(() => cadastreBookmarkLayers.get(id)?.getLayers()[0]?.openPopup(), 600);
       } catch {}
       // 手機上飛過去後把面板收起來，才看得到地圖
       if (window.matchMedia("(max-width: 768px)").matches) setPanelOpen(false);
