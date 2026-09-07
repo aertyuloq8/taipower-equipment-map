@@ -3445,7 +3445,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
                     if (destination === "local" || destination === "both") XLSX.writeFile(workbook, fileName);
                     if (destination === "drive" || destination === "both") {
                       window.__v2DriveResume = { type: "export", mode: "xlsx", records, fallbackFolderPath, fileName: cloudBase + ".xlsx" };
-                      uploadRecordsWorkbookToDrive(workbook, cloudBase + ".xlsx");
+                      uploadRecordsWorkbookToDrive(workbook, cloudBase + ".xlsx", records.length);
                     }
                     return;
                   }
@@ -4863,7 +4863,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
             window.__v2DriveResume = { type: "export", mode: "zip", records, folders, fileBaseName, photoProfile, destination, cloudBase: cloudBaseName };
             cloudName = (cloudBaseName || fileBaseName) + ".zip";
             backupProgressUpdate(66, "上傳 ZIP 至雲端…");
-            await uploadZipToDrive(blob, cloudName, (pct) => backupProgressUpdate(66 + Math.round(pct * 0.32), "上傳 ZIP " + pct + "%…"));
+            await uploadZipToDrive(blob, cloudName, (pct) => backupProgressUpdate(66 + Math.round(pct * 0.32), "上傳 ZIP " + pct + "%…"), "application/zip",
+              driveContentDescription([
+                "批次匯出",
+                `資料夾${folders.length}個`,
+                `紀錄${records.length}筆`,
+                `照片${photoCount}張`,
+                photoProfile === "compressed" ? "壓縮版" : "原圖版",
+              ]));
           }
           backupProgressUpdate(100, "完成");
           saveBackupSummary({
@@ -4889,13 +4896,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         }
       }
 
-      async function uploadRecordsWorkbookToDrive(workbook, fileName) {
+      async function uploadRecordsWorkbookToDrive(workbook, fileName, recordCount = 0) {
         try {
           await ensureXLSX();
           backupProgressUpdate(10, "上傳 Excel 至雲端…");
           const array = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
           const blob = new Blob([array], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-          await uploadZipToDrive(blob, fileName, (pct) => backupProgressUpdate(10 + Math.round(pct * 0.85), "上傳 Excel " + pct + "%…"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          await uploadZipToDrive(blob, fileName, (pct) => backupProgressUpdate(10 + Math.round(pct * 0.85), "上傳 Excel " + pct + "%…"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            driveContentDescription(["Excel匯出", recordCount > 0 ? `紀錄${recordCount}筆` : ""]));
           backupProgressUpdate(100, "完成");
           GlobalModal.alert(`Excel 已上傳到雲端硬碟：${fileName}`);
         } catch (error) {
@@ -5089,7 +5097,11 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         }
         return resp;
       }
-      async function uploadZipToDrive(blob, name, onProgress = null, mimeType = "application/zip") {
+      // 雲端備份內容明細：寫入 Drive 檔案 description，列表直接顯示、免下載拆 ZIP
+      function driveContentDescription(parts) {
+        return parts.filter(Boolean).join(" · ");
+      }
+      async function uploadZipToDrive(blob, name, onProgress = null, mimeType = "application/zip", description = "") {
         const token = await getDriveAccessToken();
         return new Promise((resolve, reject) => {
           const init = new XMLHttpRequest();
@@ -5124,14 +5136,16 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
             put.send(blob);
           };
           init.onerror = () => reject(new Error("Google Drive 連線失敗，請確認網路後重試"));
-          init.send(JSON.stringify({ name, mimeType: "application/zip" }));
+          const metadata = { name, mimeType };
+          if (description) metadata.description = String(description).slice(0, 1000);
+          init.send(JSON.stringify(metadata));
         });
       }
       async function listDriveBackups() {
         const query = encodeURIComponent("(name contains '設備地圖備份' or name contains '批次匯出' or name contains '巡視紀錄') and trashed = false");
         const resp = await driveFetch(
           "https://www.googleapis.com/drive/v3/files?q=" + query +
-          "&orderBy=createdTime desc&pageSize=20&fields=files(id,name,size,createdTime)"
+          "&orderBy=createdTime desc&pageSize=20&fields=files(id,name,size,createdTime,description)"
         );
         return (await resp.json()).files || [];
       }
@@ -5177,7 +5191,23 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           button.textContent = "☁️ 上傳中（" + formatStorageBytes(archive.blob.size) + "）";
           backupProgressUpdate(62, "上傳中（" + formatStorageBytes(archive.blob.size) + "）…");
           const fileName = driveBackupFileName();
-          await uploadZipToDrive(archive.blob, fileName, (pct) => backupProgressUpdate(62 + Math.round(pct * 0.36), "上傳 " + pct + "%…"));
+          let cadastreBM = [], addressBM = [];
+          if (window.__bookmarkDB) {
+            try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
+            try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
+          } else {
+            const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+            cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
+            addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
+          }
+          await uploadZipToDrive(archive.blob, fileName, (pct) => backupProgressUpdate(62 + Math.round(pct * 0.36), "上傳 " + pct + "%…"), "application/zip",
+            driveContentDescription([
+              `資料夾${state.folders.length}個`,
+              `紀錄${state.records.length}筆`,
+              `照片${archive.photoCount}張`,
+              "原圖版",
+              (cadastreBM.length + addressBM.length > 0) ? `收藏${cadastreBM.length}地籍${addressBM.length}門牌` : "",
+            ]));
           backupProgressUpdate(100, "完成");
           saveBackupSummary({
             exportedAt: new Date().toISOString(),
@@ -5189,15 +5219,6 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash: archive.manifestHash,
           });
-          let cadastreBM = [], addressBM = [];
-          if (window.__bookmarkDB) {
-            try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
-            try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
-          } else {
-            const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
-            cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
-            addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
-          }
           const bmInfo = (cadastreBM.length + addressBM.length > 0) ? "<br>收藏：" + cadastreBM.length + " 筆地籍、" + addressBM.length + " 筆門牌" : "";
           GlobalModal.alert("已備份到個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
             state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + formatStorageBytes(archive.blob.size) + "）。" + bmInfo + "<br>" +
@@ -5213,14 +5234,16 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         }
       }
       function driveBackupRows(files, multi) {
-        return files.map((f, i) =>
-          '<label style="display:block; padding:6px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
+        return files.map((f, i) => {
+          const detail = f.description ? String(f.description).trim() : "";
+          return '<label style="display:block; padding:6px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
           '<input type="' + (multi ? "checkbox" : "radio") + '" name="driveBackupPick" value="' + f.id + '"' + (!multi && i === 0 ? " checked" : "") + "> " +
           "<strong>" + escapeHtml(f.name) + "</strong><br>" +
           '<span style="font-size:12px; color:#64748b; margin-left:20px;">' +
           (f.createdTime ? new Date(f.createdTime).toLocaleString("zh-TW") : "") +
-          (f.size ? " · " + formatStorageBytes(Number(f.size)) : "") + "</span></label>"
-        ).join("");
+          (f.size ? " · " + formatStorageBytes(Number(f.size)) : "") +
+          (detail ? "<br>📋 " + escapeHtml(detail) : "") + "</span></label>";
+        }).join("");
       }
       async function driveRestoreAction() {
         window.__v2DriveResume = { type: "restore" };
