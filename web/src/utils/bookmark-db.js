@@ -20,7 +20,9 @@ async function getDb() {
   if (window.__getSharedDb) return window.__getSharedDb();
   if (window.__bookmarkDb) return window.__bookmarkDb;
   const PHOTO_DB_NAME = window.PHOTO_DB_NAME || "taipower_inspection_photos_v2";
-  const PHOTO_DB_VERSION = Number(window.PHOTO_DB_VERSION) || 3;
+  const PHOTO_DB_VERSION = (typeof window.__photoDbVersion === "function")
+    ? window.__photoDbVersion()
+    : (Number(window.PHOTO_DB_VERSION) || 3);
   const PHOTO_STORE_NAME = window.PHOTO_STORE_NAME || "photos";
   const DRAFT_STORE_NAME = window.DRAFT_STORE_NAME || "drafts";
   const APP_DATA_STORE_NAME = window.APP_DATA_STORE_NAME || "appData";

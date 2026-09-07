@@ -27,3 +27,17 @@ window.BACKUP_SUMMARY_KEY  = BACKUP_SUMMARY_KEY;
 window.BACKUP_FORMAT_VERSION = BACKUP_FORMAT_VERSION;
 window.MAX_DIRECT_POINTS   = MAX_DIRECT_POINTS;
 window.MAX_ROUTE_POINTS    = MAX_ROUTE_POINTS;
+
+// IndexedDB 版本統一入口：修復補表可能把版本往上加，localStorage 留一份避免重整後用舊版號開新庫報 VersionError
+window.__photoDbVersion = function () {
+  let v = Number(window.PHOTO_DB_VERSION) || 3;
+  try {
+    const saved = Number(localStorage.getItem("taipower_idb_version"));
+    if (saved > v) v = saved;
+  } catch {}
+  return v;
+};
+window.__rememberPhotoDbVersion = function (v) {
+  window.PHOTO_DB_VERSION = v;
+  try { localStorage.setItem("taipower_idb_version", String(v)); } catch {}
+};

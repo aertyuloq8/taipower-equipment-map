@@ -539,8 +539,15 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
       // V2 照片儲存：影像檔在 IndexedDB，紀錄只保留照片索引
       // ==========================================
       let photoDbPromise = null;
-      // 本機 DB 版本（修復補表時可能往上加，統一讀 window 以便跨模組一致）
-      function photoDbVersion() { return Number(window.PHOTO_DB_VERSION) || 3; }
+      // 本機 DB 版本：優先用修復後記住的版本，避免重整後用舊版號開新庫報 VersionError
+      function photoDbVersion() {
+        if (typeof window.__photoDbVersion === "function") return window.__photoDbVersion();
+        return Number(window.PHOTO_DB_VERSION) || 3;
+      }
+      function rememberDbVersion(v) {
+        if (typeof window.__rememberPhotoDbVersion === "function") window.__rememberPhotoDbVersion(v);
+        else window.PHOTO_DB_VERSION = v;
+      }
       function createMissingStores(db) {
         if (!db.objectStoreNames.contains(PHOTO_STORE_NAME)) db.createObjectStore(PHOTO_STORE_NAME, { keyPath: "id" });
         if (!db.objectStoreNames.contains(DRAFT_STORE_NAME)) db.createObjectStore(DRAFT_STORE_NAME, { keyPath: "id" });
@@ -549,41 +556,43 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
       function missingStores(db) {
         return [PHOTO_STORE_NAME, DRAFT_STORE_NAME, APP_DATA_STORE_NAME].filter(n => !db.objectStoreNames.contains(n));
       }
-      function openPhotoDb() {
-        if (photoDbPromise) return photoDbPromise;
-        photoDbPromise = new Promise((resolve, reject) => {
+      function doOpenDb(version) {
+        return new Promise((resolve, reject) => {
           let request;
           try {
-            request = indexedDB.open(PHOTO_DB_NAME, photoDbVersion());
+            request = (version == null) ? indexedDB.open(PHOTO_DB_NAME) : indexedDB.open(PHOTO_DB_NAME, version);
           } catch (err) { reject(err); return; }
           request.onupgradeneeded = () => createMissingStores(request.result);
           request.onblocked = () => {
-            console.warn("照片資料庫升級被阻擋：請關閉其他已開啟本站的分頁後再重整");
+            reject(new Error("照片資料庫升級被阻擋：請關閉其他已開啟本站的分頁後再重整"));
           };
           request.onsuccess = () => {
             const db = request.result;
             db.onversionchange = () => db.close();
+            if (version != null && db.version > version) rememberDbVersion(db.version);
             const missing = missingStores(db);
             if (!missing.length) { resolve(db); return; }
             // 舊結構缺表：非破壞性升版補表（保留既有照片/草稿，只建缺的表）
             const nextVersion = db.version + 1;
             db.close();
-            let up;
-            try {
-              up = indexedDB.open(PHOTO_DB_NAME, nextVersion);
-            } catch (err) { reject(err); return; }
-            up.onupgradeneeded = () => createMissingStores(up.result);
-            up.onblocked = () => reject(new Error("照片資料庫修復被阻擋：請關閉其他已開啟本站的分頁後再重整"));
-            up.onsuccess = () => {
-              const udb = up.result;
-              udb.onversionchange = () => udb.close();
-              window.PHOTO_DB_VERSION = nextVersion;
-              resolve(udb);
-            };
-            up.onerror = () => reject(up.error || new Error("照片資料庫修復失敗"));
+            doOpenDb(nextVersion).then(
+              (udb) => { rememberDbVersion(nextVersion); resolve(udb); },
+              reject
+            );
           };
-          request.onerror = () => reject(request.error || new Error("無法開啟照片資料庫"));
+          request.onerror = () => {
+            if (request.error && request.error.name === "VersionError") {
+              // 本機版本已高於要求：改以現行版本開啟
+              doOpenDb(undefined).then(resolve, reject);
+              return;
+            }
+            reject(request.error || new Error("無法開啟照片資料庫"));
+          };
         });
+      }
+      function openPhotoDb() {
+        if (photoDbPromise) return photoDbPromise;
+        photoDbPromise = doOpenDb(photoDbVersion());
         return photoDbPromise;
       }
 
