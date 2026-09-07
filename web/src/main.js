@@ -1434,20 +1434,23 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
 
         const image = await loadImageFromBlob(blob);
         const record = photoViewerRecord || {};
+        // 版型對齊 ZIP 網頁版列印卡（.inspection-card @media print）：
+        // 白底滿版，標頭／照片／明細上下相接，照片滿版無側邊留白
         const width = 1200;
-        const padding = 56;
-        const contentWidth = width - padding * 2;
-        const imageScale = Math.min(contentWidth / image.naturalWidth, 1120 / image.naturalHeight, 1);
-        const imageWidth = Math.max(1, Math.round(image.naturalWidth * imageScale));
-        const imageHeight = Math.max(1, Math.round(image.naturalHeight * imageScale));
+        const SIDE = 40;
+        const FRAME = 8;
+        const DIVIDER = 2;
+        const BOTTOM = 32;
         const title = record.name || record.code || "巡檢紀錄";
+        const photoW = width - FRAME * 2;
+        const photoH = Math.max(1, Math.round(image.naturalHeight * (photoW / Math.max(1, image.naturalWidth))));
         // 與 ZIP 網頁版巡檢卡同結構：左文案 + 右蓋章表格（巡視/改修）
         const FONT_TITLE = '700 34px "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif';
         const FONT_DETAIL = '400 28px "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif';
         const FONT_STAMP = '700 30px "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif';
-        const STAMP_W = 180, STAMP_GAP = 0, STAMP_LABEL_H = 46, STAMP_AREA_H = 110, STAMP_BORDER = 4;
-        const stampsWidth = STAMP_W * 2 + STAMP_GAP;
-        const textWidth = contentWidth - stampsWidth - 32;
+        const STAMP_W = 180, STAMP_LABEL_H = 46, STAMP_AREA_H = 110, STAMP_BORDER = 4;
+        const stampsWidth = STAMP_W * 2;
+        const textWidth = width - SIDE * 2 - stampsWidth - 32;
         const details = [
           `圖號：${record.code || "未填寫"}`,
           `改善事項：${record.defect || "未填寫"}`,
@@ -1456,7 +1459,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         const measureCanvas = document.createElement("canvas");
         const measure = measureCanvas.getContext("2d");
         measure.font = FONT_TITLE;
-        const titleLines = wrapCanvasText(measure, title, contentWidth);
+        const titleLines = wrapCanvasText(measure, title, width - SIDE * 2);
         measure.font = FONT_DETAIL;
         const detailLines = details.flatMap(detail => wrapCanvasText(measure, detail, textWidth));
         const headerHeight = 26 + titleLines.length * 42 + 22;
@@ -1465,10 +1468,10 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         const detailHeight = Math.max(textBlockHeight, stampsHeight + 16);
         const canvas = document.createElement("canvas");
         canvas.width = width;
-        canvas.height = headerHeight + imageHeight + detailHeight + padding * 2;
+        canvas.height = headerHeight + FRAME + photoH + FRAME + DIVIDER + detailHeight + BOTTOM;
         const context = canvas.getContext("2d");
 
-        context.fillStyle = "#eef2f5";
+        context.fillStyle = "#ffffff";
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.fillStyle = "#087f8c";
         context.fillRect(0, 0, canvas.width, headerHeight);
@@ -1476,29 +1479,29 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         context.font = FONT_TITLE;
         let titleY = 50;
         titleLines.forEach(line => {
-          context.fillText(line, padding, titleY);
+          context.fillText(line, SIDE, titleY);
           titleY += 42;
         });
 
-        const imageX = Math.round((width - imageWidth) / 2);
-        const imageY = headerHeight + padding;
-        context.fillStyle = "#ffffff";
-        context.fillRect(padding - 8, imageY - 8, contentWidth + 16, imageHeight + 16);
-        context.drawImage(image, imageX, imageY, imageWidth, imageHeight);
+        const imageX = FRAME;
+        const imageY = headerHeight + FRAME;
+        context.drawImage(image, imageX, imageY, photoW, photoH);
 
-        const detailY = imageY + imageHeight + padding;
-        context.fillStyle = "#ffffff";
-        context.fillRect(padding - 8, detailY - 16, contentWidth + 16, detailHeight + 16);
+        const dividerY = imageY + photoH + FRAME;
+        context.fillStyle = "#d9e1e8";
+        context.fillRect(0, dividerY, canvas.width, DIVIDER);
+
+        const detailY = dividerY + DIVIDER;
         context.fillStyle = "#17202a";
         context.font = FONT_DETAIL;
         let textY = detailY + 18;
         detailLines.forEach(line => {
-          context.fillText(line, padding, textY);
+          context.fillText(line, SIDE, textY);
           textY += 42;
         });
         // 蓋章表格（對齊網頁版 .stamp-boxes：巡視 / 改修）
         const stampY = detailY;
-        const stampX = padding + textWidth + 32;
+        const stampX = SIDE + textWidth + 32;
         context.strokeStyle = "#333333";
         context.lineWidth = STAMP_BORDER;
         context.strokeRect(stampX, stampY, stampsWidth, STAMP_LABEL_H + STAMP_AREA_H);
@@ -1514,7 +1517,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         context.font = FONT_STAMP;
         context.textAlign = "center";
         context.fillText("巡視", stampX + STAMP_W / 2, stampY + 36);
-        context.fillText("改修", stampX + STAMP_W + STAMP_GAP + STAMP_W / 2, stampY + 36);
+        context.fillText("改修", stampX + STAMP_W + STAMP_W / 2, stampY + 36);
         context.textAlign = "left";
         return canvasToBlob(canvas, "image/png");
       }
