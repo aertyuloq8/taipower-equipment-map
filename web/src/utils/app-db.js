@@ -10,14 +10,27 @@ const INSPECTION_IDB_KEY = "inspection-records";
 async function getAppDb() {
   if (window.__appDb) return window.__appDb;
   const PHOTO_DB_NAME = window.PHOTO_DB_NAME || "taipower_inspection_photos_v2";
+  const PHOTO_DB_VERSION = Number(window.PHOTO_DB_VERSION) || 3;
+  const PHOTO_STORE_NAME = window.PHOTO_STORE_NAME || "photos";
+  const DRAFT_STORE_NAME = window.DRAFT_STORE_NAME || "drafts";
   const APP_DATA_STORE_NAME = window.APP_DATA_STORE_NAME || "appData";
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(PHOTO_DB_NAME, 2);
+    const request = indexedDB.open(PHOTO_DB_NAME, PHOTO_DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
+      // 升級時建全表：任一入口觸發升級都能補齊缺的表
+      if (!db.objectStoreNames.contains(PHOTO_STORE_NAME)) {
+        db.createObjectStore(PHOTO_STORE_NAME, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(DRAFT_STORE_NAME)) {
+        db.createObjectStore(DRAFT_STORE_NAME, { keyPath: "id" });
+      }
       if (!db.objectStoreNames.contains(APP_DATA_STORE_NAME)) {
         db.createObjectStore(APP_DATA_STORE_NAME, { keyPath: "id" });
       }
+    };
+    request.onblocked = () => {
+      console.warn("共用資料庫升級被阻擋：請關閉其他已開啟本站的分頁後再重整");
     };
     request.onsuccess = () => {
       window.__appDb = request.result;

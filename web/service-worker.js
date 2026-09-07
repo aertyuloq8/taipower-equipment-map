@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-r29";
+const CACHE_NAME = "equipment-map-photo-edition-r30";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 2500;
 const TILE_CACHE_TRIM = 2000;
@@ -76,7 +76,13 @@ self.addEventListener("fetch", (event) => {
     (isV2Navigation
       ? fetch(request, { cache: "no-store" })
           .then((response) => {
-            if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+            if (response && response.ok) {
+              // 必須同步 clone：等 caches.open() 回來後 body 可能已被頁面取用
+              const copy = response.clone();
+              event.waitUntil(
+                caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {})
+              );
+            }
             return response;
           })
           .catch(() => caches.match(request).then(cached => cached || caches.match("./index.html")))
@@ -121,7 +127,12 @@ self.addEventListener("fetch", (event) => {
                   return response;
                 }))
           : caches.match(request.url).then(cached => cached || fetch(request).then(response => {
-              if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+              if (response && response.ok) {
+                const copy = response.clone();
+                event.waitUntil(
+                  caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {})
+                );
+              }
               return response;
             })))
       .catch(() => new Response("", { status: 503, statusText: "Offline" }))

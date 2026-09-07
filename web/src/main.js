@@ -1,7 +1,7 @@
 import "./modules/modal.js";
 import "./modules/coords.js";
 import "./modules/constants.js";
-const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT_STORE_NAME, APP_DATA_STORE_NAME,
+const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO_STORE_NAME, DRAFT_STORE_NAME, APP_DATA_STORE_NAME,
         DRAFT_ACTIVE_ID, EQUIPMENT_CACHE_ID, BACKUP_SUMMARY_KEY, BACKUP_FORMAT_VERSION, MAX_DIRECT_POINTS, MAX_ROUTE_POINTS } = window;
 
 
@@ -539,34 +539,79 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
       // V2 照片儲存：影像檔在 IndexedDB，紀錄只保留照片索引
       // ==========================================
       let photoDbPromise = null;
+      // 本機 DB 版本（修復補表時可能往上加，統一讀 window 以便跨模組一致）
+      function photoDbVersion() { return Number(window.PHOTO_DB_VERSION) || 3; }
+      function createMissingStores(db) {
+        if (!db.objectStoreNames.contains(PHOTO_STORE_NAME)) db.createObjectStore(PHOTO_STORE_NAME, { keyPath: "id" });
+        if (!db.objectStoreNames.contains(DRAFT_STORE_NAME)) db.createObjectStore(DRAFT_STORE_NAME, { keyPath: "id" });
+        if (!db.objectStoreNames.contains(APP_DATA_STORE_NAME)) db.createObjectStore(APP_DATA_STORE_NAME, { keyPath: "id" });
+      }
+      function missingStores(db) {
+        return [PHOTO_STORE_NAME, DRAFT_STORE_NAME, APP_DATA_STORE_NAME].filter(n => !db.objectStoreNames.contains(n));
+      }
       function openPhotoDb() {
         if (photoDbPromise) return photoDbPromise;
         photoDbPromise = new Promise((resolve, reject) => {
-          const request = indexedDB.open(PHOTO_DB_NAME, 2);
-          request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains(PHOTO_STORE_NAME)) db.createObjectStore(PHOTO_STORE_NAME, { keyPath: "id" });
-            if (!db.objectStoreNames.contains(DRAFT_STORE_NAME)) db.createObjectStore(DRAFT_STORE_NAME, { keyPath: "id" });
-            if (!db.objectStoreNames.contains(APP_DATA_STORE_NAME)) db.createObjectStore(APP_DATA_STORE_NAME, { keyPath: "id" });
+          let request;
+          try {
+            request = indexedDB.open(PHOTO_DB_NAME, photoDbVersion());
+          } catch (err) { reject(err); return; }
+          request.onupgradeneeded = () => createMissingStores(request.result);
+          request.onblocked = () => {
+            console.warn("照片資料庫升級被阻擋：請關閉其他已開啟本站的分頁後再重整");
           };
           request.onsuccess = () => {
-            request.result.onversionchange = () => request.result.close();
-            resolve(request.result);
+            const db = request.result;
+            db.onversionchange = () => db.close();
+            const missing = missingStores(db);
+            if (!missing.length) { resolve(db); return; }
+            // 舊結構缺表：非破壞性升版補表（保留既有照片/草稿，只建缺的表）
+            const nextVersion = db.version + 1;
+            db.close();
+            let up;
+            try {
+              up = indexedDB.open(PHOTO_DB_NAME, nextVersion);
+            } catch (err) { reject(err); return; }
+            up.onupgradeneeded = () => createMissingStores(up.result);
+            up.onblocked = () => reject(new Error("照片資料庫修復被阻擋：請關閉其他已開啟本站的分頁後再重整"));
+            up.onsuccess = () => {
+              const udb = up.result;
+              udb.onversionchange = () => udb.close();
+              window.PHOTO_DB_VERSION = nextVersion;
+              resolve(udb);
+            };
+            up.onerror = () => reject(up.error || new Error("照片資料庫修復失敗"));
           };
           request.onerror = () => reject(request.error || new Error("無法開啟照片資料庫"));
         });
         return photoDbPromise;
       }
 
+      function photoDbRequestOnce(mode, action, storeName) {
+        return openPhotoDb().then(db => new Promise((resolve, reject) => {
+          let request;
+          try {
+            const transaction = db.transaction(storeName, mode);
+            request = action(transaction.objectStore(storeName));
+            transaction.oncomplete = () => resolve(request ? request.result : undefined);
+            transaction.onerror = () => reject(transaction.error || request?.error || new Error("照片資料庫操作失敗"));
+            transaction.onabort = () => reject(transaction.error || new Error("照片資料庫操作已取消"));
+          } catch (err) { reject(err); }
+        }));
+      }
+
       async function photoDbRequest(mode, action, storeName = PHOTO_STORE_NAME) {
-        const db = await openPhotoDb();
-        return new Promise((resolve, reject) => {
-          const transaction = db.transaction(storeName, mode);
-          const request = action(transaction.objectStore(storeName));
-          transaction.oncomplete = () => resolve(request ? request.result : undefined);
-          transaction.onerror = () => reject(transaction.error || request?.error || new Error("照片資料庫操作失敗"));
-          transaction.onabort = () => reject(transaction.error || new Error("照片資料庫操作已取消"));
-        });
+        try {
+          return await photoDbRequestOnce(mode, action, storeName);
+        } catch (err) {
+          // 連線過期或結構異常：丟掉快取連線重開一次（重開會自動補表）
+          if (err && (err.name === "NotFoundError" || err.name === "InvalidStateError")) {
+            photoDbPromise = null;
+            try { await openPhotoDb(); } catch {}
+            return photoDbRequestOnce(mode, action, storeName);
+          }
+          throw err;
+        }
       }
 
       function getDraftRecord() {
@@ -4917,12 +4962,16 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
           let popupHandle = null;
           let pollTimer = null;
           const realOpen = window.open;
+          // COOP 政策下讀取跨源 popup.closed 會丟錯，包起來避免紅字洗版
+          const isPopupClosed = (popup) => {
+            try { return !!(popup && popup.closed); } catch { return false; }
+          };
           const finish = (fn, arg) => {
             if (settled) return;
             settled = true;
             if (pollTimer) clearInterval(pollTimer);
             window.open = realOpen;
-            if (popupHandle && !popupHandle.closed) { try { popupHandle.close(); } catch { /* ignore */ } }
+            if (popupHandle && !isPopupClosed(popupHandle)) { try { popupHandle.close(); } catch { /* ignore */ } }
             fn(arg);
           };
           window.open = (...args) => {
@@ -4931,7 +4980,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_STORE_NAME, DRAFT
             return opened;
           };
           pollTimer = setInterval(() => {
-            if (popupHandle && popupHandle.closed) {
+            if (isPopupClosed(popupHandle)) {
               finish(reject, new Error("Google 登入視窗已關閉，已取消"));
             }
           }, 300);
@@ -7513,7 +7562,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?rev=20', { scope: './' })
+          navigator.serviceWorker.register('./service-worker.js?rev=21', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 

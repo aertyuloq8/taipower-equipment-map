@@ -2,6 +2,7 @@
 export const STORAGE_KEY         = "taipower_inspection_v8_photos";
 export const LEGACY_STORAGE_KEYS = ["taipower_inspection_v7", "taipower_inspection_v6", "taipower_inspection_v5"];
 export const PHOTO_DB_NAME       = "taipower_inspection_photos_v2";
+export const PHOTO_DB_VERSION    = 3;
 export const PHOTO_STORE_NAME    = "photos";
 export const DRAFT_STORE_NAME    = "drafts";
 export const APP_DATA_STORE_NAME = "appData";
@@ -16,6 +17,7 @@ export const MAX_ROUTE_POINTS    = 20000;
 window.STORAGE_KEY         = STORAGE_KEY;
 window.LEGACY_STORAGE_KEYS = LEGACY_STORAGE_KEYS;
 window.PHOTO_DB_NAME       = PHOTO_DB_NAME;
+window.PHOTO_DB_VERSION    = PHOTO_DB_VERSION;
 window.PHOTO_STORE_NAME    = PHOTO_STORE_NAME;
 window.DRAFT_STORE_NAME    = DRAFT_STORE_NAME;
 window.APP_DATA_STORE_NAME = APP_DATA_STORE_NAME;
