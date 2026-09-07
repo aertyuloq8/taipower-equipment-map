@@ -108,6 +108,14 @@
     font-size: 12px !important;
   }
 }
+/* 粗指針（手機直橫向/平板）：圖示鈕放大好點，列高仍遠小於改前 */
+@media (pointer: coarse) {
+  .v2-bookmark-item-actions button {
+    min-height: 34px;
+    min-width: 38px;
+    font-size: 14px;
+  }
+}
 .v2-bookmark-list {
   display: grid;
   gap: 6px;
