@@ -310,7 +310,10 @@
       if (choice === "merge") {
         setStatus("正在合併…");
         const result = await window.__syncBridge.mergeBackup(file);
-        setStatus(`同步完成，已合併 ${result.recordCount} 筆紀錄（新增 ${result.photoAdded} 張照片）。`, "ok");
+        const skipInfo = result.photoSkipped > 0 ? `（${result.photoSkipped} 張已存在，略過）` : "";
+        const mergeInfo = result.photoMergedRecords > 0 ? `，${result.photoMergedRecords} 筆既有紀錄合併照片` : "";
+        const bmInfo = result.bookmarksAdded > 0 ? `，收藏新增 ${result.bookmarksAdded} 筆` : "";
+        setStatus(`同步完成：新增 ${result.folderCount} 個資料夾、${result.recordCount} 筆紀錄，照片新增 ${result.photoAdded} 張${skipInfo}${mergeInfo}${bmInfo}。`, "ok");
       } else {
         setStatus("正在還原…");
         await window.__syncBridge.restoreBackup(file);

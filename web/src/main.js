@@ -5251,8 +5251,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
               backupProgressUpdate(5, "合併備份中…");
               const result = await mergeZipBackup(new File([blob], picked.name, { type: "application/zip" }));
               backupProgressUpdate(100, "完成");
-              const bmInfo = result.bookmarksAdded > 0 ? `<br>收藏合併：新增 ${result.bookmarksAdded} 筆` : "";
-              GlobalModal.alert("已合併到現有：新增 " + result.folderCount + " 個資料夾、" + result.recordCount + " 筆紀錄，照片新增 " + result.photoAdded + " 張。" + bmInfo);
+              const mergeLines = [
+                `資料夾：新增 ${result.folderCount} 個`,
+                `紀錄：新增 ${result.recordCount} 筆`,
+              ];
+              if (result.photoMergedRecords > 0) mergeLines.push(`既有紀錄照片合併：${result.photoMergedRecords} 筆`);
+              mergeLines.push(`照片：新增 ${result.photoAdded} 張` + (result.photoSkipped > 0 ? `（${result.photoSkipped} 張已存在，略過）` : ""));
+              if (result.bookmarksAdded > 0) mergeLines.push(`收藏：新增 ${result.bookmarksAdded} 筆`);
+              GlobalModal.alert("已合併到現有：<br>" + mergeLines.join("<br>"));
             } else {
               await processBackupImport(new File([blob], picked.name, { type: "application/zip" }), "", (done, total) => backupProgressUpdate(68 + Math.round((done / Math.max(1, total)) * 28), "解壓照片 " + done + " / " + total + "…"));
               backupProgressUpdate(100, "完成");
@@ -5426,6 +5432,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
             if (downloaded.length === 0) { GlobalModal.alert("備份檔案為空（0 筆）。"); return; }
             // Step 2: choose merge or replace (if local data exists)
             let mergedBookmarks;
+            let bookmarkAdded = 0;
+            let bookmarkMode = "replace";
             if (currentBookmarks.length) {
               const mode = await new Promise(resolve => {
                 GlobalModal.show({
@@ -5440,20 +5448,28 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
               });
               if (mode === "replace") {
                 mergedBookmarks = downloaded;
+                bookmarkAdded = downloaded.length;
               } else {
+                bookmarkMode = "merge";
                 const existIds = new Set(currentBookmarks.map(b => b.id || b.address || JSON.stringify(b)));
                 const newItems = downloaded.filter(b => !existIds.has(b.id || b.address || JSON.stringify(b)));
+                bookmarkAdded = newItems.length;
                 mergedBookmarks = [...currentBookmarks, ...newItems];
               }
             } else {
               mergedBookmarks = downloaded;
+              bookmarkAdded = downloaded.length;
             }
             localStorage.setItem(key, JSON.stringify(mergedBookmarks));
             if (window.__bookmarkDB) {
               try { await window.__bookmarkDB.saveBookmarks(type, mergedBookmarks); } catch { /* ignore */ }
             }
             window.dispatchEvent(new CustomEvent("bookmarksRestored"));
-            GlobalModal.alert(`已還原${label}收藏：共 ${mergedBookmarks.length} 筆。`);
+            GlobalModal.alert(`已還原${label}收藏：備份 ${downloaded.length} 筆，` +
+              (bookmarkMode === "merge"
+                ? `新增 ${bookmarkAdded} 筆（原有 ${currentBookmarks.length} 筆）`
+                : `已取代原有 ${currentBookmarks.length} 筆`) +
+              `，共 ${mergedBookmarks.length} 筆。`);
           } catch (e) {
             GlobalModal.alert(label + "收藏還原失敗：" + e.message);
           }
@@ -5597,6 +5613,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
+        return {
+          folderCount: parsed.folders.length,
+          recordCount: parsed.records.length,
+          photoCount: replacePhotos ? photoEntries.length : 0,
+          photosReplaced: replacePhotos,
+          cadastreBookmarks: Array.isArray(extra.cadastreBookmarks) ? extra.cadastreBookmarks.length : 0,
+          addressBookmarks: Array.isArray(extra.addressBookmarks) ? extra.addressBookmarks.length : 0,
+        };
       }
 
       async function mergeZipBackup(file) {
@@ -5811,10 +5835,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           cancelText: "取消",
           onConfirm: async () => {
             try {
-              await restoreBackupData(imported.parsed, imported.photoEntries || [], isZip, { cadastreBookmarks: imported.cadastreBookmarks, addressBookmarks: imported.addressBookmarks });
-              const bmCount = (imported.cadastreBookmarks?.length || 0) + (imported.addressBookmarks?.length || 0);
-              const bmInfo = bmCount > 0 ? `<br>已還原收藏：${imported.cadastreBookmarks?.length || 0} 筆地籍、${imported.addressBookmarks?.length || 0} 筆門牌` : "";
-              GlobalModal.alert((isZip ? "完整備份還原成功！" : "紀錄還原成功！JSON 不含照片，現有照片已保留。") + bmInfo);
+              const restored = await restoreBackupData(imported.parsed, imported.photoEntries || [], isZip, { cadastreBookmarks: imported.cadastreBookmarks, addressBookmarks: imported.addressBookmarks });
+              const bmCount = restored.cadastreBookmarks + restored.addressBookmarks;
+              const bmInfo = bmCount > 0 ? `<br>收藏：${restored.cadastreBookmarks} 筆地籍、${restored.addressBookmarks} 筆門牌` : "";
+              const photoInfo = isZip
+                ? `<br>照片：${restored.photoCount} 張（已取代本機照片庫）`
+                : `<br>照片：JSON 不含照片，現有照片已保留`;
+              GlobalModal.alert((isZip ? "完整備份還原成功！" : "紀錄還原成功！") +
+                `<br>資料夾：${restored.folderCount} 個<br>紀錄：${restored.recordCount} 筆` + photoInfo + bmInfo);
             } catch (error) {
               console.error("還原失敗：", error);
               GlobalModal.alert("還原失敗：" + error.message);
