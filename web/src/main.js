@@ -4054,22 +4054,28 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
     .photo-frame img { display: block; height: auto; margin: 0 auto; max-height: 72vh; max-width: 100%; object-fit: contain; }
     .details { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 18px 22px 22px; }
     .detail { font-size: 18px; line-height: 1.55; overflow-wrap: anywhere; }
-    .screen-toolbar { align-items: center; background: #fff; border: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 12px; padding: 12px; }
+    .screen-toolbar { align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 2px 10px rgba(22, 36, 52, 0.06); display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 12px; padding: 12px 14px; }
     .screen-toolbar h1 { font-size: 22px; margin: 0; }
     .screen-toolbar-actions, .screen-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-    .screen-toolbar button, .screen-actions button, .screen-actions a { background: #fff; border: 1px solid var(--line); color: #075d67; cursor: pointer; display: inline-block; font-weight: 800; min-height: 36px; padding: 8px 12px; text-decoration: none; }
+    .screen-toolbar button, .screen-actions button, .screen-actions a { background: #fff; border: 1px solid var(--line); border-radius: 8px; color: #075d67; cursor: pointer; display: inline-block; font-weight: 800; min-height: 36px; padding: 8px 12px; text-decoration: none; }
+    .screen-toolbar button:hover, .screen-actions button:hover { background: #eef8f9; }
     .screen-toolbar button.primary, .screen-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .screen-toolbar button.primary:hover, .screen-actions button.primary:hover { background: #075d67; }
     .selection-summary { color: #687584; font-size: 13px; margin-right: auto; }
-    .folder-group { background: #fff; border: 1px solid var(--line); margin-bottom: 10px; }
+    .folder-group { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
     .folder-group.depth-1 { margin-left: 18px; }
     .folder-group.depth-2 { margin-left: 36px; }
     .folder-group-head { align-items: center; background: #f8fafc; border-bottom: 1px solid var(--line); display: flex; gap: 8px; min-height: 46px; padding: 8px 12px; }
+    .folder-group-head.is-clickable { cursor: pointer; user-select: none; }
+    .folder-group-head.is-clickable:hover { background: #e9f4f6; }
+    .folder-group-head.is-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .folder-group-head strong { flex: 1; overflow-wrap: anywhere; }
     .folder-group-count { color: #687584; font-size: 12px; }
-    .folder-toggle { background: #fff; border: 1px solid var(--line); color: #075d67; cursor: pointer; flex: 0 0 auto; font-size: 13px; font-weight: 800; min-height: 32px; padding: 5px 9px; }
+    .folder-toggle { background: #fff; border: 1px solid var(--line); border-radius: 8px; color: #075d67; cursor: pointer; flex: 0 0 auto; font-size: 13px; font-weight: 800; min-height: 32px; padding: 5px 9px; }
     .folder-records { display: grid; gap: 8px; padding: 10px; }
     .folder-records[hidden] { display: none; }
-    .folder-record { align-items: flex-start; border: 1px solid var(--line); display: flex; gap: 8px; padding: 10px; }
+    .folder-record { align-items: flex-start; border: 1px solid var(--line); border-radius: 8px; display: flex; gap: 8px; padding: 10px; }
+    .folder-record:hover { background: #f6fbfc; }
     .folder-record a { color: #075d67; display: grid; gap: 4px; min-width: 0; text-decoration: none; }
     .folder-record a:hover { background: #eef8f9; }
     .record-title { font-weight: 800; overflow-wrap: anywhere; }
@@ -4182,6 +4188,11 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         });
         const summary = app.querySelector("[data-selection-summary]");
         if (summary) summary.textContent = "已選 " + selectedIds.size + " 張巡檢卡";
+        const selectToggle = app.querySelector("[data-select-toggle]");
+        if (selectToggle) {
+          const allSelected = cards.length > 0 && selectedIds.size === cards.length;
+          selectToggle.textContent = allSelected ? "取消全選" : "全選";
+        }
       };
       const waitForImages = () => Promise.all([...app.querySelectorAll("img")].map(image => {
         if (image.complete) return Promise.resolve();
@@ -4248,6 +4259,22 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           toggle.textContent = expanded ? "收合" : "展開";
         }
       };
+      // 整列可點：點 head 空白處即展開/收合，點到勾選框/連結/按鈕則不觸發
+      const makeFolderHeadClickable = (head, records) => {
+        head.classList.add("is-clickable");
+        head.title = "點擊展開 / 收合";
+        head.tabIndex = 0;
+        head.addEventListener("click", event => {
+          if (event.target.closest("input, a, button")) return;
+          setFolderExpanded(records, records.hidden);
+        });
+        head.addEventListener("keydown", event => {
+          if (event.target !== head) return;
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          setFolderExpanded(records, records.hidden);
+        });
+      };
       const buildFolderGroup = (folder, depth = 0) => {
         if (!hasCardsInFolderTree(folder.id)) return null;
         const section = document.createElement("section");
@@ -4265,6 +4292,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         records.className = "folder-records";
         setFolderExpanded(records, false);
         toggle.addEventListener("click", () => setFolderExpanded(records, records.hidden));
+        makeFolderHeadClickable(head, records);
         head.append(checkbox, text("strong", folder.name || "未命名資料夾"), text("span", totalCount + " 張卡" + (directCount ? "" : "（子層）"), "folder-group-count"), toggle);
         section.append(head);
         (cardsByFolder.get(folder.id) || []).forEach(card => {
@@ -4332,15 +4360,18 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         summary.dataset.selectionSummary = "true";
         const toolbarActions = document.createElement("div");
         toolbarActions.className = "screen-toolbar-actions";
-        const selectAll = createButton("全選");
-        selectAll.addEventListener("click", () => { cards.forEach(card => selectedIds.add(card.id)); updateSelectionUi(); });
-        const clearAll = createButton("清除");
-        clearAll.addEventListener("click", () => { selectedIds.clear(); updateSelectionUi(); });
+        const selectToggle = createButton("全選");
+        selectToggle.dataset.selectToggle = "true";
+        selectToggle.addEventListener("click", () => {
+          if (cards.length > 0 && selectedIds.size === cards.length) selectedIds.clear();
+          else cards.forEach(card => selectedIds.add(card.id));
+          updateSelectionUi();
+        });
         const generate = createButton("產生所選巡檢卡", "primary");
         generate.addEventListener("click", () => showSelectedCards(false));
         const print = createButton("列印所選巡檢卡", "primary");
         print.addEventListener("click", () => showSelectedCards(true));
-        toolbarActions.append(selectAll, clearAll, generate, print);
+        toolbarActions.append(selectToggle, generate, print);
         toolbar.append(summary, toolbarActions);
         app.append(toolbar);
         folderChildren(null).forEach(folder => {
@@ -4359,6 +4390,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           records.className = "folder-records";
           setFolderExpanded(records, false);
           toggle.addEventListener("click", () => setFolderExpanded(records, records.hidden));
+          makeFolderHeadClickable(head, records);
           head.append(text("strong", "未歸類"), text("span", uncategorized.length + " 張卡", "folder-group-count"), toggle);
           group.append(head);
           uncategorized.forEach(card => {
