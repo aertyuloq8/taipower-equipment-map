@@ -393,6 +393,16 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         document.getElementById('editScrollTopBtn').addEventListener('click', () => { document.getElementById('editFormScrollArea').scrollTo({ top: 0, behavior: 'smooth' }); });
         document.getElementById('editScrollBotBtn').addEventListener('click', () => { const el = document.getElementById('editFormScrollArea'); el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); });
 
+        // 桌機的拍照鈕跟相簿鈕開的是同一個檔案對話框（還只能單選），直接隱藏；手機保留直達相機
+        function isMobilePhotoDevice() {
+          try {
+            if (navigator.userAgentData?.mobile === true) return true;
+            if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "")) return true;
+            if (navigator.maxTouchPoints > 1 && window.matchMedia?.("(pointer: coarse)").matches) return true;
+          } catch {}
+          return false;
+        }
+        document.getElementById("photoCaptureBtn").hidden = !isMobilePhotoDevice();
         document.getElementById("photoCaptureBtn").addEventListener("click", () => {
           const input = document.getElementById("photoInput");
           // Ask the browser to open the rear-camera capture flow for one photo.
