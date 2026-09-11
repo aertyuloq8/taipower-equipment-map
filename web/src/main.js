@@ -739,7 +739,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           element.textContent = "最近一次備份：尚未建立";
           return;
         }
-        const profile = summary.profile === "compressed" ? "壓縮版" : "原圖";
+        const profile = summary.profile === "compressed" ? "高畫質版" : "原圖";
         const protection = summary.encrypted ? "、已加密" : "";
         element.textContent = `最近備份：${formatDateTime(summary.exportedAt)}｜${summary.records || 0} 筆、${summary.photos || 0} 張、${profile}${protection}｜格式 v${summary.formatVersion || BACKUP_FORMAT_VERSION}`;
       }
@@ -3493,10 +3493,10 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
                   }
                 GlobalModal.select(
                     "選擇 ZIP 照片版本",
-                    "完整備份建議使用原圖；壓縮版適合分享，還原後只會保留壓縮圖片。",
+                    "完整備份建議使用原圖；高畫質版適合分享，還原後只會保留高畫質圖片。",
                     [
                       '<option value="original">原圖：可完整備份與還原</option>',
-                      '<option value="compressed">壓縮版：檔案較小，適合分享</option>',
+                      '<option value="compressed">高畫質版：檔案較小，適合分享</option>',
                     ].join(""),
                     photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile, destination, cloudBase)
                   );
@@ -3930,7 +3930,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
       async function compressPhotoForExport(blob) {
         try {
           const image = await loadImageFromBlob(blob);
-          const maxSize = 1920;
+          const maxSize = 2560;
           const sourceWidth = image.naturalWidth || image.width;
           const sourceHeight = image.naturalHeight || image.height;
           const scale = Math.min(1, maxSize / Math.max(sourceWidth, sourceHeight));
@@ -3938,7 +3938,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           canvas.width = Math.max(1, Math.round(sourceWidth * scale));
           canvas.height = Math.max(1, Math.round(sourceHeight * scale));
           canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-          return await canvasToBlob(canvas, "image/jpeg", 0.82);
+          return await canvasToBlob(canvas, "image/jpeg", 0.88);
         } catch (error) {
           console.warn("匯出壓縮失敗，改用原圖：", error);
           return blob;
@@ -4733,7 +4733,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           `備份格式版本：${BACKUP_FORMAT_VERSION}`,
           `巡檢紀錄：${archiveRecords.length} 筆`,
           `照片檔案：${photoCount} 張`,
-          `照片版本：${photoProfile === "compressed" ? "匯出壓縮版（適合分享，無法恢復未匯出的原始細節）" : "原圖（可完整還原）"}`,
+          `照片版本：${photoProfile === "compressed" ? "匯出高畫質版（適合分享，無法恢復未匯出的原始細節）" : "原圖（可完整還原）"}`,
           "請先解壓縮 ZIP，再開啟 records.xlsx。",
           `Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「${photoProfile === "compressed" ? "照片連結" : "原始照片連結"}」。`,
           `${INSPECTION_CARD_FILE} 是依資料夾分類的巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的圖片，不會額外複製照片檔案。`,
@@ -4911,7 +4911,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
                 `資料夾${folders.length}個`,
                 `紀錄${records.length}筆`,
                 `照片${photoCount}張`,
-                photoProfile === "compressed" ? "壓縮版" : "原圖版",
+                photoProfile === "compressed" ? "高畫質版" : "原圖版",
               ]));
           }
           backupProgressUpdate(100, "完成");
@@ -4929,7 +4929,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           const cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
           const addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
           const bookmarkInfo = (cadastreBM.length + addressBM.length > 0) ? `、收藏 ${cadastreBM.length} 筆地籍 + ${addressBM.length} 筆門牌` : "";
-          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片${bookmarkInfo}（${photoProfile === "compressed" ? "壓縮版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + cloudName + "）。" : ""}`);
+          GlobalModal.alert(`ZIP 匯出完成：${records.length} 筆紀錄、${photoCount} 張照片${bookmarkInfo}（${photoProfile === "compressed" ? "高畫質版" : "原圖"}）。解壓縮後可開啟 records.xlsx、巡檢卡或使用資料還原。${toCloud ? "並已上傳到雲端硬碟（" + cloudName + "）。" : ""}`);
         } catch (error) {
           console.error("ZIP 匯出失敗：", error);
           GlobalModal.alert("ZIP 匯出失敗：" + error.message);
@@ -5926,9 +5926,9 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           ? "瀏覽器未提供可用空間估算"
           : `目前可用：約 ${formatStorageBytes(capacity.remaining)}${capacity.enough === false ? "，可能不足" : ""}`;
         const warning = capacity.enough === false
-          ? "<br><strong style='color:#b91c1c'>警告：照片預估容量超過目前可用空間，請先清理或改用壓縮版備份。</strong>"
+          ? "<br><strong style='color:#b91c1c'>警告：照片預估容量超過目前可用空間，請先清理或改用高畫質版備份。</strong>"
           : "";
-        const photoProfile = summary.profile === "compressed" ? "壓縮版" : summary.profile === "original" ? "原圖" : "未標示";
+        const photoProfile = summary.profile === "compressed" ? "高畫質版" : summary.profile === "original" ? "原圖" : "未標示";
         const bmPreview = (imported.cadastreBookmarks?.length || imported.addressBookmarks?.length)
           ? `<br>收藏：${imported.cadastreBookmarks?.length || 0} 筆地籍、${imported.addressBookmarks?.length || 0} 筆門牌`
           : "";
