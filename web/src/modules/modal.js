@@ -48,7 +48,7 @@ const GlobalModal = {
   alert(msg)                   { this.show({ title: "提示",   content: msg, type: "alert" }); },
   confirm(msg, onConfirm, onCancel) { this.show({ title: "請確認", content: msg, type: "confirm", onConfirm, onCancel }); },
   prompt(msg, defaultVal, onConfirm, options = {}) { this.show({ title: "輸入", content: msg, type: "prompt", defaultVal, onConfirm, ...options }); },
-  select(title, msg, selectHtml, onConfirm) { this.show({ title, content: msg, type: "select", selectHtml, onConfirm }); },
+  select(title, msg, selectHtml, onConfirm, options = {}) { this.show({ title, content: msg, type: "select", selectHtml, onConfirm, ...options }); },
 };
 
 if (GlobalModal.dateInputEl) {

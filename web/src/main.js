@@ -5224,11 +5224,25 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         button.disabled = true;
         button.textContent = "☁️ 登入 Google 中";
         try {
+          const photoProfile = await new Promise((resolve) => {
+            GlobalModal.select("選擇照片版本",
+              "完整備份建議使用原圖；高畫質版適合分享，還原後只會保留高畫質圖片。",
+              '<option value="original">原圖：可完整備份與還原</option><option value="compressed">高畫質版：檔案較小，適合分享</option>',
+              (v) => resolve(v),
+              { confirmText: "下一步", cancelText: "取消", onCancel: () => resolve(null) });
+          });
+          if (!photoProfile) return;
+          const profileLabel = photoProfile === "compressed" ? "高畫質版" : "原圖版";
+          const note = await new Promise((resolve) => {
+            GlobalModal.prompt("備註（選填，會顯示在雲端備份清單）", "",
+              (v) => resolve(String(v || "").trim().slice(0, 100)),
+              { title: "備份備註", confirmText: "開始備份", cancelText: "略過", onCancel: () => resolve("") });
+          });
           await ensureJSZip();
           backupProgressUpdate(2, "準備打包…");
           await getDriveAccessToken();
           normalizeInspectionState();
-          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份", "original",
+          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份", photoProfile,
             (done, total) => backupProgressUpdate(3 + Math.round((done / Math.max(1, total)) * 57), "打包照片 " + done + " / " + total + "…"));
           button.textContent = "☁️ 上傳中（" + formatStorageBytes(archive.blob.size) + "）";
           backupProgressUpdate(62, "上傳中（" + formatStorageBytes(archive.blob.size) + "）…");
@@ -5247,8 +5261,9 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
               `資料夾${state.folders.length}個`,
               `紀錄${state.records.length}筆`,
               `照片${archive.photoCount}張`,
-              "原圖版",
+              profileLabel,
               (cadastreBM.length + addressBM.length > 0) ? `收藏${cadastreBM.length}地籍${addressBM.length}門牌` : "",
+              note ? `備註：${note}` : "",
             ]));
           backupProgressUpdate(100, "完成");
           saveBackupSummary({
@@ -5256,14 +5271,14 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
             folders: state.folders.length,
             records: state.records.length,
             photos: archive.photoCount,
-            profile: "original",
+            profile: photoProfile === "compressed" ? "compressed" : "original",
             encrypted: false,
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash: archive.manifestHash,
           });
           const bmInfo = (cadastreBM.length + addressBM.length > 0) ? "<br>收藏：" + cadastreBM.length + " 筆地籍、" + addressBM.length + " 筆門牌" : "";
           GlobalModal.alert("已備份到個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
-            state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + formatStorageBytes(archive.blob.size) + "）。" + bmInfo + "<br>" +
+            state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + profileLabel + "，" + formatStorageBytes(archive.blob.size) + "）。" + bmInfo + "<br>" +
             "其他裝置可在「☁️ 從 Drive 還原」選取此檔。<small>備份檔未加密，請勿放入機密照片。</small>");
         } catch (error) {
           console.error("Drive 備份失敗：", error);
@@ -5659,31 +5674,40 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         button.disabled = true;
         button.textContent = password ? "⏳ 加密備份中" : "⏳ 打包中";
         try {
+          const photoProfile = await new Promise((resolve) => {
+            GlobalModal.select("選擇照片版本",
+              "完整備份建議使用原圖；高畫質版適合分享，還原後只會保留高畫質圖片。",
+              '<option value="original">原圖：可完整備份與還原</option><option value="compressed">高畫質版：檔案較小，適合分享</option>',
+              (v) => resolve(v),
+              { confirmText: "開始備份", cancelText: "取消", onCancel: () => resolve(null) });
+          });
+          if (!photoProfile) return;
+          const profileLabel = photoProfile === "compressed" ? "高畫質版" : "原圖版";
           backupProgressUpdate(2, "準備打包…");
           normalizeInspectionState();
           const archive = await createPhotoArchive(
             state.records,
             state.folders,
             "土木設備分布地圖照片版完整備份",
-            "original",
+            photoProfile,
             (done, total) => backupProgressUpdate(3 + Math.round((done / Math.max(1, total)) * 62), "打包照片 " + done + " / " + total + "…")
           );
           backupProgressUpdate(68, password ? "加密中…" : "產生 ZIP…");
           const encryptedArchive = await encryptBackupBlob(archive.blob, password);
           backupProgressUpdate(100, "完成");
           const fileExtension = encryptedArchive.encrypted ? ".zip.enc" : ".zip";
-          downloadBlob(encryptedArchive.blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}${fileExtension}`);
+          downloadBlob(encryptedArchive.blob, `土木設備照片版完整備份_${new Date().toISOString().slice(0, 10)}${photoProfile === "compressed" ? "_高畫質" : ""}${fileExtension}`);
           saveBackupSummary({
             exportedAt: new Date().toISOString(),
             folders: state.folders.length,
             records: state.records.length,
             photos: archive.photoCount,
-            profile: "original",
+            profile: photoProfile === "compressed" ? "compressed" : "original",
             encrypted: encryptedArchive.encrypted,
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash: archive.manifestHash,
           });
-          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${archive.photoCount} 張照片。${encryptedArchive.encrypted ? "此檔案已加密，請妥善保存密碼。" : "ZIP 內含 manifest.json，可在還原前檢查完整性。"}`);
+          GlobalModal.alert(`完整備份已建立：${state.records.length} 筆紀錄、${archive.photoCount} 張照片（${profileLabel}）。${encryptedArchive.encrypted ? "此檔案已加密，請妥善保存密碼。" : "ZIP 內含 manifest.json，可在還原前檢查完整性。"}`);
         } catch (error) {
           console.error("完整備份失敗：", error);
           GlobalModal.alert("完整備份失敗：" + error.message);
