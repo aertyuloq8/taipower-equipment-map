@@ -2556,7 +2556,8 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           `<div style="font-size:13px;line-height:1.7;">` +
           `<strong>WGS84：</strong>${lng.toFixed(6)}, ${lat.toFixed(6)}<br>` +
           `<strong>度分秒：</strong>${coordDecimalToDms(lng, true)} ${coordDecimalToDms(lat, false)}<br>` +
-          `<strong>TWD97：</strong>E ${Math.round(tm.x).toLocaleString()}, N ${Math.round(tm.y).toLocaleString()}` +
+          `<strong>TWD97：</strong>E ${Math.round(tm.x).toLocaleString()}, N ${Math.round(tm.y).toLocaleString()}<br>` +
+          `<a class="popup-navigation-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat.toFixed(6) + "," + lng.toFixed(6))}" target="_blank" rel="noopener" style="margin-top:6px;">🗺️ 導航</a>` +
           `</div>`
         ).openPopup();
         coordLocateStatus(`已定位：${lng.toFixed(6)}, ${lat.toFixed(6)}（TWD97 E ${Math.round(tm.x)}, N ${Math.round(tm.y)}）`);
