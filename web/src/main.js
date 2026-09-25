@@ -2548,7 +2548,7 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
         el.textContent = message || "";
         el.classList.toggle("is-error", isError);
       }
-      function flyToCoord(lat, lng) {
+      function flyToCoord(lat, lng, note = "") {
         if (coordLocateMarker) { map.removeLayer(coordLocateMarker); coordLocateMarker = null; }
         const tm = twd97FromWgs84(lng, lat);
         map.flyTo([lat, lng], Math.max(map.getZoom(), 17), { duration: 0.6 });
@@ -2560,22 +2560,39 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
           `<a class="popup-navigation-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat.toFixed(6) + "," + lng.toFixed(6))}" target="_blank" rel="noopener" style="margin-top:6px;">🗺️ 導航</a>` +
           `</div>`
         ).openPopup();
-        coordLocateStatus(`已定位：${lng.toFixed(6)}, ${lat.toFixed(6)}（TWD97 E ${Math.round(tm.x)}, N ${Math.round(tm.y)}）`);
+        coordLocateStatus(`已定位：${lng.toFixed(6)}, ${lat.toFixed(6)}（TWD97 E ${Math.round(tm.x)}, N ${Math.round(tm.y)}）${note ? "。" + note : ""}`);
       }
       function coordLocateDecimal() {
         let lngRaw = document.getElementById("coordLng").value.trim();
         let latRaw = document.getElementById("coordLat").value.trim();
-        // 支援一次貼上「經度, 緯度」
+        let swapped = false;
+        // 支援一次貼上「經度, 緯度」或 Google Maps 格式「緯度, 經度」
         if (lngRaw && !latRaw && /[,，\s]/.test(lngRaw)) {
-          const parts = lngRaw.split(/[,，\s]+/).filter(Boolean);
-          if (parts.length >= 2) { lngRaw = parts[0]; latRaw = parts[1]; }
+          const parts = lngRaw.split(/[,，\s]+/).filter(Boolean).map(Number);
+          if (parts.length >= 2 && parts.every(Number.isFinite)) {
+            const inLng = (v) => v >= 118 && v <= 124;
+            const inLat = (v) => v >= 20 && v <= 27;
+            const [a, b] = parts;
+            const aLat = inLat(a), aLng = inLng(a), bLat = inLat(b), bLng = inLng(b);
+            if ((aLat && bLng && !(aLng && bLat)) || (Math.abs(b) > 90 && Math.abs(a) <= 90)) {
+              lngRaw = String(b); latRaw = String(a); swapped = true;
+            } else {
+              lngRaw = String(a); latRaw = String(b);
+            }
+          } else if (parts.length >= 2) {
+            lngRaw = String(parts[0]); latRaw = String(parts[1]);
+          }
         }
         const lng = Number(lngRaw), lat = Number(latRaw);
         if (!lngRaw || !latRaw || !Number.isFinite(lng) || !Number.isFinite(lat)) {
           coordLocateStatus("請輸入有效的經緯度數字", true);
           return;
         }
-        flyToCoord(lat, lng);
+        if (Math.abs(lng) > 180 || Math.abs(lat) > 90) {
+          coordLocateStatus("經度要在 ±180 內、緯度要在 ±90 內，請檢查順序", true);
+          return;
+        }
+        flyToCoord(lat, lng, swapped ? "偵測為 Google Maps 格式（緯度在前），已自動對調" : "");
       }
       function coordLocateDms() {
         const v = (id) => document.getElementById(id).value.trim();
