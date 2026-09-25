@@ -648,5 +648,30 @@
     <script src="cadastre.js"></script>
     <script src="address-search.js"></script>
     <script src="sync.js"></script>
+    <script>
+    /* 版本對帳：主程式 5 秒內沒開機（舊 JS 配新殼 / 載入失敗）就跳橫幅請重整，
+       避免新介面點不動。慢網路有 5 秒寬限，不會誤報。 */
+    window.addEventListener("load", function () {
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries++;
+        if (window.__appBooted) { clearInterval(timer); return; }
+        if (tries < 5) return;
+        clearInterval(timer);
+        try {
+          var banner = document.getElementById("pwaUpdateBanner");
+          if (!banner || !banner.hidden) return;
+          var label = banner.querySelector("span");
+          if (label) label.textContent = "程式版本不一致或載入不完整，請重新載入";
+          banner.hidden = false;
+          var reloadBtn = document.getElementById("pwaUpdateReload");
+          if (reloadBtn && !reloadBtn.__skewWired) {
+            reloadBtn.__skewWired = true;
+            reloadBtn.addEventListener("click", function () { window.location.reload(); });
+          }
+        } catch (e) {}
+      }, 1000);
+    });
+    </script>
   </body>
 </html>

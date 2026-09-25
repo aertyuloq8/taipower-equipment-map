@@ -3,6 +3,8 @@ import "./modules/coords.js";
 import "./modules/constants.js";
 const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO_STORE_NAME, DRAFT_STORE_NAME, APP_DATA_STORE_NAME,
         DRAFT_ACTIVE_ID, EQUIPMENT_CACHE_ID, BACKUP_SUMMARY_KEY, BACKUP_FORMAT_VERSION, MAX_DIRECT_POINTS, MAX_ROUTE_POINTS } = window;
+// 開機旗標：index.html 內聯腳本用它判斷主程式是否成功載入（版本錯位時提示重整）
+window.__appBooted = true;
 
 
       // ==========================================
