@@ -2468,6 +2468,153 @@ const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO
       const totalCount        = document.getElementById("totalCount");
       const visibleCount      = document.getElementById("visibleCount");
       const drawCount         = document.getElementById("drawCount");
+
+      // ==========================================
+      // 座標定位分頁（WGS84 十進位 / 度分秒 / TWD97）
+      // ==========================================
+      document.querySelectorAll("#mapSearchPanel [data-search-tab]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const tab = btn.dataset.searchTab;
+          document.querySelectorAll("#mapSearchPanel [data-search-tab]").forEach(b => {
+            const active = b.dataset.searchTab === tab;
+            b.classList.toggle("is-active", active);
+            b.setAttribute("aria-selected", String(active));
+          });
+          document.querySelectorAll("#mapSearchPanel [data-search-pane]").forEach(p => {
+            p.hidden = p.dataset.searchPane !== tab;
+          });
+        });
+      });
+      // TWD97 TM2（121 分帶，GRS80）與 WGS84 互轉
+      const TM_TWD97 = { a: 6378137, rf: 298.257222101, k0: 0.9999, lon0: 121 * Math.PI / 180, e0: 250000, n0: 0 };
+      function twd97FromWgs84(lng, lat) {
+        const { a, rf, k0, lon0, e0, n0 } = TM_TWD97;
+        const f = 1 / rf, e2 = 2 * f - f * f, ep2 = e2 / (1 - e2);
+        const phi = lat * Math.PI / 180, lam = lng * Math.PI / 180;
+        const sinPhi = Math.sin(phi), cosPhi = Math.cos(phi), tanPhi = Math.tan(phi);
+        const N = a / Math.sqrt(1 - e2 * sinPhi * sinPhi);
+        const T = tanPhi * tanPhi, C = ep2 * cosPhi * cosPhi;
+        const A = (lam - lon0) * cosPhi;
+        const M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * phi
+          - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.sin(2 * phi)
+          + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.sin(4 * phi)
+          - (35 * e2 * e2 * e2 / 3072) * Math.sin(6 * phi));
+        const x = e0 + k0 * N * (A + (1 - T + C) * A * A * A / 6
+          + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * Math.pow(A, 5) / 120);
+        const y = n0 + k0 * (M + N * tanPhi * (A * A / 2
+          + (5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4) / 24
+          + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * Math.pow(A, 6) / 720));
+        return { x, y };
+      }
+      function wgs84FromTwd97(x, y) {
+        const { a, rf, k0, lon0, e0, n0 } = TM_TWD97;
+        const f = 1 / rf, e2 = 2 * f - f * f, ep2 = e2 / (1 - e2);
+        const M = (y - n0) / k0;
+        const mu = M / (a * (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256));
+        const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+        const phi1 = mu + (3 * e1 / 2 - 27 * e1 * e1 * e1 / 32) * Math.sin(2 * mu)
+          + (21 * e1 * e1 / 16 - 55 * e1 * e1 * e1 * e1 / 32) * Math.sin(4 * mu)
+          + (151 * e1 * e1 * e1 / 96) * Math.sin(6 * mu)
+          + (1097 * e1 * e1 * e1 * e1 / 512) * Math.sin(8 * mu);
+        const sinPhi1 = Math.sin(phi1), cosPhi1 = Math.cos(phi1), tanPhi1 = Math.tan(phi1);
+        const N1 = a / Math.sqrt(1 - e2 * sinPhi1 * sinPhi1);
+        const R1 = a * (1 - e2) / Math.pow(1 - e2 * sinPhi1 * sinPhi1, 1.5);
+        const T1 = tanPhi1 * tanPhi1, C1 = ep2 * cosPhi1 * cosPhi1;
+        const D = (x - e0) / (N1 * k0);
+        const lat = phi1 - (N1 * tanPhi1 / R1) * (D * D / 2
+          - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1) * Math.pow(D, 4) / 24
+          + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * Math.pow(D, 6) / 720);
+        const lng = lon0 + (D - (1 + 2 * T1 + C1) * Math.pow(D, 3) / 6
+          + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * Math.pow(D, 5) / 120) / cosPhi1;
+        return { lng: lng * 180 / Math.PI, lat: lat * 180 / Math.PI };
+      }
+      function coordDmsToDecimal(d, m, s) {
+        return Number(d) + Number(m) / 60 + Number(s) / 3600;
+      }
+      function coordDecimalToDms(dec, isLng) {
+        const sign = dec < 0 ? -1 : 1;
+        const abs = Math.abs(dec);
+        const d = Math.floor(abs);
+        const mFloat = (abs - d) * 60;
+        const m = Math.floor(mFloat);
+        const s = (mFloat - m) * 60;
+        const hemi = isLng ? (sign < 0 ? "W" : "E") : (sign < 0 ? "S" : "N");
+        return `${hemi}${d}°${m}′${s.toFixed(1)}″`;
+      }
+      let coordLocateMarker = null;
+      function coordLocateStatus(message, isError = false) {
+        const el = document.getElementById("coordStatus");
+        if (!el) return;
+        el.textContent = message || "";
+        el.classList.toggle("is-error", isError);
+      }
+      function flyToCoord(lat, lng) {
+        if (coordLocateMarker) { map.removeLayer(coordLocateMarker); coordLocateMarker = null; }
+        const tm = twd97FromWgs84(lng, lat);
+        map.flyTo([lat, lng], Math.max(map.getZoom(), 17), { duration: 0.6 });
+        coordLocateMarker = L.marker([lat, lng]).addTo(map).bindPopup(
+          `<div style="font-size:13px;line-height:1.7;">` +
+          `<strong>WGS84：</strong>${lng.toFixed(6)}, ${lat.toFixed(6)}<br>` +
+          `<strong>度分秒：</strong>${coordDecimalToDms(lng, true)} ${coordDecimalToDms(lat, false)}<br>` +
+          `<strong>TWD97：</strong>E ${Math.round(tm.x).toLocaleString()}, N ${Math.round(tm.y).toLocaleString()}` +
+          `</div>`
+        ).openPopup();
+        coordLocateStatus(`已定位：${lng.toFixed(6)}, ${lat.toFixed(6)}（TWD97 E ${Math.round(tm.x)}, N ${Math.round(tm.y)}）`);
+      }
+      function coordLocateDecimal() {
+        let lngRaw = document.getElementById("coordLng").value.trim();
+        let latRaw = document.getElementById("coordLat").value.trim();
+        // 支援一次貼上「經度, 緯度」
+        if (lngRaw && !latRaw && /[,，\s]/.test(lngRaw)) {
+          const parts = lngRaw.split(/[,，\s]+/).filter(Boolean);
+          if (parts.length >= 2) { lngRaw = parts[0]; latRaw = parts[1]; }
+        }
+        const lng = Number(lngRaw), lat = Number(latRaw);
+        if (!lngRaw || !latRaw || !Number.isFinite(lng) || !Number.isFinite(lat)) {
+          coordLocateStatus("請輸入有效的經緯度數字", true);
+          return;
+        }
+        flyToCoord(lat, lng);
+      }
+      function coordLocateDms() {
+        const v = (id) => document.getElementById(id).value.trim();
+        const parts = [v("coordLngD"), v("coordLngM"), v("coordLngS"), v("coordLatD"), v("coordLatM"), v("coordLatS")];
+        if (parts.some(p => p === "" || !Number.isFinite(Number(p)))) {
+          coordLocateStatus("度分秒六格都要填數字", true);
+          return;
+        }
+        const lngM = Number(parts[1]), lngS = Number(parts[2]), latM = Number(parts[4]), latS = Number(parts[5]);
+        if (lngM < 0 || lngM >= 60 || lngS < 0 || lngS >= 60 || latM < 0 || latM >= 60 || latS < 0 || latS >= 60) {
+          coordLocateStatus("分、秒要在 0～60 之間", true);
+          return;
+        }
+        flyToCoord(coordDmsToDecimal(parts[3], parts[4], parts[5]), coordDmsToDecimal(parts[0], parts[1], parts[2]));
+      }
+      function coordLocateTwd97() {
+        const x = Number(document.getElementById("coordTwd97E").value.trim());
+        const y = Number(document.getElementById("coordTwd97N").value.trim());
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          coordLocateStatus("請輸入有效的 TWD97 E、N 數字", true);
+          return;
+        }
+        if (x < 50000 || x > 500000 || y < 2200000 || y > 2900000) {
+          coordLocateStatus("數值不在台灣本島 TWD97 範圍，請檢查", true);
+          return;
+        }
+        const { lng, lat } = wgs84FromTwd97(x, y);
+        flyToCoord(lat, lng);
+      }
+      document.getElementById("coordLocateDecimal")?.addEventListener("click", coordLocateDecimal);
+      document.getElementById("coordLocateDms")?.addEventListener("click", coordLocateDms);
+      document.getElementById("coordLocateTwd97")?.addEventListener("click", coordLocateTwd97);
+      ["coordLng", "coordLat", "coordLngD", "coordLngM", "coordLngS", "coordLatD", "coordLatM", "coordLatS", "coordTwd97E", "coordTwd97N"].forEach(id => {
+        document.getElementById(id)?.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter") return;
+          if (id === "coordLng" || id === "coordLat") coordLocateDecimal();
+          else if (id.startsWith("coordTwd97")) coordLocateTwd97();
+          else coordLocateDms();
+        });
+      });
       function refreshViewportLayout() {
         syncMobileMapControls();
         if (typeof map !== "undefined") {

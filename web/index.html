@@ -147,15 +147,56 @@
           <button id="mapSearchClose"
             style="background:transparent; color:var(--muted); border:none; min-height:unset; padding:4px 8px; font-size:16px; cursor:pointer;">✕</button>
         </div>
-        <select id="areaSelect"><option value="">全部區域</option></select>
-        <input id="searchInput" type="search" placeholder="搜尋設備或圖號座標" autocomplete="off" />
+        <nav class="v2-bookmark-tabs" role="tablist" aria-label="搜尋分頁">
+          <button class="v2-tab-btn is-active" data-search-tab="device" role="tab" aria-selected="true">🔍 設備</button>
+          <button class="v2-tab-btn" data-search-tab="coord" role="tab" aria-selected="false">📍 座標</button>
+        </nav>
+        <div data-search-pane="device" style="display:flex; flex-direction:column; gap:8px;">
+          <select id="areaSelect"><option value="">全部區域</option></select>
+          <input id="searchInput" type="search" placeholder="搜尋設備或圖號座標" autocomplete="off" />
+        </div>
+        <div class="map-search-coord-form" data-search-pane="coord" hidden>
+          <div class="coord-group">
+            <span class="coord-group-title">經緯度 WGS84（十進位）</span>
+            <div class="coord-row">
+              <label>經度 <input id="coordLng" type="text" inputmode="decimal" placeholder="120.196300" autocomplete="off" /></label>
+              <label>緯度 <input id="coordLat" type="text" inputmode="decimal" placeholder="22.991100" autocomplete="off" /></label>
+              <button id="coordLocateDecimal" type="button">定位</button>
+            </div>
+          </div>
+          <div class="coord-group">
+            <span class="coord-group-title">經緯度 WGS84（度分秒）</span>
+            <div class="coord-row">
+              <span class="coord-axis">E</span>
+              <input id="coordLngD" type="text" inputmode="decimal" placeholder="120" autocomplete="off" aria-label="經度度" /><span>°</span>
+              <input id="coordLngM" type="text" inputmode="decimal" placeholder="11" autocomplete="off" aria-label="經度分" /><span>′</span>
+              <input id="coordLngS" type="text" inputmode="decimal" placeholder="46.7" autocomplete="off" aria-label="經度秒" /><span>″</span>
+            </div>
+            <div class="coord-row">
+              <span class="coord-axis">N</span>
+              <input id="coordLatD" type="text" inputmode="decimal" placeholder="22" autocomplete="off" aria-label="緯度度" /><span>°</span>
+              <input id="coordLatM" type="text" inputmode="decimal" placeholder="59" autocomplete="off" aria-label="緯度分" /><span>′</span>
+              <input id="coordLatS" type="text" inputmode="decimal" placeholder="28" autocomplete="off" aria-label="緯度秒" /><span>″</span>
+            </div>
+            <button id="coordLocateDms" type="button">定位</button>
+          </div>
+          <div class="coord-group">
+            <span class="coord-group-title">TWD97 座標（121 分帶）</span>
+            <div class="coord-row">
+              <label>E <input id="coordTwd97E" type="text" inputmode="decimal" placeholder="171709" autocomplete="off" /></label>
+              <label>N <input id="coordTwd97N" type="text" inputmode="decimal" placeholder="2543727" autocomplete="off" /></label>
+              <button id="coordLocateTwd97" type="button">定位</button>
+            </div>
+          </div>
+          <p id="coordStatus" class="coord-status" aria-live="polite"></p>
+        </div>
       </div>
-      <div class="map-search-stats">
+      <div class="map-search-stats" data-search-pane="device">
         <span>總點位 <strong id="totalCount">--</strong></span>
         <span>視窗內 <strong id="visibleCount">--</strong></span>
         <span>標籤數 <strong id="drawCount">--</strong></span>
       </div>
-      <div id="results" class="map-search-results"></div>
+      <div id="results" class="map-search-results" data-search-pane="device"></div>
     </div>
 
     <section id="v2CadastrePanel" class="v2-cadastre-panel" aria-hidden="true" aria-label="地籍圖查詢">
