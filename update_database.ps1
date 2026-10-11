@@ -1,4 +1,4 @@
-﻿param(
+param(
   [switch]$NoPush
 )
 
@@ -22,9 +22,13 @@ $env:PYTHONIOENCODING = "utf-8"
 function Run-Git {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GitArgs)
   
-  # 執行 git 指令，並使用 "2>&1" 將惱人的錯誤提示流轉回一般文字
-  # 這樣就能避免 PowerShell 動不動就噴出紅字嚇人
-  & git @GitArgs 2>&1 | ForEach-Object { Write-Host $_ }
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    & git @GitArgs 2>&1 | ForEach-Object { "$_" } | Write-Host
+  } finally {
+    $ErrorActionPreference = $prev
+  }
   
   if ($LASTEXITCODE -ne 0) {
     throw "Git 指令執行失敗: git $($GitArgs -join ' ')"
