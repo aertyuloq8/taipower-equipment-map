@@ -164,27 +164,37 @@ def tpc_to_wgs84(raw_code: object) -> tuple[float, float] | None:
     return cartesian_to_lat_lng(x84, y84, z84, a_wgs84, b_wgs84)
 
 
-def find_excel_file() -> Path:
-    files = [path for path in ROOT.glob(SOURCE_GLOB) if not path.name.startswith("~$")]
-    if not files:
-        raise FileNotFoundError("找不到 Excel 檔案")
-    return max(files, key=lambda path: path.stat().st_mtime)
+def find_source_file() -> Path:
+    candidates = [path for path in ROOT.glob(SOURCE_GLOB) if not path.name.startswith("~$")]
+    candidates.extend(path for path in ROOT.glob("*設備大表*.csv") if not path.name.startswith("~$"))
+    if not candidates:
+        raise FileNotFoundError("找不到 Excel 或 CSV 來源檔案")
+    return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
 def normalize_header(value: object) -> str:
-    return str(value or "").strip().replace(" ", "")
+    return str(value or "").strip().replace(" ", "").lower()
 
 
 def find_headers(headers: Iterable[object]) -> dict[str, int]:
-    wanted = {"土木設備": "device", "圖號座標": "code", "區域": "area"}
+    wanted = {
+        "土木設備": "device",
+        "civil_eng": "device",
+        "civileng": "device",
+        "圖號座標": "code",
+        "map_coord": "code",
+        "mapcoord": "code",
+        "區域": "area",
+        "address": "area",
+    }
     found: dict[str, int] = {}
     for index, header in enumerate(headers):
         key = wanted.get(normalize_header(header))
         if key:
             found[key] = index
-    missing = [name for name in wanted.values() if name not in found]
+    missing = [name for name in ("device", "code", "area") if name not in found]
     if missing:
-        raise ValueError(f"Excel 欄位缺少: {', '.join(missing)}")
+        raise ValueError(f"來源檔案欄位缺少: {', '.join(missing)}")
     return found
 
 
@@ -206,78 +216,99 @@ def read_addr_updated(meta_path: Path) -> str:
 
 def main() -> None:
     DATA_DIR.mkdir(exist_ok=True)
-    source = find_excel_file()
+    source = find_source_file()
+    print(f"讀取來源檔案: {source.name}")
     points_path = DATA_DIR / "points.json"
     csv_path = DATA_DIR / "points.csv"
     meta_path = DATA_DIR / "meta.json"
 
-    workbook = load_workbook(source, read_only=True, data_only=True, keep_vba=False)
-    sheet = workbook.worksheets[0]
-    rows = sheet.iter_rows(values_only=True)
-    headers = next(rows)
-    indexes = find_headers(headers)
+    is_csv = source.suffix.lower() == ".csv"
+    csv_file_handle = None
+    workbook = None
+
+    if is_csv:
+        csv_file_handle = source.open("r", encoding="utf-8-sig")
+        reader = csv.reader(csv_file_handle)
+        headers = next(reader)
+        indexes = find_headers(headers)
+        row_iter = reader
+    else:
+        workbook = load_workbook(source, read_only=True, data_only=True, keep_vba=False)
+        sheet = workbook.worksheets[0]
+        rows = sheet.iter_rows(values_only=True)
+        headers = next(rows)
+        indexes = find_headers(headers)
+        row_iter = rows
 
     converted = 0
     skipped = 0
+    total_rows = 0
     min_lat = 90.0
     min_lng = 180.0
     max_lat = -90.0
     max_lng = -180.0
     area_counter: Counter[str] = Counter()
 
-    with points_path.open("w", encoding="utf-8") as json_file, csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
-        writer = csv.writer(csv_file)
-        writer.writerow(["id", "name", "code", "area", "lat", "lng"])
-        json_file.write("[\n")
-        first = True
+    try:
+        with points_path.open("w", encoding="utf-8") as json_file, csv_path.open("w", encoding="utf-8-sig", newline="") as out_csv:
+            writer = csv.writer(out_csv)
+            writer.writerow(["id", "name", "code", "area", "lat", "lng"])
+            json_file.write("[\n")
+            first = True
 
-        for row_number, row in enumerate(rows, start=2):
-            device = str(row[indexes["device"]] or "").strip()
-            code = str(row[indexes["code"]] or "").strip()
-            area = str(row[indexes["area"]] or "").strip()
-            result = tpc_to_wgs84(code)
-            if not result:
-                skipped += 1
-                continue
+            for row in row_iter:
+                if not row:
+                    continue
+                total_rows += 1
+                device = str(row[indexes["device"]] if len(row) > indexes["device"] else "").strip()
+                code = str(row[indexes["code"]] if len(row) > indexes["code"] else "").strip()
+                area = str(row[indexes["area"]] if len(row) > indexes["area"] else "").strip()
+                result = tpc_to_wgs84(code)
+                if not result:
+                    skipped += 1
+                    continue
 
-            lat, lng = result
-            if not (20.0 <= lat <= 27.0 and 118.0 <= lng <= 123.5):
-                skipped += 1
-                continue
+                lat, lng = result
+                if not (20.0 <= lat <= 27.0 and 118.0 <= lng <= 123.5):
+                    skipped += 1
+                    continue
 
-            converted += 1
-            min_lat = min(min_lat, lat)
-            min_lng = min(min_lng, lng)
-            max_lat = max(max_lat, lat)
-            max_lng = max(max_lng, lng)
-            area_counter[area] += 1
+                converted += 1
+                min_lat = min(min_lat, lat)
+                min_lng = min(min_lng, lng)
+                max_lat = max(max_lat, lat)
+                max_lng = max(max_lng, lng)
+                area_counter[area] += 1
 
-            record = {
-                "id": converted,
-                "name": device,
-                "code": code,
-                "area": area,
-                "lat": round(lat, 7),
-                "lng": round(lng, 7),
-            }
-            writer.writerow([record["id"], record["name"], record["code"], record["area"], record["lat"], record["lng"]])
-            if not first:
-                json_file.write(",\n")
-            json.dump(record, json_file, ensure_ascii=False, separators=(",", ":"))
-            first = False
+                record = {
+                    "id": converted,
+                    "name": device,
+                    "code": code,
+                    "area": area,
+                    "lat": round(lat, 7),
+                    "lng": round(lng, 7),
+                }
+                writer.writerow([record["id"], record["name"], record["code"], record["area"], record["lat"], record["lng"]])
+                if not first:
+                    json_file.write(",\n")
+                json.dump(record, json_file, ensure_ascii=False, separators=(",", ":"))
+                first = False
 
-            if converted % 50000 == 0:
-                print(f"converted {converted:,} rows...")
+                if converted % 50000 == 0:
+                    print(f"converted {converted:,} rows...")
 
-        json_file.write("\n]\n")
-
-    workbook.close()
+            json_file.write("\n]\n")
+    finally:
+        if csv_file_handle:
+            csv_file_handle.close()
+        if workbook:
+            workbook.close()
 
     meta = {
         "source": source.name,
         "sourceModified": datetime.fromtimestamp(source.stat().st_mtime).isoformat(timespec="seconds"),
         "sourceSize": source.stat().st_size,
-        "totalRows": sheet.max_row - 1,
+        "totalRows": total_rows,
         "converted": converted,
         "skipped": skipped,
         "bounds": [[min_lat, min_lng], [max_lat, max_lng]],

@@ -51,6 +51,8 @@ $allowedDirty = @(
   "data/meta.json",
   "data/points.csv",
   "data/points.json",
+  "tools/convert_excel.py",
+  ".gitignore",
   "update_database.ps1" # 允許腳本本身的變更
 )
 
@@ -73,15 +75,15 @@ if ($blockedDirty.Count -gt 0) {
 # 5. 抓取最新的 Excel 並執行 Python 轉換
 # ==========================================
 $source = Get-ChildItem -Path $Root -File |
-  Where-Object { $_.Extension -match "^\.xls" -and -not $_.Name.StartsWith("~$") } |
+  Where-Object { (($_.Extension -match "^\.xls") -or ($_.Extension -eq ".csv" -and $_.Name -like "*設備大表*")) -and -not $_.Name.StartsWith("~$") } |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
 if (-not $source) {
-  throw "找不到 Excel 檔案。請先將最新的 Excel 檔案放入專案資料夾中。"
+  throw "找不到 Excel 或 CSV 檔案。請先將最新的檔案放入專案資料夾中。"
 }
 
-Write-Host "讀取最新 Excel 來源: $($source.Name)"
+Write-Host "讀取最新檔案來源: $($source.Name)"
 Write-Host "正在轉換為地圖資料庫格式..."
 
 & python ".\tools\convert_excel.py"
