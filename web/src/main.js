@@ -2042,13 +2042,36 @@ window.__appBooted = true;
       }
 
       // ==========================================
-      // 地圖上的迷你導航小視窗 (精簡版)
+      // 地圖上的迷你導航小視窗 (精簡版，支援同座標共桿設備切換)
       // ==========================================
       function miniPopupHtml(point) {
+        let coLocatedHtml = "";
+        try {
+          if (typeof state !== "undefined" && Array.isArray(state?.points)) {
+            const lat = Number(point.lat), lng = Number(point.lng);
+            const others = state.points.filter(p => (p.id !== point.id || p.name !== point.name) && Math.abs(p.lat - lat) < 0.0000005 && Math.abs(p.lng - lng) < 0.0000005);
+            if (others.length > 0) {
+              coLocatedHtml = `
+                <div style="margin-top:6px; padding-top:6px; border-top:1px dashed #cbd5e1; font-size:11px; text-align:left;">
+                  <div style="color:#0f766e; font-weight:bold; margin-bottom:4px;">📍 同座標共桿設備 (${others.length + 1})：</div>
+                  <div style="display:flex; flex-direction:column; gap:3px;">
+                    ${others.map(o => `
+                      <button type="button" class="co-located-switch-btn" data-point-id="${o.id}" style="padding:3px 6px; font-size:11px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer; text-align:left; color:#1e293b; font-weight:600; display:flex; justify-content:space-between; align-items:center;">
+                        <span>🔄 ${escapeHtml(o.name || o.code)}</span>
+                        <span style="color:#64748b; font-size:10px;">${escapeHtml(o.code || "")}</span>
+                      </button>
+                    `).join("")}
+                  </div>
+                </div>`;
+            }
+          }
+        } catch (e) {}
+
         return `
           <div class="popup-layout" style="min-width: 140px; text-align: center;">
             <div class="popup-title">${escapeHtml(point.name || "未命名設備")}</div>
             <div class="popup-meta" style="margin-bottom:2px;">圖號：${escapeHtml(point.code || "")}</div>
+            ${coLocatedHtml}
           </div>`;
       }
 
@@ -6972,10 +6995,22 @@ window.__appBooted = true;
       function updateLabels() {
         labelsLayer.clearLayers();
         if (state.labelsHidden || state.displayMode !== "point" || state.visiblePoints.length > MAX_POINT_LABELS) return;
+        const coordCount = new Map();
         for (const point of state.visiblePoints) {
+          const coordKey = `${Number(point.lat).toFixed(6)},${Number(point.lng).toFixed(6)}`;
+          const index = coordCount.get(coordKey) || 0;
+          coordCount.set(coordKey, index + 1);
+
           const labelColor = colorForEquipmentName(point.name);
+          const yOffset = 20 - (index * 24);
           L.marker([point.lat, point.lng], {
-            icon: L.divIcon({ className: "point-label", html: `<span class="point-label-chip" style="--label-color:${labelColor}">${escapeHtml(point.name)}</span>`, iconSize: null, iconAnchor: [-8, 20] }),
+            icon: L.divIcon({
+              className: "point-label",
+              html: `<span class="point-label-chip" style="--label-color:${labelColor}">${escapeHtml(point.name)}</span>`,
+              iconSize: null,
+              iconAnchor: [-8, yOffset]
+            }),
+            zIndexOffset: index * 10
           }).on("click", () => {
             L.popup({ autoPanPadding: [10, 10] })
               .setLatLng([point.lat, point.lng])
@@ -7181,14 +7216,16 @@ window.__appBooted = true;
         for (const point of state.points) {
           if (state.area && point.area !== state.area && point.area !== "📂 巡視紀錄") continue;
           if (matchesSearch(point, search)) {
-            outputMap.set(`${point.lat},${point.lng}`, point);
+            const key = point.id != null ? `p_${point.id}` : `p_${point.code}_${point.name}`;
+            outputMap.set(key, point);
           }
         }
 
         // 2. 搜尋巡視紀錄
         for (const record of state.records) {
           if (matchesSearch(record, search)) {
-            outputMap.set(`${record.lat},${record.lng}`, {
+            const key = record.id != null ? `r_${record.id}` : `r_${record.code}_${record.name}`;
+            outputMap.set(key, {
               ...record,
               area: "📂 巡視紀錄"
             });
@@ -7298,12 +7335,28 @@ function renderDefectStats() {
             disableRouteLayerForTools();
             map.flyTo([point.lat, point.lng], map.getMaxZoom(), { duration: 0.45 });
             L.popup({ autoPanPadding: [10, 10] }).setLatLng([point.lat, point.lng]).setContent(miniPopupHtml(point)).openOn(map);
+            openEditPanel(point);
             document.getElementById("mapSearchPanel").classList.remove("is-open");
             searchInput.value = ""; applyFilter();
           });
           results.append(fragment);
         }
       }
+
+      // 支援同座標共桿設備點擊按鈕一鍵切換
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".co-located-switch-btn");
+        if (!btn) return;
+        const targetId = Number(btn.getAttribute("data-point-id"));
+        const targetPoint = (state.points || []).find(p => p.id === targetId);
+        if (targetPoint) {
+          L.popup({ autoPanPadding: [10, 10] })
+            .setLatLng([targetPoint.lat, targetPoint.lng])
+            .setContent(miniPopupHtml(targetPoint))
+            .openOn(map);
+          openEditPanel(targetPoint);
+        }
+      });
 
       map.on("click", (e) => {
         disableRouteLayerForTools();

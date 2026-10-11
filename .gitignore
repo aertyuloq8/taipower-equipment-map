@@ -32,3 +32,6 @@ node_modules/
 
 設備大表*.csv
 gas-patch.js
+
+*.bak
+*.bak*
