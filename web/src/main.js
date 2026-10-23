@@ -2081,7 +2081,79 @@ window.__appBooted = true;
 // ==========================================
       // Leaflet 地圖初始化
       // ==========================================
-      const map = L.map("map", { preferCanvas: true, zoomControl: false, attributionControl: true });
+      let initialCenter = [23.1, 120.3];
+      let initialZoom = 11;
+      const hashMatch = (location.hash || "").match(/^#(\d+(?:\.\d+)?)\/([0-9.-]+)\/([0-9.-]+)/);
+      if (hashMatch) {
+        initialZoom = parseFloat(hashMatch[1]);
+        initialCenter = [parseFloat(hashMatch[2]), parseFloat(hashMatch[3])];
+      }
+      const map = L.map("map", { preferCanvas: true, zoomControl: false, attributionControl: true }).setView(initialCenter, initialZoom);
+      window.map = map;
+
+      // 隱藏式雙版本跳轉：連點 3 次大標題、長按 1.5 秒、或按 Ctrl+Alt+S 觸發，介面 100% 不留痕跡
+      function switchToTaiwanEdition() {
+        if (!map) return;
+        const c = map.getCenter();
+        const z = map.getZoom();
+        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const defaultTarget = isLocal ? "http://localhost:5173/" : "https://aertyuloq8.github.io/taipower-taiwan-map/web/";
+        const baseUrl = window.__TAIWAN_EDITION_URL || defaultTarget;
+        const targetUrl = `${baseUrl}#${z}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`;
+        if (confirm("⚡ 是否切換至【全台土部設備分布地圖】？\n\n（將保留目前地圖視野位置）")) {
+          window.location.href = targetUrl;
+        }
+      }
+
+      (function initHiddenSwitchTriggers() {
+        const titleEl = document.querySelector(".panel-title h1");
+        if (titleEl) {
+          let clicks = 0;
+          let timer = null;
+          titleEl.addEventListener("click", () => {
+            clicks++;
+            clearTimeout(timer);
+            timer = setTimeout(() => { clicks = 0; }, 700);
+            if (clicks >= 3) {
+              clicks = 0;
+              switchToTaiwanEdition();
+            }
+          });
+
+          let pressTimer = null;
+          titleEl.addEventListener("touchstart", () => {
+            pressTimer = setTimeout(switchToTaiwanEdition, 1500);
+          }, { passive: true });
+          titleEl.addEventListener("touchend", () => clearTimeout(pressTimer));
+          titleEl.addEventListener("touchcancel", () => clearTimeout(pressTimer));
+        }
+
+        // 電腦端鍵盤快捷鍵：Ctrl + Alt + S (Switch)
+        window.addEventListener("keydown", (e) => {
+          if (e.ctrlKey && e.altKey && (e.key === "s" || e.key === "S")) {
+            e.preventDefault();
+            switchToTaiwanEdition();
+          }
+        });
+
+        // 在圖層面板最底端加上微小不起眼的版本號，作為備用暗門 (外人只會當作一般版本號)
+        const layerPanel = document.getElementById("layerMenuPanel");
+        if (layerPanel) {
+          const verWrap = document.createElement("div");
+          verWrap.style.cssText = "margin-top:10px; padding-top:6px; border-top:1px dashed #e2e8f0; text-align:center;";
+          const verLink = document.createElement("a");
+          verLink.href = "javascript:void(0)";
+          verLink.textContent = "v2.6.0-tn";
+          verLink.style.cssText = "color:#94a3b8; font-size:10px; text-decoration:none; opacity:0.6; cursor:pointer;";
+          verLink.title = "系統版本資訊";
+          verLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            switchToTaiwanEdition();
+          });
+          verWrap.appendChild(verLink);
+          layerPanel.appendChild(verWrap);
+        }
+      })();
       window.__v2LeafletMap = map;
       map.createPane("routePane");
       map.getPane("routePane").style.zIndex = 390;
@@ -7901,8 +7973,8 @@ function renderDefectStats() {
           state.meta = meta; state.points = points;
           await cacheEquipmentData(meta, points);
           fillAreas(); renderResults([]);
-          map.setView([23.7, 120.95], 8);
-          if (state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
+          if (!hashMatch) map.setView([23.7, 120.95], 8);
+          if (!hashMatch && state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
           renderer.redraw();
           updateNetworkNotice();
           setStatus("");
@@ -7913,8 +7985,8 @@ function renderDefectStats() {
             if (!cached) throw e;
             state.meta = cached.meta; state.points = cached.points;
             fillAreas(); renderResults([]);
-            map.setView([23.7, 120.95], 8);
-            if (state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
+            if (!hashMatch) map.setView([23.7, 120.95], 8);
+            if (!hashMatch && state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
             renderer.redraw();
             setOfflineNotice(`離線降級模式：已使用 ${formatDateTime(cached.cachedAt)} 的設備資料。紀錄、照片與備份仍可使用；地圖底圖可能無法載入。`);
             setStatus("");
