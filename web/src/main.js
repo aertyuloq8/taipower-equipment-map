@@ -2097,7 +2097,7 @@ window.__appBooted = true;
         const c = map.getCenter();
         const z = map.getZoom();
         const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const defaultTarget = isLocal ? "http://localhost:5173/" : "https://aertyuloq8.github.io/taipower-taiwan-map/web/";
+        const defaultTarget = isLocal ? "http://localhost:5173/" : "https://taipower-taiwan-map.vercel.app/web/";
         const baseUrl = window.__TAIWAN_EDITION_URL || defaultTarget;
         const targetUrl = `${baseUrl}#${z}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`;
         if (confirm("⚡ 是否切換至【全台土部設備分布地圖】？\n\n（將保留目前地圖視野位置）")) {
