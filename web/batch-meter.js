@@ -1121,13 +1121,17 @@
           if (!r.code && localPt.code) r.code = localPt.code;
         }
 
-        const resolvePoleCoord = (code) => {
+                const resolvePoleCoord = (c) => {
           if (localPt && Number.isFinite(localPt.lat) && Number.isFinite(localPt.lng)) {
             return { lat: localPt.lat, lng: localPt.lng };
           }
-          if (code && typeof tpcFunc === "function") {
-            const pt = resolvePoleCoord(code);
-            if (pt && Number.isFinite(pt.lat) && Number.isFinite(pt.lng)) return pt;
+          if (c && typeof tpcFunc === "function") {
+            try {
+              const pt = tpcFunc(c);
+              if (pt && Number.isFinite(pt.lat) && Number.isFinite(pt.lng)) return pt;
+            } catch (err) {
+              console.warn("tpcFunc error:", err);
+            }
           }
           return null;
         };
@@ -1700,6 +1704,17 @@
   function normalizeImportedRecords(records) {
     if (!Array.isArray(records)) return [];
     records.forEach(r => {
+      if (!r.addr && (r.address || r.fullAddress || r.rawAddress)) {
+        r.addr = r.address || r.fullAddress || r.rawAddress;
+      }
+      if (!r.lat && r.coordinates && Number.isFinite(r.coordinates.lat)) {
+        r.lat = r.coordinates.lat;
+        r.lng = r.coordinates.lng;
+      }
+      if (!r.lat && r.latDeg && Number.isFinite(r.latDeg)) {
+        r.lat = r.latDeg;
+        r.lng = r.lngDeg;
+      }
       if (!r.extra) r.extra = {};
       if (r.locType && !r.extra["定位型態"]) {
         r.extra["定位型態"] = r.locType === "doorplate" ? "🏠 門牌定位" : (r.locType === "fallback" ? "⚡ 圖號保底" : "⚡ 圖號定位");

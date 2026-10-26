@@ -5773,7 +5773,7 @@ window.__appBooted = true;
           if (!bookmarks.length) { GlobalModal.alert("目前沒有" + label + "收藏可上傳。"); return; }
           const blob = new Blob([JSON.stringify(bookmarks, null, 2)], { type: "application/json" });
           const dateStr = new Date().toISOString().slice(0, 10);
-          const fileName = `設備地圖收藏_${label}_${dateStr}.json`;
+          const fileName = type === "batch" ? `批次電表清單備份_${dateStr}.json` : `設備地圖收藏_${label}_${dateStr}.json`;
           try {
             clearDriveAccessToken();
             await getDriveAccessToken();
@@ -5802,7 +5802,15 @@ window.__appBooted = true;
             return;
           }
           try {
-            const query = encodeURIComponent(`name contains '設備地圖收藏_${label}_' and trashed = false`);
+            let nameQuery = `name contains '設備地圖收藏_${label}_'`;
+            if (type === "batch") {
+              nameQuery = "(name contains '批次' or name contains '電表' or name contains '設備地圖收藏_批次電表' or name contains '批次電表清單備份')";
+            } else if (type === "address") {
+              nameQuery = "(name contains '門牌' or name contains '地址' or name contains '設備地圖收藏_門牌' or name contains '門牌收藏備份')";
+            } else if (type === "cadastre") {
+              nameQuery = "(name contains '地籍' or name contains '設備地圖收藏_地籍' or name contains '地籍收藏備份')";
+            }
+            const query = encodeURIComponent(`${nameQuery} and trashed = false`);
             const resp = await driveFetch(
               "https://www.googleapis.com/drive/v3/files?q=" + query +
               "&orderBy=createdTime desc&pageSize=20&fields=files(id,name,size,createdTime)"
@@ -5905,7 +5913,15 @@ window.__appBooted = true;
             return;
           }
           try {
-            const query = encodeURIComponent(`name contains '設備地圖收藏_${label}_' and trashed = false`);
+            let nameQuery = `name contains '設備地圖收藏_${label}_'`;
+            if (type === "batch") {
+              nameQuery = "(name contains '批次' or name contains '電表' or name contains '設備地圖收藏_批次電表' or name contains '批次電表清單備份')";
+            } else if (type === "address") {
+              nameQuery = "(name contains '門牌' or name contains '地址' or name contains '設備地圖收藏_門牌' or name contains '門牌收藏備份')";
+            } else if (type === "cadastre") {
+              nameQuery = "(name contains '地籍' or name contains '設備地圖收藏_地籍' or name contains '地籍收藏備份')";
+            }
+            const query = encodeURIComponent(`${nameQuery} and trashed = false`);
             const resp = await driveFetch(
               "https://www.googleapis.com/drive/v3/files?q=" + query +
               "&orderBy=createdTime desc&pageSize=50&fields=files(id,name,size,createdTime)"
