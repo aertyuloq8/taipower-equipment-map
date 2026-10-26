@@ -1,0 +1,981 @@
+/* 批次電表清單標記面板樣式 (起點、邊界與尺寸完全與設備、地籍、門牌一致) */
+.v2-batch-panel {
+  background: #fff;
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  display: none;
+  flex-direction: column;
+  left: calc(10px + env(safe-area-inset-left, 0px));
+  max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px);
+  overflow: hidden;
+  position: fixed;
+  top: calc(60px + env(safe-area-inset-top, 0px));
+  width: min(420px, calc(100vw - 20px));
+  z-index: calc(var(--control-z, 1000) + 20);
+}
+.v2-batch-panel.is-open { display: flex; }
+
+@media (max-width: 768px) {
+  .v2-batch-panel {
+    border-radius: 14px;
+    max-height: calc(100dvh - 74px);
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    width: min(420px, calc(100vw - 20px));
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .v2-batch-panel {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    left: auto;
+    max-height: none;
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    top: calc(62px + env(safe-area-inset-top, 0px));
+    width: min(420px, calc(100vw - 20px));
+  }
+}
+
+.v2-batch-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+.v2-batch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+.v2-batch-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f766e;
+}
+.v2-batch-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.v2-batch-guide {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.v2-batch-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  resize: vertical;
+  min-height: 110px;
+  box-sizing: border-box;
+}
+
+.v2-batch-btn-primary {
+  background: #0f766e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.v2-batch-btn-primary:hover { background: #115e59; }
+
+.v2-batch-btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.v2-batch-btn-secondary:hover { background: #e2e8f0; }
+
+.v2-batch-progress {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.v2-batch-progress-text {
+  font-size: 11px;
+  color: #0f766e;
+  font-weight: 700;
+}
+.v2-batch-progress-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.v2-batch-progress-fill {
+  height: 100%;
+  background: #0f766e;
+  transition: width 0.2s ease;
+}
+
+.v2-batch-summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+.v2-batch-badge-item {
+  flex: 1;
+  text-align: center;
+  background: #f1f5f9;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.v2-batch-badge-item.is-green { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.v2-batch-badge-item.is-blue { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.v2-batch-badge-item.is-amber { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+.v2-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+  min-height: 80px;
+}
+.v2-batch-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.v2-batch-item:hover {
+  background: #f0fdf4;
+  border-color: #86efac;
+  transform: translateY(-1px);
+}
+.v2-batch-item-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f766e;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.v2-batch-item-meta {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* 批次電表重點規格標籤列 */
+.v2-batch-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.v2-batch-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+.v2-batch-chip.is-type {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+  font-weight: 700;
+}
+.v2-batch-chip.is-contract {
+  background: #f0fdfa;
+  color: #0f766e;
+  border-color: #99f6e4;
+}
+.v2-batch-chip.is-phase {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+/* 清單卡片內之完整資料摺疊收合區 */
+.v2-batch-card-details {
+  margin-top: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+.v2-batch-card-details[open] {
+  border-color: #94a3b8;
+  background: #fafafa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.v2-batch-card-summary {
+  cursor: pointer;
+  color: #0f766e;
+  font-weight: 700;
+  user-select: none;
+  outline: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+}
+.v2-batch-card-summary::-webkit-details-marker {
+  display: none;
+}
+.v2-batch-card-arrow {
+  font-size: 9px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+.v2-batch-card-details[open] .v2-batch-card-arrow {
+  transform: rotate(180deg);
+}
+.v2-batch-card-body {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed #e2e8f0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.v2-batch-card-row {
+  display: contents;
+}
+.v2-batch-card-key {
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.v2-batch-card-val {
+  color: #1e293b;
+  word-break: break-all;
+  font-weight: 500;
+}
+
+/* 地圖 POP 視窗內之完整資料摺疊收合區 */
+.batch-popup-collapse {
+  margin-top: 6px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+.batch-popup-collapse summary {
+  cursor: pointer;
+  color: #0f766e;
+  font-weight: 700;
+  outline: none;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+}
+.batch-popup-collapse summary::-webkit-details-marker {
+  display: none;
+}
+.batch-popup-details-body {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed #cbd5e1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.batch-popup-row {
+  display: contents;
+}
+.batch-popup-key {
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.batch-popup-val {
+  color: #1e293b;
+  word-break: break-all;
+  font-weight: 500;
+}
+
+/* Custom numbered map markers */
+.batch-marker-pin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  border: 2px solid #fff;
+  width: 26px;
+  height: 26px;
+}
+.batch-marker-pin.is-doorplate {
+  background: #059669; /* 綠色：電子門牌定位 */
+}
+.batch-marker-pin.is-grid {
+  background: #2563eb; /* 藍色：圖號座標定位 */
+}
+.batch-marker-pin.is-fallback {
+  background: #d97706; /* 橘色：門牌查無，轉用圖號 */
+}
+/* 同變壓器/桿位多戶 Marker 聚合角標 */
+.batch-marker-pin.is-cluster {
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.5), 0 3px 8px rgba(0,0,0,0.4);
+}
+.batch-marker-pin-badge {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  background: #e11d48;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 0 4px;
+  line-height: 14px;
+  min-width: 14px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+
+/* 地圖上的永久醒目標籤 (Batch Map Label Tooltip) */
+.leaflet-tooltip.batch-meter-map-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  pointer-events: none;
+}
+.leaflet-tooltip-top.batch-meter-map-tooltip:before {
+  display: none !important;
+}
+
+.batch-map-label {
+  background: #ffffff;
+  border: 1.5px solid #0f766e;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  transform: translateY(-2px);
+}
+.batch-map-label.is-doorplate {
+  border-color: #059669;
+}
+.batch-map-label.is-doorplate .batch-label-index {
+  background: #059669;
+  color: #ffffff;
+}
+.batch-map-label.is-grid {
+  border-color: #2563eb;
+}
+.batch-map-label.is-grid .batch-label-index {
+  background: #2563eb;
+  color: #ffffff;
+}
+.batch-map-label.is-fallback {
+  border-color: #d97706;
+}
+.batch-map-label.is-fallback .batch-label-index {
+  background: #d97706;
+  color: #ffffff;
+}
+.batch-label-index {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+.batch-label-text {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.batch-label-pole {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* 同變壓器多戶整合標籤 */
+.batch-map-label.is-cluster-label {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px 7px;
+  gap: 2px;
+}
+.batch-map-label-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.batch-label-multi-badge {
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* 同變壓器彈窗卡片樣式 */
+.batch-popup-cluster-head {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+}
+.batch-popup-cluster-count {
+  background: #059669;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.batch-popup-meter-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.batch-popup-meter-item:last-child {
+  margin-bottom: 0;
+}
+.batch-popup-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed #e2e8f0;
+}
+.batch-popup-act-btn {
+  flex: 1;
+  min-height: 27px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 8px;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.batch-popup-act-btn.is-nav {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.batch-popup-act-btn.is-nav:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+.batch-popup-act-btn.is-del {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+.batch-popup-act-btn.is-del:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecdd3;
+}
+.v2-batch-badge-shared {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 三合一行：[設備標籤] [地址標籤] [條件篩選] (平分整行，極致省空間) */
+.v2-batch-trio-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  margin: 4px 0 6px;
+  box-sizing: border-box;
+}
+.v2-batch-trio-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  user-select: none;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+.v2-batch-trio-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+.v2-batch-trio-btn.is-active {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+.v2-batch-trio-btn.is-hidden-state {
+  background: #fff1f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+/* 篩選觸發按鈕 */
+.v2-batch-filter-trio-btn {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f766e;
+}
+.v2-batch-filter-trio-btn:hover {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+.v2-batch-filter-trio-btn.has-filter {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.25);
+}
+.v2-batch-filter-trio-badge {
+  background: #059669;
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.v2-batch-filter-trio-btn.has-filter .v2-batch-filter-trio-badge {
+  background: #ffffff;
+  color: #0f766e;
+}
+
+/* 巡視紀錄抽屜風格折疊卡片 (.panel-fold) */
+.v2-batch-fold {
+  background: #f8fafc;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  transition: all 0.15s ease;
+}
+.v2-batch-fold[open] {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.v2-batch-fold > summary {
+  align-items: center;
+  color: var(--accent-dark, #0f766e);
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  font-weight: bold;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 36px;
+  padding: 6px 10px;
+  user-select: none;
+  outline: none;
+}
+.v2-batch-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.v2-batch-fold > summary::after {
+  color: var(--muted, #94a3b8);
+  content: "▶";
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+.v2-batch-fold[open] > summary::after {
+  transform: rotate(90deg);
+}
+.v2-batch-fold > .panel-fold-body {
+  padding: 0 8px 8px;
+}
+
+/* 折疊內動作按鈕群組 */
+.v2-batch-fold .folder-btn-group {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.v2-batch-fold .folder-btn-group:last-child {
+  margin-bottom: 0;
+}
+.v2-batch-fold .btn-action {
+  flex: 1 1 80px;
+  min-height: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 5px;
+  background: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+.v2-batch-fold .btn-action:hover {
+  filter: brightness(0.96);
+}
+#batchFitBoundsBtn,
+.v2-batch-btn-view,
+.v2-batch-action-btn.btn-sync {
+  background: #f0f9ff !important;
+  color: #0369a1 !important;
+  border: 1px dashed #0284c7 !important;
+}
+#batchFitBoundsBtn:hover,
+.v2-batch-btn-view:hover,
+.v2-batch-action-btn.btn-sync:hover {
+  background: #e0f2fe !important;
+  color: #0284c7 !important;
+}
+
+/* 舊樣式相容 */
+.v2-batch-cloud-bar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-top: 1px dashed #e2e8f0;
+  margin-top: 6px;
+}
+.v2-batch-btn-cloud {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px dashed #fdba74;
+  border-radius: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: 1;
+  min-width: 95px;
+  text-align: center;
+}
+.v2-batch-btn-cloud:hover {
+  background: #ffedd5;
+}
+.v2-batch-btn-star {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: 1;
+  min-width: 105px;
+  text-align: center;
+}
+.v2-batch-btn-star:hover {
+  background: #dbeafe;
+}
+
+.v2-batch-btn-file {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: 1;
+  min-width: 95px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.v2-batch-btn-file:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
+/* ============================================================
+   批次多條件篩選抽屜 (針對手機螢幕特別優化之 Bottom Sheet)
+   ============================================================ */
+.v2-batch-filter-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: flex-end; /* 手機預設由底部滑出 */
+  justify-content: center;
+}
+.v2-batch-filter-drawer.is-hidden {
+  display: none !important;
+}
+.v2-batch-filter-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.v2-batch-filter-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 460px;
+  max-height: 85vh;
+  max-height: 85dvh;
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  animation: v2FilterSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+@media (min-width: 769px) {
+  .v2-batch-filter-drawer {
+    align-items: center;
+  }
+  .v2-batch-filter-content {
+    border-radius: 16px;
+    max-height: 80vh;
+    animation: v2FilterFadeIn 0.2s ease-out;
+  }
+}
+@keyframes v2FilterSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes v2FilterFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.v2-batch-filter-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+}
+.v2-filter-link-btn {
+  background: none;
+  border: none;
+  color: #0d9488;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.v2-filter-link-btn:hover {
+  background: #f0fdfa;
+}
+.v2-filter-close-btn {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+}
+.v2-batch-filter-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.v2-filter-group {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.v2-filter-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.v2-filter-group-title {
+  font-weight: 800;
+  font-size: 12px;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.v2-filter-group-actions {
+  display: flex;
+  gap: 6px;
+}
+.v2-filter-action-link {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: #0284c7;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.v2-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.v2-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  transition: all 0.12s ease;
+  min-height: 34px; /* 手機單手觸控友善 */
+  box-sizing: border-box;
+}
+.v2-filter-chip:active {
+  transform: scale(0.96);
+}
+.v2-filter-chip.is-active {
+  background: #0f766e;
+  color: #ffffff;
+  border-color: #0f766e;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.25);
+}
+.v2-filter-chip-count {
+  font-size: 10px;
+  opacity: 0.85;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.08);
+}
+.v2-filter-chip.is-active .v2-filter-chip-count {
+  background: rgba(255, 255, 255, 0.25);
+}
+.v2-batch-filter-footer {
+  padding: 10px 14px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+.v2-batch-filter-apply-btn {
+  width: 100%;
+  background: #0f766e;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(15, 118, 110, 0.3);
+  transition: background 0.15s ease;
+}
+.v2-batch-filter-apply-btn:hover {
+  background: #115e59;
+}
+

@@ -158,10 +158,21 @@ window.__appBooted = true;
         syncPanelToggleState();
         return didCollapse;
       }
+      function closeBatchMeterPanel() {
+        const panel = document.getElementById("v2BatchMeterPanel");
+        const toggle = document.getElementById("v2BatchMeterToggle");
+        panel?.classList.remove("is-open");
+        panel?.setAttribute("aria-hidden", "true");
+        toggle?.classList.remove("is-active");
+        toggle?.setAttribute("aria-expanded", "false");
+      }
+      window.__closeBatchMeterPanel = closeBatchMeterPanel;
+
       function collapseFloatingControls() {
         closeMapSearchPanel();
         closeLayerMenu();
         closeAddressPanel();
+        closeBatchMeterPanel();
         collapsePanelControl();
       }
       mapSearchToggle.addEventListener("click", () => {
@@ -171,6 +182,7 @@ window.__appBooted = true;
           closeLayerMenu();
           window.__closeSyncPanel && window.__closeSyncPanel();
           closeAddressPanel();
+          closeBatchMeterPanel();
           if (!collapsePanelControl()) return;
         }
         mapSearchPanel.classList.toggle("is-open", willOpen);
@@ -178,6 +190,13 @@ window.__appBooted = true;
       });
       document.getElementById("mapSearchClose").addEventListener("click", () => {
         closeMapSearchPanel();
+      });
+      document.addEventListener("v2-batch-open", () => {
+        closeMapSearchPanel();
+        closeLayerMenu();
+        closeAddressPanel();
+        window.__closeSyncPanel && window.__closeSyncPanel();
+        collapsePanelControl();
       });
 
       // ==========================================
@@ -2549,6 +2568,7 @@ window.__appBooted = true;
         labelsHidden: false, lastFolderId: null,
         routeLayerVisible: false,
       };
+      window.state = state;
 
       let editPhotoState = { recordId: null, existing: [], originalExisting: [], pending: [] };
       let editDraftState = { dirty: false, point: null, saveTimer: null, saveSequence: Promise.resolve(), restored: false };
@@ -5187,7 +5207,7 @@ window.__appBooted = true;
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash,
           });
-          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
           const cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
           const addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
           const bookmarkInfo = (cadastreBM.length + addressBM.length > 0) ? `、收藏 ${cadastreBM.length} 筆地籍 + ${addressBM.length} 筆門牌` : "";
@@ -5514,7 +5534,7 @@ window.__appBooted = true;
             try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
             try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
           } else {
-            const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+            const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
             cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
             addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
           }
@@ -5738,13 +5758,18 @@ window.__appBooted = true;
       // --- Bookmark Drive Sync ---
       const bookmarkDrive = {
         async upload(type) {
-          const label = type === "cadastre" ? "地籍" : "門牌";
-          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+          const label = type === "cadastre" ? "地籍" : (type === "batch" ? "批次電表" : "門牌");
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
           const key = lsKeys[type];
           let bookmarks;
-          try {
-            bookmarks = JSON.parse(localStorage.getItem(key) || "[]");
-          } catch { bookmarks = []; }
+          if (type === "batch" && window.__getBatchRecords) {
+            try { bookmarks = window.__getBatchRecords(); } catch { bookmarks = []; }
+          }
+          if (!bookmarks || !bookmarks.length) {
+            try {
+              bookmarks = JSON.parse(localStorage.getItem(key) || "[]");
+            } catch { bookmarks = []; }
+          }
           if (!bookmarks.length) { GlobalModal.alert("目前沒有" + label + "收藏可上傳。"); return; }
           const blob = new Blob([JSON.stringify(bookmarks, null, 2)], { type: "application/json" });
           const dateStr = new Date().toISOString().slice(0, 10);
@@ -5765,8 +5790,8 @@ window.__appBooted = true;
           }
         },
         async restore(type) {
-          const label = type === "cadastre" ? "地籍" : "門牌";
-          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+          const label = type === "cadastre" ? "地籍" : (type === "batch" ? "批次電表" : "門牌");
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
           const key = lsKeys[type];
           try {
             clearDriveAccessToken();
@@ -5855,7 +5880,11 @@ window.__appBooted = true;
             if (window.__bookmarkDB) {
               try { await window.__bookmarkDB.saveBookmarks(type, mergedBookmarks); } catch { /* ignore */ }
             }
-            window.dispatchEvent(new CustomEvent("bookmarksRestored"));
+            if (type === "batch") {
+              window.dispatchEvent(new CustomEvent("batchMetersRestored"));
+            } else {
+              window.dispatchEvent(new CustomEvent("bookmarksRestored"));
+            }
             GlobalModal.alert(`已還原${label}收藏：備份 ${downloaded.length} 筆，` +
               (bookmarkMode === "merge"
                 ? `新增 ${bookmarkAdded} 筆（原有 ${currentBookmarks.length} 筆）`
@@ -5866,7 +5895,7 @@ window.__appBooted = true;
           }
         },
         async deleteCloud(type) {
-          const label = type === "cadastre" ? "地籍" : "門牌";
+          const label = type === "cadastre" ? "地籍" : (type === "batch" ? "批次電表" : "門牌");
           try {
             clearDriveAccessToken();
             await getDriveAccessToken();
@@ -5985,7 +6014,7 @@ window.__appBooted = true;
         if (replacePhotos) await replacePhotoStore(photoEntries);
         // Restore bookmarks if present in backup (optional, not in old backups)
         try {
-          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
           if (Array.isArray(extra.cadastreBookmarks)) {
             localStorage.setItem(lsKeys.cadastre, JSON.stringify(extra.cadastreBookmarks));
             if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks("cadastre", extra.cadastreBookmarks);
@@ -6073,7 +6102,7 @@ window.__appBooted = true;
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
         // Merge bookmarks
         let bookmarksAdded = 0;
-        const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
+        const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
         for (const [bmType, bmKey] of [["cadastreBookmarks", lsKeys.cadastre], ["addressBookmarks", lsKeys.address]]) {
           const remoteBm = imported[bmType];
           if (!Array.isArray(remoteBm) || !remoteBm.length) continue;
@@ -6335,7 +6364,7 @@ window.__appBooted = true;
         const editToggleEl = document.getElementById("defectEditToggle");
         const isInsideEdit = e.target.closest?.("#defectEditPanel, #defectEditToggle");
         if (!isInsideEdit && editPanelEl && !editPanelEl.hasAttribute("hidden")) {
-          const openAnother = e.target.closest?.("#v2AddressToggle, #mapSearchToggle, #layerMenuToggle, #v2CadastreToggle, #v2SyncToggle, #v2AddressPanel, #mapSearchPanel, #layerMenuPanel, #v2CadastrePanel, #v2SyncPanel");
+          const openAnother = e.target.closest?.("#v2AddressToggle, #mapSearchToggle, #layerMenuToggle, #v2CadastreToggle, #v2BatchMeterToggle, #v2SyncToggle, #v2AddressPanel, #mapSearchPanel, #layerMenuPanel, #v2CadastrePanel, #v2BatchMeterPanel, #v2SyncPanel");
           if (openAnother) closeDefectEditPanel();
         }
         const statHeader = e.target.closest('.defect-stat-header');

@@ -12,6 +12,7 @@
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
     <link rel="stylesheet" href="cadastre.css" />
+    <link rel="stylesheet" href="batch-meter.css" />
     <script type="module" src="./src/utils/cdn.js"></script>
 
     <link rel="stylesheet" href="./src/styles/main.css" />
@@ -91,6 +92,8 @@
         aria-expanded="false" aria-controls="v2CadastrePanel" title="查詢地籍圖">🗺️ 地籍</button>
       <button id="v2AddressToggle" class="map-search-btn" type="button"
         aria-expanded="false" aria-controls="v2AddressPanel" title="查詢門牌地址">🏠 門牌</button>
+      <button id="v2BatchMeterToggle" class="map-search-btn" type="button"
+        aria-expanded="false" aria-controls="v2BatchMeterPanel" title="批次標記電表清單">📋 批次</button>
       <div class="layer-menu">
         <button id="layerMenuToggle" class="layer-menu-toggle" type="button" aria-expanded="false" aria-controls="layerMenuPanel" title="圖層控制">
           <span class="layer-menu-glyph" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -300,6 +303,149 @@
         <p class="v2-address-disclaimer">門牌地址僅供參考！實際位置請依政府電子門牌為準</p>
       </div>
     </section>
+
+    <section id="v2BatchMeterPanel" class="v2-batch-panel" aria-hidden="true" aria-label="批次電表清單標記">
+      <div class="v2-batch-inner">
+        <header class="v2-batch-head">
+          <span class="v2-batch-title">📋 批次電表清單標記</span>
+          <button id="v2BatchMeterClose" class="v2-batch-close" type="button" title="關閉批次電表標記" aria-label="關閉批次電表標記">×</button>
+        </header>
+
+        <nav class="v2-bookmark-tabs" role="tablist" aria-label="批次標記分頁">
+          <button class="v2-tab-btn is-active" data-tab="input" data-panel="batch" role="tab" aria-selected="true">📝 貼上清單</button>
+          <button class="v2-tab-btn" data-tab="list" data-panel="batch" role="tab" aria-selected="false">📍 標記結果 <span class="v2-tab-count" id="v2BatchCount">0</span></button>
+        </nav>
+
+        <!-- Tab 1: 貼上清單與解析執行 -->
+        <div class="v2-tab-pane is-active" data-pane="input" data-panel="batch">
+          <div class="v2-batch-guide">
+            <div style="font-weight:700;color:#0f766e;margin-bottom:2px;">💡 智慧自動定位分流規則：</div>
+            <div style="color:#475569;line-height:1.5;">
+              • <strong>地號地址</strong>（含「段」、「小段」或無路名）：自動依<strong>圖號座標</strong>反推現場掛表桿位。<br>
+              • <strong>門牌地址</strong>（含「路/街/巷/弄」）：優先查<strong>電子門牌</strong>定位；若查無門牌自動以<strong>圖號座標</strong>保底。
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+            <label for="batchMeterInput" style="font-size:12px;font-weight:700;color:#334155;">貼上 Excel 清單內容：</label>
+            <button id="batchMeterClearInputBtn" class="v2-batch-btn-secondary" type="button" style="font-size:11px;padding:2px 8px;color:#dc2626;border-color:#fecdd3;background:#fff1f2;" title="清空文字框內容">🧹 清除輸入框</button>
+          </div>
+          <textarea id="batchMeterInput" class="v2-batch-textarea" placeholder="請從 Excel 複製包含【電號、用電地址、圖號座標】等欄位並貼上至此...
+（支援直接 Ctrl+V 貼上，包含或不含表頭皆可自動識別）"></textarea>
+
+          <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;margin-top:6px;font-size:12px;flex-wrap:wrap;">
+            <span style="font-weight:700;color:#334155;">定位基準：</span>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#0f766e;font-weight:600;" title="優先標記用戶住家門牌（支援異體字與樓層正規化）；若查無門牌或與電桿相距逾300m自動以電桿現場保底">
+              <input type="radio" name="batchLocStrategy" value="smart" checked style="accent-color:#0f766e;">
+              🏠 智慧雙軌（優先住家門牌，差逾300m轉電桿）
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:#475569;" title="有圖號座標一律定位在現場電桿，最適合外勤巡檢、抄表與換表找表">
+              <input type="radio" name="batchLocStrategy" value="pole" style="accent-color:#0f766e;">
+              ⚡ 電桿圖號優先（全數鎖定現場掛表桿位）
+            </label>
+          </div>
+
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+            <button id="batchMeterStartBtn" class="v2-batch-btn-primary" type="button" style="flex:1;min-width:140px;">🚀 開始解析並定位標記</button>
+            <button id="batchMeterSampleBtn" class="v2-batch-btn-secondary" type="button">💡 載入範例</button>
+            <button id="batchMeterFileBtn" class="v2-batch-btn-secondary" type="button">📁 匯入檔案</button>
+            <input type="file" id="batchMeterFileInput" accept=".xlsx,.xls,.csv,.txt" style="display:none;" />
+          </div>
+
+          <div id="batchMeterProgress" class="v2-batch-progress" style="display:none;">
+            <div id="batchMeterProgressText" class="v2-batch-progress-text">準備定位...</div>
+            <div class="v2-batch-progress-bar">
+              <div id="batchMeterProgressFill" class="v2-batch-progress-fill" style="width:0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: 結果清單與匯出操作 -->
+        <div class="v2-tab-pane" data-pane="list" data-panel="batch" hidden>
+          <!-- 統計結果指標列 (三等分對稱徽章) -->
+          <div class="v2-batch-summary">
+            <span class="v2-batch-badge-item">總計 <strong id="batchTotalCount">0</strong> 筆</span>
+            <span class="v2-batch-badge-item is-green">🏠 門牌 <strong id="batchDoorplateCount">0</strong> 筆</span>
+            <span class="v2-batch-badge-item is-blue">⚡ 圖號 <strong id="batchGridCount">0</strong> 筆</span>
+          </div>
+
+          <!-- 折疊卡片 1：地圖視野與匯出管理 (巡視紀錄抽屜風格) -->
+          <details class="panel-fold v2-batch-fold" id="batchViewToolsFold">
+            <summary>🗺️ 地圖視野與匯出管理</summary>
+            <div class="panel-fold-body">
+              <div class="folder-btn-group" style="margin-bottom:0;">
+                <button id="batchFitBoundsBtn" class="btn-action btn-sync v2-batch-action-btn" type="button" title="將地圖縮放至涵蓋此批次全部標記點位">🔍 全體視野</button>
+                <button id="batchMeterExportBtn" class="btn-action btn-import-csv" type="button" title="匯出包含定位座標、門牌與電桿之 Excel">📥 匯出 Excel</button>
+                <button id="batchClearAllBtn" class="btn-action btn-import-json" type="button" title="清空此批次所有定位標記與資料">🗑️ 清空清單</button>
+              </div>
+            </div>
+          </details>
+
+          <!-- 折疊卡片 2：跨裝置雲端與本機備份 (巡視紀錄抽屜風格) -->
+          <details class="panel-fold v2-batch-fold" id="batchBackupAccordion">
+            <summary>🧰 跨裝置雲端與本機備份</summary>
+            <div class="panel-fold-body">
+              <div class="folder-btn-group">
+                <button id="batchDownloadJsonBtn" class="btn-action btn-export-zip" type="button" title="下載本機備份檔 (免登入、公司內網最佳)">💾 下載備份檔</button>
+                <button id="batchRestoreJsonBtn" class="btn-action btn-add-folder" type="button" title="讀取本機備份檔 (免登入)">📂 讀取備份檔</button>
+                <input type="file" id="batchJsonFileInput" accept=".json" style="display:none;" />
+              </div>
+              <div class="folder-btn-group" style="margin-bottom:0;">
+                <button id="batchDriveUploadBtn" class="btn-action btn-drive" type="button" title="將批次資料上傳至個人 Google 雲端硬碟">☁️ 上傳雲端</button>
+                <button id="batchDriveRestoreBtn" class="btn-action btn-drive" type="button" title="從個人 Google 雲端硬碟還原批次資料">☁️ 雲端還原</button>
+                <button id="batchDriveDeleteBtn" class="btn-action btn-drive-delete" type="button" title="刪除個人 Google 雲端硬碟中的批次備份">🗑️ 刪除雲端</button>
+              </div>
+            </div>
+          </details>
+
+          <!-- 三合一行：[設備標籤] [地址標籤] [條件篩選] (移動至跨裝置之下、清單之上) -->
+          <div class="v2-batch-trio-row">
+            <button id="batchToggleBgLabelsBtn" class="v2-batch-trio-btn is-active" type="button" title="點擊切換底圖設備標籤與桿名點位">👁️ 設備標籤</button>
+            <button id="batchToggleLabelsBtn" class="v2-batch-trio-btn is-active" type="button" title="點擊切換批次地址標籤與定位標記">🏷️ 地址標籤</button>
+            <button id="batchFilterBtn" class="v2-batch-trio-btn v2-batch-filter-trio-btn" type="button" title="開啟多條件篩選抽屜">
+              <span>🌪️ 條件篩選</span>
+              <span id="batchFilterBadge" class="v2-batch-filter-trio-badge" style="display:none;">0</span>
+            </button>
+          </div>
+
+          <!-- 篩選生效時顯示之狀態提示列 -->
+          <div id="batchFilterActiveBar" style="display:none;align-items:center;justify-content:space-between;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:5px 8px;margin:3px 0 5px;font-size:11px;color:#065f46;">
+            <span>🌪️ 篩選生效中：顯示 <strong id="batchFilterVisibleCount">0</strong> / <span id="batchFilterTotalCount">0</span> 筆</span>
+            <button id="batchFilterResetQuickBtn" type="button" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;font-weight:700;text-decoration:underline;">✕ 重設篩選</button>
+          </div>
+
+          <div id="batchMeterList" class="v2-batch-list"></div>
+        </div>
+
+        <p class="v2-cadastre-disclaimer" style="margin-top:auto;padding-top:6px;">定位結果依公部門電子門牌與台電圖資反推，僅供工作查對與巡檢導航參考。</p>
+      </div>
+    </section>
+
+    <div id="batchFilterDrawer" class="v2-batch-filter-drawer is-hidden" aria-hidden="true">
+      <div class="v2-batch-filter-backdrop" id="batchFilterBackdrop"></div>
+      <div class="v2-batch-filter-content">
+        <div class="v2-batch-filter-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:16px;">🎯</span>
+            <strong style="font-size:14px;color:#1e293b;">批次資料條件篩選</strong>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button id="batchFilterResetAllBtn" type="button" class="v2-filter-link-btn">重設全部</button>
+            <button id="batchFilterCloseBtn" type="button" class="v2-filter-close-btn" aria-label="關閉">✕</button>
+          </div>
+        </div>
+
+        <div class="v2-batch-filter-body" id="batchFilterBody">
+          <!-- 動態生成各欄位篩選分組，如：型式、契約、相別、定位型態等 -->
+        </div>
+
+        <div class="v2-batch-filter-footer">
+          <button id="batchFilterApplyBtn" type="button" class="v2-batch-filter-apply-btn">
+            確定套用 (符合 <span id="batchFilterMatchCount">0</span> 筆)
+          </button>
+        </div>
+      </div>
+    </div>
 
     <section id="v2SyncPanel" class="v2-sync-panel" aria-hidden="true" aria-label="裝置同步">
       <div class="v2-sync-inner">
@@ -641,12 +787,14 @@
     </section>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 
+        <script src="panel-mutex.js"></script>
         <script type="module" src="./src/main.js"></script>
     <script src="cadastre-config.js"></script>
     <script src="src/utils/app-db.js"></script>
     <script src="src/utils/bookmark-db.js"></script>
     <script src="cadastre.js"></script>
     <script src="address-search.js"></script>
+    <script src="batch-meter.js"></script>
     <script src="sync.js"></script>
     <script>
     /* 版本對帳：主程式 5 秒內沒開機（舊 JS 配新殼 / 載入失敗）就跳橫幅請重整，
