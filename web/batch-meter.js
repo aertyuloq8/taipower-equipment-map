@@ -824,9 +824,11 @@
             marker.openTooltip();
           }
         }
-        // 更新巡檢已跑外觀樣式
+        // 更新巡檢已跑外觀樣式 (Pin 與 Tooltip 同步呈現半透明已跑樣式)
         const pin = marker.getElement()?.querySelector(".batch-marker-pin");
         if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
+        const tooltipEl = marker.getTooltip()?.getElement();
+        if (tooltipEl) tooltipEl.classList.toggle("is-all-done", isClusterAllDone);
       } else {
         culledCount++;
         if (state.layerGroup.hasLayer(marker)) {
@@ -961,11 +963,8 @@
     return list;
   }
 
-  // 判定某筆記錄是否符合給定之篩選條件
+  // 判定某筆記錄是否符合給定之篩選條件（純粹判定條件篩選，絕不混雜巡檢已跑隱藏狀態）
   function isRecordVisible(r, filterState) {
-    if (state.hideInspected !== false && r.inspected) {
-      return false;
-    }
     const filters = filterState || state.activeFilters;
     if (!filters) return true;
     for (const [key, selectedSet] of Object.entries(filters)) {
@@ -980,17 +979,19 @@
 
   // 套用當前篩選狀態至地圖標記與結果清單
   function applyFilters() {
-    let visibleCount = 0;
+    let filterMatchesCount = 0;
+    const isHiding = state.hideInspected !== false;
 
     state.records.forEach((r, idx) => {
-      const isVis = isRecordVisible(r);
-      r.filteredOut = !isVis;
-      if (isVis) visibleCount++;
+      const matches = isRecordVisible(r);
+      r.filteredOut = !matches;
+      if (matches) filterMatchesCount++;
 
-      // 1. 清單卡片聯動
+      // 1. 清單卡片聯動 (正交判定：條件篩選排除 OR 巡檢已跑隱藏)
       const card = controls.list?.querySelector(`.v2-batch-item[data-meter-idx="${idx}"]`);
       if (card) {
-        card.style.display = isVis ? "" : "none";
+        const isHidden = Boolean(r.filteredOut) || (isHiding && r.inspected);
+        card.style.display = isHidden ? "none" : "";
       }
     });
 
@@ -999,7 +1000,7 @@
       updateBatchViewportCulling();
     }
 
-    updateFilterStatusUI(visibleCount);
+    updateFilterStatusUI(filterMatchesCount);
   }
 
   // 更新篩選按鈕、狀態提示條與統計徽章 UI
@@ -2300,6 +2301,15 @@
     const bounds = map ? map.getBounds().pad(0.25) : null;
     const inView = bounds ? bounds.contains(record.marker.getLatLng()) : true;
 
+    // 條件篩選檢查：若群組內所有項目均已被條件篩選排除，則不應顯示於地圖
+    const hasVisibleFilter = group.some(item => !item.r.filteredOut);
+    if (!hasVisibleFilter) {
+      if (state.layerGroup.hasLayer(record.marker)) {
+        state.layerGroup.removeLayer(record.marker);
+      }
+      return;
+    }
+
     if (isHiding) {
       if (record.inspected) {
         if (isClusterAllDone) {
@@ -2331,6 +2341,8 @@
       }
       const pin = record.marker.getElement()?.querySelector(".batch-marker-pin");
       if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
+      const tooltipEl = record.marker.getTooltip()?.getElement();
+      if (tooltipEl) tooltipEl.classList.toggle("is-all-done", isClusterAllDone);
     }
   }
 

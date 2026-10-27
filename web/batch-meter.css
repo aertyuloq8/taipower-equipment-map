@@ -1144,6 +1144,16 @@
   text-decoration: line-through;
 }
 
+/* 地圖地址標籤已跑樣式 (顯示全部時) */
+.batch-meter-map-tooltip.is-all-done,
+.batch-map-label.is-all-done {
+  opacity: 0.55;
+  filter: saturate(0.4);
+}
+.batch-map-label.is-all-done .batch-label-index {
+  text-decoration: line-through;
+}
+
 /* 手機端專屬適應性佈局優化 */
 @media (max-width: 480px) {
   .v2-batch-patrol-bar {
