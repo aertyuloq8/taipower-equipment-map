@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-r31";
+const CACHE_NAME = "equipment-map-photo-edition-r32";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 5000;
 const TILE_CACHE_TRIM = 4000;
@@ -13,6 +13,8 @@ const STATIC_ASSETS = [
   "./cadastre.css",
   "./address-search.js",
   "./sync.js",
+  "./batch-meter.js",
+  "./batch-meter.css",
   "./archive-worker.js",
   // points.json 不預快取：由 Worker 以 networkFirst 載入，避免舊檔卡住
   "../data/meta.json",
@@ -67,13 +69,14 @@ self.addEventListener("fetch", (event) => {
   const isDropdownData = /\/data\/cadastral-dropdowns-tw\.json$/.test(url.pathname);
   const isCadastreAsset = /\/cadastre(-config)?\.(js|css)$/.test(url.pathname);
   const isSyncAsset = /\/sync\.js$/.test(url.pathname);
+  const isBatchAsset = /\/batch-meter\.(js|css)$/.test(url.pathname);
   const isArchiveWorker = /\/archive-worker\.js$/.test(url.pathname);
   const isRemoteAsset = REMOTE_ASSETS.some(asset => asset === request.url);
   const isTileRequest = /^(https:\/\/wmts\.nlsc\.gov\.tw\/|https:\/\/[a-z]\.tile\.openstreetmap\.org\/)/.test(url.href);
   // 本站 src 下的程式檔（main.js / modules / utils / styles）：SWR——有快取直接用、
   // 背景更新供下次載入，離線也能開 App；跨站 JSONP（GAS）不受影響（非同源）
   const isSrcAsset = url.origin === self.location.origin && /\/src\/.+\.(js|css)$/.test(url.pathname);
-  if (!isV2Navigation && !isMetaData && !isPointsData && !isDropdownData && !isCadastreAsset && !isSyncAsset && !isArchiveWorker && !isRemoteAsset && !isTileRequest && !isSrcAsset) return;
+  if (!isV2Navigation && !isMetaData && !isPointsData && !isDropdownData && !isCadastreAsset && !isSyncAsset && !isBatchAsset && !isArchiveWorker && !isRemoteAsset && !isTileRequest && !isSrcAsset) return;
 
   // stale-while-revalidate：快取命中立刻回傳 + 背景更新；未命中則等網路並寫入快取
   const staleWhileRevalidate = (req) => caches.open(CACHE_NAME).then(cache => cache.match(req.url).then(cached => {
@@ -120,7 +123,7 @@ self.addEventListener("fetch", (event) => {
               return response;
             })
             .catch(() => caches.match(request.url))
-        : (isMetaData || isDropdownData || isCadastreAsset || isSyncAsset || isArchiveWorker)
+        : (isMetaData || isDropdownData || isCadastreAsset || isSyncAsset || isBatchAsset || isArchiveWorker)
         ? fetch(request, { cache: "no-store" })
             .then((response) => {
               if (response.ok) {

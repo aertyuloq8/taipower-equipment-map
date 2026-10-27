@@ -1977,10 +1977,41 @@
     // 監聽 Drive 還原事件
     window.addEventListener("batchMetersRestored", (e) => {
       try {
-        const saved = JSON.parse(localStorage.getItem("tp_batch_meter_bookmarks_v1") || "[]");
+        // 優先讀取事件 detail 內傳遞的已解析資料，徹底避開 localStorage 延遲或舊版快取
+        let saved = (e && e.detail && Array.isArray(e.detail.records) && e.detail.records.length > 0)
+          ? e.detail.records
+          : null;
+        if (!saved || !saved.length) {
+          try {
+            const raw = JSON.parse(localStorage.getItem("tp_batch_meter_bookmarks_v1") || "[]");
+            if (Array.isArray(raw) && raw.length > 0) saved = raw;
+          } catch {}
+        }
+        // 若前面曾被舊版寫入 "undefined"，自動搶救還原
+        if (!saved || !saved.length) {
+          try {
+            const undefRaw = JSON.parse(localStorage.getItem("undefined") || "[]");
+            if (Array.isArray(undefRaw) && undefRaw.length > 0) {
+              saved = undefRaw;
+              localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(saved));
+              localStorage.removeItem("undefined");
+            }
+          } catch {}
+        }
+
+        // 若備份檔物件結構包含 records 或 meters，自動解包
+        if (!Array.isArray(saved) && saved && typeof saved === "object") {
+          if (Array.isArray(saved.records)) saved = saved.records;
+          else if (Array.isArray(saved.meters)) saved = saved.meters;
+          else if (Array.isArray(saved.data)) saved = saved.data;
+          else if (Array.isArray(saved.items)) saved = saved.items;
+          else if (Array.isArray(saved.bookmarks)) saved = saved.bookmarks;
+        }
+
         if (Array.isArray(saved) && saved.length > 0) {
           state.records = normalizeImportedRecords(saved);
           state.activeFilters = {};
+          localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(state.records));
           hideBackgroundPoleLabels();
           renderBatchMarkers();
           renderBatchList();

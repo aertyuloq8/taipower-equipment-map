@@ -5790,7 +5790,7 @@ window.__appBooted = true;
             altPrefix: "設備地圖收藏_批次電表_",
             lsKey: "tp_batch_meter_bookmarks_v1",
             restoreEvent: "batchMetersRestored",
-            dbType: "batch"
+            dbType: null
           };
         }
         return {
@@ -6006,6 +6006,13 @@ window.__appBooted = true;
               GlobalModal.alert("備份檔案格式錯誤，無法解析。");
               return;
             }
+            if (!Array.isArray(downloaded) && downloaded && typeof downloaded === "object") {
+              if (Array.isArray(downloaded.records)) downloaded = downloaded.records;
+              else if (Array.isArray(downloaded.meters)) downloaded = downloaded.meters;
+              else if (Array.isArray(downloaded.data)) downloaded = downloaded.data;
+              else if (Array.isArray(downloaded.items)) downloaded = downloaded.items;
+              else if (Array.isArray(downloaded.bookmarks)) downloaded = downloaded.bookmarks;
+            }
             if (!Array.isArray(downloaded)) {
               GlobalModal.alert("備份檔案格式不符（需為項目清單陣列）。");
               return;
@@ -6051,13 +6058,18 @@ window.__appBooted = true;
             }
 
             // 寫入 localStorage 專屬鍵值
-            localStorage.setItem(cfg.lsKey, JSON.stringify(mergedBookmarks));
+            localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(mergedBookmarks));
+            if (cfg.lsKey && cfg.lsKey !== "tp_batch_meter_bookmarks_v1") {
+              localStorage.setItem(cfg.lsKey, JSON.stringify(mergedBookmarks));
+            }
             if (cfg.dbType && window.__bookmarkDB) {
               try { await window.__bookmarkDB.saveBookmarks(cfg.dbType, mergedBookmarks); } catch {}
             }
 
             if (type === "batch") {
-              window.dispatchEvent(new CustomEvent("batchMetersRestored", { detail: { count: mergedBookmarks.length } }));
+              window.dispatchEvent(new CustomEvent("batchMetersRestored", {
+                detail: { count: mergedBookmarks.length, records: mergedBookmarks }
+              }));
             } else if (type === "address") {
               window.dispatchEvent(new CustomEvent("addressBookmarksRestored"));
               window.dispatchEvent(new CustomEvent("bookmarksRestored"));
