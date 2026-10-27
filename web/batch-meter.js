@@ -747,6 +747,142 @@
     }
   }
 
+  // ============================================================
+  // 地圖標籤視野裁切 (Viewport Culling)
+  // 僅將目前螢幕可視範圍（加 25% 平移緩衝區）內的 Marker 與 Tooltip 掛載至 DOM
+  // 視窗外的數百上千個節點自動脫離 DOM，大幅消除縮放拖曳卡頓並維持 60 FPS
+  // ============================================================
+  let _lastCullingStats = "";
+  function updateBatchViewportCulling() {
+    const map = getMap();
+    if (!map || !state.layerGroup) return;
+
+    if (!state.records || !state.records.length) {
+      state.layerGroup.clearLayers();
+      return;
+    }
+
+    // 若使用者全局關閉地址標籤
+    if (!state.showLabels) {
+      if (map.hasLayer(state.layerGroup)) {
+        map.removeLayer(state.layerGroup);
+      }
+      return;
+    }
+
+    if (!map.hasLayer(state.layerGroup)) {
+      map.addLayer(state.layerGroup);
+    }
+
+    // 視野邊界加 25% 緩衝區（平移拖曳時邊緣無感加載，不產生突然跳出的突兀感）
+    const bounds = map.getBounds().pad(0.25);
+    const isHidingInspected = state.hideInspected !== false;
+
+    // 收集所有唯一 Marker
+    const uniqueMarkers = new Set();
+    state.records.forEach(r => {
+      if (r.marker) uniqueMarkers.add(r.marker);
+    });
+
+    let inViewCount = 0;
+    let culledCount = 0;
+
+    uniqueMarkers.forEach(marker => {
+      const group = marker._batchClusterGroup;
+
+      // 1. 條件篩選檢查：群組內所有項目若全被過濾，直接不顯示
+      const hasVisibleFilter = group ? group.some(item => !item.r.filteredOut) : true;
+      if (!hasVisibleFilter) {
+        if (state.layerGroup.hasLayer(marker)) {
+          state.layerGroup.removeLayer(marker);
+        }
+        return;
+      }
+
+      // 2. 巡檢已跑隱藏檢查：群組內所有項目若全已跑且開啟隱藏，直接不顯示
+      const isClusterAllDone = group ? group.every(item => item.r.inspected) : false;
+      if (isHidingInspected && isClusterAllDone) {
+        if (state.layerGroup.hasLayer(marker)) {
+          state.layerGroup.removeLayer(marker);
+        }
+        return;
+      }
+
+      // 3. 視野裁切判定 (Viewport Culling)
+      const latLng = marker.getLatLng();
+      const inView = bounds.contains(latLng);
+
+      if (inView) {
+        inViewCount++;
+        if (!state.layerGroup.hasLayer(marker)) {
+          state.layerGroup.addLayer(marker);
+          if (state.showLabels && marker.getTooltip()) {
+            marker.openTooltip();
+          }
+        } else {
+          if (state.showLabels && marker.getTooltip() && !marker.isTooltipOpen()) {
+            marker.openTooltip();
+          }
+        }
+        // 更新巡檢已跑外觀樣式
+        const pin = marker.getElement()?.querySelector(".batch-marker-pin");
+        if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
+      } else {
+        culledCount++;
+        if (state.layerGroup.hasLayer(marker)) {
+          state.layerGroup.removeLayer(marker);
+        }
+      }
+    });
+
+    // 提示與統計 (可於 Console 與按鈕 Hover Title 即時查看效果)
+    const statsKey = `${inViewCount}_${culledCount}`;
+    if (statsKey !== _lastCullingStats) {
+      _lastCullingStats = statsKey;
+      if (controls.toggleLabelsBtn) {
+        controls.toggleLabelsBtn.title = `批次地址標籤：視野裁切運作中（視窗內 ${inViewCount} 點 / 視窗外裁切 ${culledCount} 點）`;
+      }
+      console.log(`⚡ [地圖標籤視野裁切 Viewport Culling] 視窗內渲染: ${inViewCount} 點 / 視窗外裁切: ${culledCount} 點 (省去 DOM 節點: ${culledCount * 2} 個)`);
+    }
+  }
+
+  // 監聽地圖平移、縮放事件以觸發視野裁切
+  function setupMapViewportEvents(map) {
+    if (!map || map._batchViewportCullingAttached) return;
+    map._batchViewportCullingAttached = true;
+
+    let throttleTimer = null;
+    const onMoveThrottled = () => {
+      if (throttleTimer) return;
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        updateBatchViewportCulling();
+      }, 120);
+    };
+
+    const onMoveEnd = () => {
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+        throttleTimer = null;
+      }
+      updateBatchViewportCulling();
+    };
+
+    map.on("move", onMoveThrottled);
+    map.on("moveend", onMoveEnd);
+    map.on("zoomend", onMoveEnd);
+  }
+
+  // 取得所有有效批次紀錄的完整經緯度邊界（獨立於地圖圖層狀態，確保全體視野始終精確）
+  function getBatchRecordsBounds() {
+    if (!state.records || !state.records.length || !window.L) return null;
+    const validCoords = state.records
+      .filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng))
+      .map(r => [r.lat, r.lng]);
+    if (!validCoords.length) return null;
+    return L.latLngBounds(validCoords);
+  }
+
   // --- 批次地址標籤與數字標記切換（連動隱藏/顯示）---
   function toggleBatchLabels(force) {
     state.showLabels = typeof force === "boolean" ? force : !state.showLabels;
@@ -759,19 +895,12 @@
     const map = getMap();
     if (!map || !state.layerGroup) return;
 
-    if (state.showLabels) {
-      if (!map.hasLayer(state.layerGroup)) {
-        map.addLayer(state.layerGroup);
-      }
-      state.layerGroup.eachLayer(layer => {
-        if (layer.getTooltip()) {
-          layer.openTooltip();
-        }
-      });
-    } else {
+    if (!state.showLabels) {
       if (map.hasLayer(state.layerGroup)) {
         map.removeLayer(state.layerGroup);
       }
+    } else {
+      updateBatchViewportCulling();
     }
   }
 
@@ -865,27 +994,9 @@
       }
     });
 
-    // 2. 地圖 Marker 聯動 (依座標群組判斷：只要群組內有任一筆可見即保留 Marker)
+    // 2. 地圖 Marker 視野聯動
     if (state.layerGroup) {
-      const markers = new Set();
-      state.records.forEach(r => {
-        if (r.marker) markers.add(r.marker);
-      });
-
-      markers.forEach(marker => {
-        const group = marker._batchClusterGroup;
-        const hasVisible = group ? group.some(item => !item.r.filteredOut) : true;
-        if (hasVisible && state.showLabels) {
-          if (!state.layerGroup.hasLayer(marker)) {
-            state.layerGroup.addLayer(marker);
-          }
-          if (marker.getTooltip()) marker.openTooltip();
-        } else {
-          if (state.layerGroup.hasLayer(marker)) {
-            state.layerGroup.removeLayer(marker);
-          }
-        }
-      });
+      updateBatchViewportCulling();
     }
 
     updateFilterStatusUI(visibleCount);
@@ -1292,9 +1403,9 @@
     switchTab("list");
 
     const map = getMap();
-    if (map && state.layerGroup && state.records.length > 0) {
-      const bounds = state.layerGroup.getBounds();
-      if (bounds.isValid()) {
+    if (map && state.records.length > 0) {
+      const bounds = getBatchRecordsBounds();
+      if (bounds && bounds.isValid()) {
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
         // 避開 fitBounds 觸發 zoomstart 自動收合面板，確保標記完成後保持結果頁開啟
         setTimeout(() => setPanelOpen(true), 350);
@@ -1417,11 +1528,6 @@
       }
     } else {
       state.layerGroup.clearLayers();
-      if (state.showLabels && !map.hasLayer(state.layerGroup)) {
-        state.layerGroup.addTo(map);
-      } else if (!state.showLabels && map.hasLayer(state.layerGroup)) {
-        map.removeLayer(state.layerGroup);
-      }
     }
 
     // 依座標聚類分組（同變壓器/同掛表桿位判斷）
@@ -1432,15 +1538,6 @@
       r._displayIndex = r.seqNo;
 
       if (!Number.isFinite(r.lat) || !Number.isFinite(r.lng)) return;
-
-      // 若目前啟用「隱藏已跑」，且此筆已被標記已跑，則地圖不繪製該點
-      if (state.hideInspected !== false && r.inspected) {
-        if (r.marker && state.layerGroup) {
-          state.layerGroup.removeLayer(r.marker);
-          r.marker = null;
-        }
-        return;
-      }
 
       // 取小數點後 6 位 (約 0.1 公尺精度內視為同一現場掛表點/同變壓器)
       const key = `${r.lat.toFixed(6)},${r.lng.toFixed(6)}`;
@@ -1569,7 +1666,7 @@
       }
 
       marker.bindPopup(popupHtml, { maxWidth: 320, maxHeight: 420, className: "batch-meter-popup" });
-      state.layerGroup.addLayer(marker);
+      // 注意：此處交由 Viewport Culling 依螢幕視野動態掛載至 state.layerGroup
 
       // 為群組內每筆紀錄關聯此 Marker 與叢集資訊
       group.forEach(item => {
@@ -1579,18 +1676,11 @@
       });
     });
 
-    if (state.showLabels) {
-      if (!map.hasLayer(state.layerGroup)) {
-        map.addLayer(state.layerGroup);
-      }
-      state.layerGroup.eachLayer(layer => {
-        if (layer.getTooltip()) layer.openTooltip();
-      });
-    } else {
-      if (map.hasLayer(state.layerGroup)) {
-        map.removeLayer(state.layerGroup);
-      }
-    }
+    // 綁定地圖平移、縮放視野裁切監聽
+    setupMapViewportEvents(map);
+
+    // 依當前視窗範圍執行初次視野裁切 (僅將螢幕內之 Marker 與 Tooltip 掛載至 DOM)
+    updateBatchViewportCulling();
 
     applyFilters();
   }
@@ -1700,6 +1790,12 @@
         if (map && r && Number.isFinite(r.lat) && Number.isFinite(r.lng)) {
           if (!state.showLabels) {
             toggleBatchLabels(true); // 使用者點選特定項目查看時，自動還原顯示標籤與標記
+          }
+          if (r.marker && !state.layerGroup.hasLayer(r.marker)) {
+            state.layerGroup.addLayer(r.marker);
+            if (state.showLabels && r.marker.getTooltip()) {
+              r.marker.openTooltip();
+            }
           }
           map.flyTo([r.lat, r.lng], Math.max(map.getZoom(), 17), { duration: 0.8 });
           if (r.marker) {
@@ -1899,9 +1995,9 @@
         updateFilterStatusUI(state.records.length);
         switchTab("list");
         const map = getMap();
-        if (map && state.layerGroup) {
-          const bounds = state.layerGroup.getBounds();
-          if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+        if (map && state.records.length > 0) {
+          const bounds = getBatchRecordsBounds();
+          if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
         }
         showToast(`📂 成功還原 ${state.records.length} 筆電表標記！`);
       } catch (err) {
@@ -2022,12 +2118,12 @@
 
     controls.fitBoundsBtn?.addEventListener("click", () => {
       const map = getMap();
-      if (map && state.layerGroup && state.records.length > 0) {
+      if (map && state.records.length > 0) {
         if (!state.showLabels) {
           toggleBatchLabels(true); // 點擊全體視野時自動還原顯示
         }
-        const bounds = state.layerGroup.getBounds();
-        if (bounds.isValid()) {
+        const bounds = getBatchRecordsBounds();
+        if (bounds && bounds.isValid()) {
           map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
         }
       }
@@ -2117,9 +2213,9 @@
           setPanelOpen(true);
           switchTab("list");
           const map = getMap();
-          if (map && state.layerGroup) {
-            const bounds = state.layerGroup.getBounds();
-            if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+          if (map && state.records.length > 0) {
+            const bounds = getBatchRecordsBounds();
+            if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
           }
           const doneCount = state.records.filter(r => r.inspected).length;
           showToast(`☁️ 已從 Google Drive 還原 ${state.records.length} 筆電表 (已跑 ${doneCount} 筆已自動同步隱藏)！`);
@@ -2200,6 +2296,9 @@
     const group = record.marker._batchClusterGroup || [{ r: record }];
     const isClusterAllDone = group.every(g => g.r.inspected);
     const isHiding = state.hideInspected !== false;
+    const map = getMap();
+    const bounds = map ? map.getBounds().pad(0.25) : null;
+    const inView = bounds ? bounds.contains(record.marker.getLatLng()) : true;
 
     if (isHiding) {
       if (record.inspected) {
@@ -2210,20 +2309,24 @@
           getMap()?.closePopup();
         }
       } else {
-        // 復原待巡檢：將圖標重新加回地圖圖層
+        // 復原待巡檢：若在可視視野內，將圖標重新加回地圖圖層
+        if (inView) {
+          if (!state.layerGroup.hasLayer(record.marker)) {
+            state.layerGroup.addLayer(record.marker);
+            if (state.showLabels && record.marker.getTooltip()) {
+              record.marker.openTooltip();
+            }
+          }
+        }
+      }
+    } else {
+      // 顯示全部中：若在可視視野內，保證圖標在地圖上，並切換 is-all-done 樣式
+      if (inView) {
         if (!state.layerGroup.hasLayer(record.marker)) {
           state.layerGroup.addLayer(record.marker);
           if (state.showLabels && record.marker.getTooltip()) {
             record.marker.openTooltip();
           }
-        }
-      }
-    } else {
-      // 顯示全部中：保證圖標在地圖上，並切換 is-all-done 樣式
-      if (!state.layerGroup.hasLayer(record.marker)) {
-        state.layerGroup.addLayer(record.marker);
-        if (state.showLabels && record.marker.getTooltip()) {
-          record.marker.openTooltip();
         }
       }
       const pin = record.marker.getElement()?.querySelector(".batch-marker-pin");
@@ -2308,30 +2411,10 @@
         const isHidden = (isHiding && r.inspected) || Boolean(r.filteredOut);
         card.style.display = isHidden ? "none" : "";
       }
-
-      // 2. 地圖圖層切換
-      if (r.marker && state.layerGroup) {
-        const group = r.marker._batchClusterGroup || [{ r }];
-        const isClusterAllDone = group.every(g => g.r.inspected);
-
-        if (isHiding) {
-          if (isClusterAllDone) {
-            if (state.layerGroup.hasLayer(r.marker)) {
-              state.layerGroup.removeLayer(r.marker);
-            }
-          }
-        } else {
-          if (!state.layerGroup.hasLayer(r.marker)) {
-            state.layerGroup.addLayer(r.marker);
-            if (state.showLabels && r.marker.getTooltip()) {
-              r.marker.openTooltip();
-            }
-          }
-          const pin = r.marker.getElement()?.querySelector(".batch-marker-pin");
-          if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
-        }
-      }
     });
+
+    // 2. 地圖圖層與視野動態裁切
+    updateBatchViewportCulling();
 
     if (isHiding) {
       // 若當前開啟的彈窗所屬點位已被隱藏，關閉彈窗
@@ -2413,6 +2496,9 @@
     if (!map && attempt < 40) {
       setTimeout(() => boot(attempt + 1), 100);
       return;
+    }
+    if (map) {
+      setupMapViewportEvents(map);
     }
   }
 
