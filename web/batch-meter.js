@@ -45,15 +45,18 @@
     return candidate && typeof candidate.getPane === "function" ? candidate : null;
   }
 
+  // 導航連結：100% 與台南巡檢設備、門牌導航一致，直接以 WGS84 精確座標傳入 Google Maps
   function googleNavUrl(lat, lng) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat.toFixed(6) + "," + lng.toFixed(6))}`;
+    const nLat = Number(lat);
+    const nLng = Number(lng);
+    const query = (Number.isFinite(nLat) && Number.isFinite(nLng))
+      ? `${nLat.toFixed(6)},${nLng.toFixed(6)}`
+      : `${lat},${lng}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
   }
 
-  // 門牌地址導航優先（直接帶入用電地址，若無則依座標保底）
+  // 門牌與設備導航統一依座標導航，徹底確保現場點位精準直達
   function googleAddrNavUrl(addr, lat, lng) {
-    if (addr && String(addr).trim()) {
-      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(addr).trim())}`;
-    }
     return googleNavUrl(lat, lng);
   }
 
@@ -1348,7 +1351,7 @@
         ${popupCollapseHtml}
         <!-- 每戶卡片底部專屬操作：導航與優雅移除按鈕 -->
         <div class="batch-popup-item-actions">
-          <a class="batch-popup-act-btn is-nav" href="${googleAddrNavUrl(r.addr, r.lat, r.lng)}" target="_blank" rel="noopener" title="以 Google Maps 導航至此用戶用電地址">
+          <a class="batch-popup-act-btn is-nav popup-navigation-link" href="${googleNavUrl(r.lat, r.lng)}" target="_blank" rel="noopener" title="以 Google Maps 導航至此電表精確座標">
             🗺️ 導航
           </a>
           <button type="button" class="batch-popup-act-btn is-del batch-remove-single-btn" data-remove-idx="${idx}" title="從清單與地圖中移除此電表">
@@ -1480,9 +1483,7 @@
           ? `📍 <strong>門牌：</strong>${escapeHtml(group[0].r.addr || "--")}${primaryRec.pole ? ` · ⚡ <strong>設備：</strong>${escapeHtml(primaryRec.pole)}` : ""}`
           : `⚡ <strong>設備：</strong>${escapeHtml(primaryRec.pole || "--")} · 🗺️ <strong>圖號：</strong><code style="font-family:monospace;font-weight:700;color:#0f766e;">${escapeHtml(primaryRec.code || "--")}</code>`;
 
-        const globalNavUrl = hasDoorplate
-          ? googleAddrNavUrl(group[0].r.addr, lat, lng)
-          : googleNavUrl(lat, lng);
+        const globalNavUrl = googleNavUrl(lat, lng);
         const globalNavText = "🗺️ 導航";
 
         popupHtml = `
@@ -1585,6 +1586,15 @@
         ? `<span class="v2-batch-badge-shared" title="與其他 ${r._clusterSize - 1} 戶共用同一變壓器/桿位座標">⚡ 同變壓器 (${r._clusterSize}戶)</span>`
         : "";
 
+      const navUrl = (Number.isFinite(r.lat) && Number.isFinite(r.lng)) ? googleNavUrl(r.lat, r.lng) : "";
+      const navBtnHtml = navUrl ? `
+        <div class="v2-batch-item-footer" style="margin-top:6px;display:flex;justify-content:flex-end;align-items:center;">
+          <a class="popup-navigation-link" href="${navUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;gap:4px;min-height:26px;padding:2px 10px;font-size:11px;font-weight:700;text-decoration:none;border-radius:4px;" title="以 Google Maps 導航至此電表精確座標">
+            🗺️ 導航
+          </a>
+        </div>
+      ` : "";
+
       return `
         <div class="v2-batch-item" data-meter-idx="${idx}" ${r.filteredOut ? 'style="display:none;"' : ""}>
           <div class="v2-batch-item-title">
@@ -1601,6 +1611,7 @@
           </div>
           ${chips.length > 0 ? `<div class="v2-batch-chips-row">${chips.join("")}</div>` : ""}
           ${cardCollapseHtml}
+          ${navBtnHtml}
         </div>
       `;
     }).join("");
