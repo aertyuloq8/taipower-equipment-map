@@ -460,7 +460,11 @@
       if (inspectTerm && !extra["檢定期限"]) extra["檢定期限"] = inspectTerm;
 
       if (custNo || addr || code) {
+        const seq = records.length + 1;
         records.push({
+          seqNo: seq,
+          uid: "bm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + seq,
+          inspected: false,
           custNo,
           addr,
           pole,
@@ -500,6 +504,7 @@
     showLabels: true,       // 是否顯示批次地址標籤與定位標記
     bgLabelsHidden: true,   // 是否已隱藏底圖設備標籤
     activeFilters: {},      // 當前多條件篩選狀態: { [colKey]: Set([selectedValues]) }
+    hideInspected: true,    // 是否隱藏已跑/已巡檢點位 (符合現場巡檢跑過隱藏之直覺體驗)
   };
 
   const controls = {
@@ -588,6 +593,13 @@
     controls.filterBody = document.getElementById("batchFilterBody");
     controls.filterApplyBtn = document.getElementById("batchFilterApplyBtn");
     controls.filterMatchCount = document.getElementById("batchFilterMatchCount");
+
+    controls.patrolBar = document.getElementById("batchPatrolBar");
+    controls.pendingCount = document.getElementById("batchPendingCount");
+    controls.doneCount = document.getElementById("batchDoneCount");
+    controls.toggleHideDoneBtn = document.getElementById("batchToggleHideDoneBtn");
+    controls.toggleDoneText = document.getElementById("batchToggleDoneText");
+    controls.toggleDoneIcon = document.getElementById("batchToggleDoneIcon");
 
     controls.driveUploadBtn = document.getElementById("batchDriveUploadBtn");
     controls.driveRestoreBtn = document.getElementById("batchDriveRestoreBtn");
@@ -822,6 +834,9 @@
 
   // 判定某筆記錄是否符合給定之篩選條件
   function isRecordVisible(r, filterState) {
+    if (state.hideInspected !== false && r.inspected) {
+      return false;
+    }
     const filters = filterState || state.activeFilters;
     if (!filters) return true;
     for (const [key, selectedSet] of Object.entries(filters)) {
@@ -1291,16 +1306,38 @@
     showToast(`🎉 批次標記完成！成功定位 ${state.records.length} / ${total} 筆地址（已自動隱藏底圖設備標籤）`);
   }
 
+  function updatePatrolToggleUI() {
+    const isHiding = state.hideInspected !== false;
+    if (controls.toggleHideDoneBtn) {
+      controls.toggleHideDoneBtn.classList.toggle("is-active", isHiding);
+    }
+    if (controls.toggleDoneText) {
+      controls.toggleDoneText.textContent = isHiding ? "隱藏已跑中" : "顯示全部中";
+    }
+    if (controls.toggleDoneIcon) {
+      controls.toggleDoneIcon.textContent = isHiding ? "👁️" : "👁️‍🗨️";
+    }
+  }
+
   function updateSummaryBadges(dp, grid, fallback) {
+    const total = state.records.length;
+    const done = state.records.filter(r => r.inspected).length;
+    const pending = total - done;
+
     if (dp === undefined) {
       dp = state.records.filter(r => r.locType === "doorplate").length;
       grid = state.records.filter(r => r.locType === "grid").length;
       fallback = state.records.filter(r => r.locType === "fallback").length;
     }
-    if (controls.totalCount) controls.totalCount.textContent = state.records.length;
+    if (controls.totalCount) controls.totalCount.textContent = total;
     if (controls.doorplateCount) controls.doorplateCount.textContent = dp;
     if (controls.gridCount) controls.gridCount.textContent = grid + fallback;
-    if (controls.tabCountBadge) controls.tabCountBadge.textContent = state.records.length;
+    if (controls.tabCountBadge) controls.tabCountBadge.textContent = state.hideInspected ? pending : total;
+
+    if (controls.pendingCount) controls.pendingCount.textContent = pending;
+    if (controls.doneCount) controls.doneCount.textContent = done;
+
+    updatePatrolToggleUI();
   }
 
   // 建立單一電表的詳細資訊卡 HTML（供單戶 Popup 或多戶共用點位 Popup 嵌入）
@@ -1341,21 +1378,27 @@
     ` : "";
 
     return `
-      <div class="batch-popup-meter-item" data-popup-meter-idx="${idx}">
+      <div class="batch-popup-meter-item ${r.inspected ? 'is-inspected' : ''}" data-popup-meter-idx="${idx}" data-popup-meter-uid="${r.uid}">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:4px;">
-          <strong style="color:#0f766e;font-size:12px;">#${idx + 1} 電號 ${escapeHtml(formattedCustNo || "--")}</strong>
+          <strong style="color:#0f766e;font-size:12px;display:flex;align-items:center;gap:4px;">
+            #${r.seqNo} 電號 ${escapeHtml(formattedCustNo || "--")}
+            ${r.inspected ? '<span class="v2-batch-badge-inspected">✓ 已跑</span>' : ''}
+          </strong>
           ${typeBadge}
         </div>
         <div style="color:#334155;font-size:11px;line-height:1.4;">📍 <strong>地址：</strong>${escapeHtml(r.addr || "--")}</div>
         ${chips.length > 0 ? `<div class="v2-batch-chips-row" style="margin-top:3px;">${chips.join("")}</div>` : ""}
         ${popupCollapseHtml}
-        <!-- 每戶卡片底部專屬操作：導航與優雅移除按鈕 -->
+        <!-- 每戶卡片底部專屬操作：已跑隱藏、導航與移除按鈕 (手機排版適應) -->
         <div class="batch-popup-item-actions">
+          <button type="button" class="batch-popup-act-btn is-inspect ${r.inspected ? 'is-done' : ''}" data-act-uid="${r.uid}" onclick="window.__toggleBatchInspected?.('${r.uid}');" title="${r.inspected ? '點擊取消已跑並恢復顯示' : '標記此點已巡檢並隱藏'}">
+            ${r.inspected ? '✓ 已跑(復原)' : '👁️ 標記已跑'}
+          </button>
           <a class="batch-popup-act-btn is-nav popup-navigation-link" href="${googleNavUrl(r.lat, r.lng)}" target="_blank" rel="noopener" title="以 Google Maps 導航至此電表精確座標">
             🗺️ 導航
           </a>
-          <button type="button" class="batch-popup-act-btn is-del batch-remove-single-btn" data-remove-idx="${idx}" title="從清單與地圖中移除此電表">
-            🗑️ 移除此點
+          <button type="button" class="batch-popup-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
+            🗑️ 移除
           </button>
         </div>
       </div>
@@ -1384,8 +1427,21 @@
     // 依座標聚類分組（同變壓器/同掛表桿位判斷）
     const coordMap = new Map();
     state.records.forEach((r, idx) => {
-      r._displayIndex = idx + 1;
+      if (!r.seqNo) r.seqNo = idx + 1;
+      if (!r.uid) r.uid = "bm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + r.seqNo;
+      r._displayIndex = r.seqNo;
+
       if (!Number.isFinite(r.lat) || !Number.isFinite(r.lng)) return;
+
+      // 若目前啟用「隱藏已跑」，且此筆已被標記已跑，則地圖不繪製該點
+      if (state.hideInspected !== false && r.inspected) {
+        if (r.marker && state.layerGroup) {
+          state.layerGroup.removeLayer(r.marker);
+          r.marker = null;
+        }
+        return;
+      }
+
       // 取小數點後 6 位 (約 0.1 公尺精度內視為同一現場掛表點/同變壓器)
       const key = `${r.lat.toFixed(6)},${r.lng.toFixed(6)}`;
       if (!coordMap.has(key)) coordMap.set(key, []);
@@ -1403,17 +1459,20 @@
       const hasDoorplate = group.some(item => item.r.locType === "doorplate");
       const badgeClass = hasDoorplate ? "is-doorplate" : (primaryRec.locType === "fallback" ? "is-fallback" : "is-grid");
 
-      // 1. Marker DivIcon 圖標
-      const pinMainText = `${primaryRec._displayIndex}`;
+      const isAllDone = group.every(item => item.r.inspected);
+      const doneClass = isAllDone ? "is-all-done" : "";
+
+      // 1. Marker DivIcon 圖標 (永久固定原始序號)
+      const pinMainText = `${primaryRec.seqNo}`;
       const pinBadge = isCluster ? `<span class="batch-marker-pin-badge">+${group.length - 1}</span>` : "";
       const clusterTypeName = hasDoorplate ? "同門牌/住址" : "共用變壓器/桿位";
       const clusterTitle = isCluster
-        ? `⚡ ${clusterTypeName}: 共 ${group.length} 只電表 (#${group.map(g => g.r._displayIndex).join(",")})`
-        : `#${primaryRec._displayIndex} ${escapeHtml(primaryRec.addr || primaryRec.code)}`;
+        ? `⚡ ${clusterTypeName}: 共 ${group.length} 只電表 (#${group.map(g => g.r.seqNo).join(",")})`
+        : `#${primaryRec.seqNo} ${escapeHtml(primaryRec.addr || primaryRec.code)}`;
 
       const icon = L.divIcon({
         className: "batch-marker-divicon",
-        html: `<div class="batch-marker-pin ${badgeClass} ${isCluster ? 'is-cluster' : ''}" title="${clusterTitle}">
+        html: `<div class="batch-marker-pin ${badgeClass} ${isCluster ? 'is-cluster' : ''} ${doneClass}" title="${clusterTitle}">
                  <span class="batch-marker-pin-main">${pinMainText}</span>
                  ${pinBadge}
                </div>`,
@@ -1431,13 +1490,13 @@
         const formattedCustNo = formatCustNo(primaryRec.custNo);
         labelHtml = `
           <div class="batch-map-label ${badgeClass}">
-            <span class="batch-label-index">#${primaryRec._displayIndex}</span>
+            <span class="batch-label-index">#${primaryRec.seqNo}</span>
             <span class="batch-label-text">${escapeHtml(primaryRec.addr || primaryRec.code || formattedCustNo)}</span>
             ${primaryRec.pole ? `<span class="batch-label-pole">(${escapeHtml(primaryRec.pole)})</span>` : ""}
           </div>
         `;
       } else {
-        const indicesStr = group.map(g => `#${g.r._displayIndex}`).join(",");
+        const indicesStr = group.map(g => `#${g.r.seqNo}`).join(",");
         const firstAddr = group[0].r.addr || group[0].r.code;
         const allSameAddr = group.every(g => (g.r.addr || g.r.code) === firstAddr);
         const displayAddrText = allSameAddr ? `${firstAddr}` : `${firstAddr} 等 ${group.length} 戶`;
@@ -1586,20 +1645,20 @@
         ? `<span class="v2-batch-badge-shared" title="與其他 ${r._clusterSize - 1} 戶共用同一變壓器/桿位座標">⚡ 同變壓器 (${r._clusterSize}戶)</span>`
         : "";
 
+      if (!r.seqNo) r.seqNo = idx + 1;
+      if (!r.uid) r.uid = "bm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + r.seqNo;
+
+      const isHidden = (state.hideInspected !== false && r.inspected) || Boolean(r.filteredOut);
       const navUrl = (Number.isFinite(r.lat) && Number.isFinite(r.lng)) ? googleNavUrl(r.lat, r.lng) : "";
-      const navBtnHtml = navUrl ? `
-        <div class="v2-batch-item-footer" style="margin-top:6px;display:flex;justify-content:flex-end;align-items:center;">
-          <a class="popup-navigation-link" href="${navUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;gap:4px;min-height:26px;padding:2px 10px;font-size:11px;font-weight:700;text-decoration:none;border-radius:4px;" title="以 Google Maps 導航至此電表精確座標">
-            🗺️ 導航
-          </a>
-        </div>
-      ` : "";
 
       return `
-        <div class="v2-batch-item" data-meter-idx="${idx}" ${r.filteredOut ? 'style="display:none;"' : ""}>
+        <div class="v2-batch-item ${r.inspected ? 'is-inspected' : ''}" data-meter-idx="${idx}" data-meter-uid="${r.uid}" ${isHidden ? 'style="display:none;"' : ""}>
           <div class="v2-batch-item-title">
-            <span>#${idx + 1} ${escapeHtml(r.addr || r.code || formattedCustNo)}</span>
-            <div style="display:flex;gap:4px;align-items:center;">
+            <span style="font-weight:700;display:flex;align-items:center;gap:4px;">
+              #${r.seqNo} ${escapeHtml(r.addr || r.code || formattedCustNo)}
+              ${r.inspected ? '<span class="v2-batch-badge-inspected">✓ 已跑</span>' : ''}
+            </span>
+            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
               ${sharedBadge}
               ${typeBadge}
             </div>
@@ -1611,7 +1670,21 @@
           </div>
           ${chips.length > 0 ? `<div class="v2-batch-chips-row">${chips.join("")}</div>` : ""}
           ${cardCollapseHtml}
-          ${navBtnHtml}
+          <div class="v2-batch-item-footer">
+            <button type="button" class="batch-item-act-btn is-inspect ${r.inspected ? 'is-done' : ''}" data-act-uid="${r.uid}" onclick="event.stopPropagation(); window.__toggleBatchInspected?.('${r.uid}');" title="${r.inspected ? '點擊取消已跑並恢復顯示' : '標記此點已巡檢並隱藏'}">
+              ${r.inspected ? '✓ 已跑 (點擊復原)' : '👁️ 標記已跑'}
+            </button>
+            <div style="display:flex;gap:4px;align-items:center;">
+              ${navUrl ? `
+                <a class="popup-navigation-link batch-item-act-btn is-nav" href="${navUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="以 Google Maps 導航至此電表精確座標">
+                  🗺️ 導航
+                </a>
+              ` : ""}
+              <button type="button" class="batch-item-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="event.stopPropagation(); window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
+                🗑️
+              </button>
+            </div>
+          </div>
         </div>
       `;
     }).join("");
@@ -1621,8 +1694,8 @@
     // 綁定卡片點擊聚焦
     controls.list.querySelectorAll(".v2-batch-item").forEach(el => {
       el.addEventListener("click", () => {
-        const idx = parseInt(el.dataset.meterIdx, 10);
-        const r = state.records[idx];
+        const uid = el.dataset.meterUid;
+        const r = state.records.find(item => item.uid === uid) || state.records[parseInt(el.dataset.meterIdx, 10)];
         const map = getMap();
         if (map && r && Number.isFinite(r.lat) && Number.isFinite(r.lng)) {
           if (!state.showLabels) {
@@ -1634,7 +1707,8 @@
               r.marker.openPopup();
               // 若為同變壓器多電表，自動將彈窗內對應電表捲入視野並短暫高亮
               setTimeout(() => {
-                const targetEl = document.querySelector(`.batch-popup-meter-item[data-popup-meter-idx="${idx}"]`);
+                const targetEl = document.querySelector(`.batch-popup-meter-item[data-popup-meter-uid="${r.uid}"]`)
+                  || document.querySelector(`.batch-popup-meter-item[data-popup-meter-idx="${el.dataset.meterIdx}"]`);
                 if (targetEl) {
                   targetEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
                   targetEl.style.boxShadow = "0 0 0 2px #0f766e";
@@ -1673,22 +1747,23 @@
       const extraKeyList = Array.from(allExtraKeys);
 
       const headerRow = [
-        "編號", "電號", "用電地址", "土木設備(桿名)", "圖號座標", "電表表號", "檢定期限", "定位型態",
+        "編號", "電號", "用電地址", "土木設備(桿名)", "圖號座標", "電表表號", "檢定期限", "定位型態", "巡檢狀態",
         ...extraKeyList,
         "緯度(Lat)", "經度(Lng)", "Google導航網址"
       ];
       const exportRows = [headerRow];
 
-      state.records.forEach((r, idx) => {
+      state.records.forEach((r) => {
         const row = [
-          idx + 1,
+          r.seqNo,
           r.custNo || "",
           r.addr || "",
           r.pole || "",
           r.code || "",
           r.meterNo || "",
           r.inspectTerm || "",
-          r.locLabel || ""
+          r.locLabel || "",
+          r.inspected ? "已巡檢(已跑)" : "待巡檢"
         ];
         extraKeyList.forEach(k => {
           row.push(r.extra?.[k] || "");
@@ -1714,7 +1789,14 @@
 
   function normalizeImportedRecords(records) {
     if (!Array.isArray(records)) return [];
-    records.forEach(r => {
+    records.forEach((r, idx) => {
+      if (!r.seqNo || typeof r.seqNo !== "number") {
+        r.seqNo = idx + 1;
+      }
+      if (!r.uid) {
+        r.uid = "bm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + r.seqNo;
+      }
+      r.inspected = Boolean(r.inspected);
       if (!r.addr && (r.address || r.fullAddress || r.rawAddress || r.name || r.title)) {
         r.addr = r.address || r.fullAddress || r.rawAddress || r.name || r.title;
       }
@@ -1751,6 +1833,9 @@
 
   function getCleanRecords() {
     return state.records.map(r => ({
+      seqNo: r.seqNo,
+      uid: r.uid,
+      inspected: Boolean(r.inspected),
       custNo: r.custNo || "",
       addr: r.addr || "",
       pole: r.pole || "",
@@ -2045,22 +2130,84 @@
       }
     });
 
-    // 監聽彈窗單筆移除
+  // 標記已跑切換 (依永久 uid 鎖定)
+  window.__toggleBatchInspected = function(uid) { toggleRecordInspected(uid); };
+  window.__removeBatchMeter = function(uid) { removeRecordByUid(uid); };
+
+  function toggleRecordInspected(uid) {
+    const record = state.records.find(r => r.uid === uid);
+    if (!record) return;
+    record.inspected = !record.inspected;
+
+    localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
+    renderBatchMarkers();
+    renderBatchList();
+    updateSummaryBadges();
+
+    if (state.hideInspected && record.inspected) {
+      getMap()?.closePopup();
+    }
+    showToast(record.inspected ? `✓ 已標記 #${record.seqNo} 為已跑 (已隱藏)` : `👁️ 已復原 #${record.seqNo} 為待巡檢`);
+  }
+
+  // 永久刪除單筆 (其餘點位序號 seqNo 永久不變動)
+  function removeRecordByUid(uid) {
+    const idx = state.records.findIndex(r => r.uid === uid);
+    if (idx === -1) return;
+    const removed = state.records.splice(idx, 1)[0];
+    if (removed.marker && state.layerGroup) {
+      state.layerGroup.removeLayer(removed.marker);
+    }
+    localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
+    renderBatchMarkers();
+    renderBatchList();
+    updateSummaryBadges();
+    getMap()?.closePopup();
+    showToast(`已移除 #${removed.seqNo} 標記`);
+  }
+
+  // 切換是否隱藏已跑點位
+  function toggleHideInspected() {
+    state.hideInspected = !state.hideInspected;
+    updatePatrolToggleUI();
+    renderBatchMarkers();
+    renderBatchList();
+    updateSummaryBadges();
+    showToast(state.hideInspected ? "已開啟：隱藏已跑點位" : "已開啟：顯示全部點位 (包含已跑)");
+  }
+
+    // 監聽巡檢進度列按鈕
+    if (controls.toggleHideDoneBtn) {
+      controls.toggleHideDoneBtn.addEventListener("click", () => {
+        toggleHideInspected();
+      });
+    }
+
+    // 監聽標記已跑與單筆移除
     document.addEventListener("click", (e) => {
-      const btn = e.target.closest(".batch-remove-single-btn");
-      if (btn) {
-        const idx = parseInt(btn.dataset.removeIdx, 10);
-        if (!isNaN(idx) && state.records[idx]) {
-          const removed = state.records.splice(idx, 1)[0];
-          if (removed.marker && state.layerGroup) {
-            state.layerGroup.removeLayer(removed.marker);
-          }
-          renderBatchMarkers();
-          renderBatchList();
-          updateSummaryBadges();
-          getMap()?.closePopup();
-          showToast("已移除該筆標記");
+      // 1. 移除單筆
+      const delBtn = e.target.closest(".batch-remove-single-btn");
+      if (delBtn) {
+        const uid = delBtn.dataset.removeUid;
+        if (uid) {
+          removeRecordByUid(uid);
+          return;
         }
+        const idx = parseInt(delBtn.dataset.removeIdx, 10);
+        if (!isNaN(idx) && state.records[idx]) {
+          removeRecordByUid(state.records[idx].uid);
+        }
+        return;
+      }
+
+      // 2. 標記已跑 / 復原切換
+      const inspectBtn = e.target.closest(".is-inspect[data-act-uid]");
+      if (inspectBtn) {
+        const uid = inspectBtn.dataset.actUid;
+        if (uid) {
+          toggleRecordInspected(uid);
+        }
+        return;
       }
     });
   }

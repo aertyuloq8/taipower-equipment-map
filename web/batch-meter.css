@@ -980,3 +980,199 @@
   background: #115e59;
 }
 
+
+
+/* =========================================================
+   巡檢進度列與已跑標記 (專為手機佈局觸控最佳化)
+   ========================================================= */
+.v2-batch-patrol-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 8px;
+  padding: 5px 8px;
+  margin: 2px 0 6px;
+  box-sizing: border-box;
+}
+.v2-batch-patrol-stats {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+.v2-batch-patrol-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.v2-batch-patrol-pill.is-pending {
+  background: #ecfeff;
+  color: #0f766e;
+  border: 1px solid #a5f3fc;
+}
+.v2-batch-patrol-pill.is-done {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.v2-batch-patrol-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+.v2-batch-patrol-toggle-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.v2-batch-patrol-toggle-btn.is-active {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #86efac;
+}
+
+/* 卡片與彈窗內已巡檢樣式 */
+.v2-batch-item.is-inspected {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  opacity: 0.85;
+}
+.v2-batch-badge-inspected {
+  background: #ecfdf5;
+  color: #15803d;
+  border: 1px solid #86efac;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.v2-batch-item-footer {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed #e2e8f0;
+  box-sizing: border-box;
+}
+.batch-item-act-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 5px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-sizing: border-box;
+}
+.batch-item-act-btn.is-inspect {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+.batch-item-act-btn.is-inspect:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.batch-item-act-btn.is-inspect.is-done {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #86efac;
+}
+.batch-item-act-btn.is-del {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+  padding: 3px 7px;
+}
+.batch-item-act-btn.is-del:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecdd3;
+}
+
+/* 彈窗按鈕 */
+.batch-popup-act-btn.is-inspect {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+.batch-popup-act-btn.is-inspect:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.batch-popup-act-btn.is-inspect.is-done {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #86efac;
+}
+
+/* 地圖圖標已跑樣式 (顯示全部時) */
+.batch-marker-pin.is-all-done {
+  opacity: 0.55;
+  filter: saturate(0.4);
+  border-style: dashed;
+}
+.batch-marker-pin.is-all-done .batch-marker-pin-main {
+  text-decoration: line-through;
+}
+
+/* 手機端專屬適應性佈局優化 */
+@media (max-width: 480px) {
+  .v2-batch-patrol-bar {
+    padding: 4px 6px;
+    gap: 4px;
+  }
+  .v2-batch-patrol-pill {
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+  .v2-batch-patrol-toggle-btn {
+    min-height: 28px;
+    padding: 2px 6px;
+    font-size: 10.5px;
+  }
+  .v2-batch-item-footer {
+    gap: 4px;
+  }
+  .batch-item-act-btn {
+    min-height: 30px;
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+  .batch-popup-item-actions {
+    gap: 3px;
+  }
+  .batch-popup-act-btn {
+    min-height: 30px;
+    padding: 3px 3px;
+    font-size: 10.5px;
+  }
+}
