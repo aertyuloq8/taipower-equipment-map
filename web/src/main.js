@@ -5291,6 +5291,7 @@ window.__appBooted = true;
           "&response_type=token" +
           "&scope=" + encodeURIComponent(DRIVE_SCOPE) +
           "&state=" + state +
+          "&prompt=select_account" +
           "&include_granted_scopes=true";
         return new Promise(() => { /* 頁面跳轉後此 Promise 不再被消費 */ });
       }
@@ -5917,6 +5918,7 @@ window.__appBooted = true;
               GlobalModal.alert(`${cfg.label} 上傳失敗：${e.message}`);
             }
           } finally {
+            clearDriveAccessToken();
             if (button) { button.disabled = false; button.textContent = originalText; }
           }
         },
@@ -6120,6 +6122,7 @@ window.__appBooted = true;
               GlobalModal.alert(`${cfg.label} 還原失敗：${e.message}`);
             }
           } finally {
+            clearDriveAccessToken();
             if (button) { button.disabled = false; button.textContent = originalText; }
           }
         },
@@ -6209,6 +6212,7 @@ window.__appBooted = true;
               GlobalModal.alert(`刪除「${cfg.label}」雲端備份失敗：${e.message}`);
             }
           } finally {
+            clearDriveAccessToken();
             if (button) { button.disabled = false; button.textContent = originalText; }
           }
         }
@@ -8314,7 +8318,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?rev=29', { scope: './' })
+          navigator.serviceWorker.register('./service-worker.js?rev=30', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 
