@@ -376,7 +376,7 @@
               <div class="folder-btn-group" style="margin-bottom:0;">
                 <button id="batchFitBoundsBtn" class="btn-action btn-sync v2-batch-action-btn" type="button" title="將地圖縮放至涵蓋此批次全部標記點位">🔍 全體視野</button>
                 <button id="batchMeterExportBtn" class="btn-action btn-import-csv" type="button" title="匯出包含定位座標、門牌與電桿之 Excel">📥 匯出 Excel</button>
-                <button id="batchClearAllBtn" class="btn-action btn-import-json" type="button" title="清空此批次所有定位標記與資料">🗑️ 清空清單</button>
+                
               </div>
             </div>
           </details>
@@ -414,10 +414,13 @@
               <span class="v2-batch-patrol-pill is-pending" title="剩餘待巡檢電表數">待跑 <strong id="batchPendingCount">0</strong></span>
               <span class="v2-batch-patrol-pill is-done" title="已完成巡檢電表數">已跑 <strong id="batchDoneCount">0</strong></span>
             </div>
-            <button id="batchToggleHideDoneBtn" class="v2-batch-patrol-toggle-btn is-active" type="button" title="點擊切換顯示或隱藏已跑點位">
-              <span id="batchToggleDoneIcon">👁️</span>
-              <span id="batchToggleDoneText">隱藏已跑中</span>
-            </button>
+            <div class="v2-batch-patrol-actions">
+              <button id="batchClearAllBtn" class="v2-batch-patrol-clear-btn" type="button" title="清空此批次所有定位標記與資料">🗑️ 清空清單</button>
+              <button id="batchToggleHideDoneBtn" class="v2-batch-patrol-toggle-btn is-active" type="button" title="點擊切換顯示或隱藏已跑點位">
+                <span id="batchToggleDoneIcon">👁️</span>
+                <span id="batchToggleDoneText">隱藏已跑中</span>
+              </button>
+            </div>
           </div>
 
           <!-- 篩選生效時顯示之狀態提示列 -->
@@ -806,7 +809,7 @@
     <script src="src/utils/bookmark-db.js?v=2.6.3"></script>
     <script src="cadastre.js"></script>
     <script src="address-search.js"></script>
-    <script src="batch-meter.js?v=2.6.8"></script>
+    <script src="batch-meter.js?v=2.6.9"></script>
     <script src="sync.js"></script>
     <script>
     /* 版本對帳：主程式 5 秒內沒開機（舊 JS 配新殼 / 載入失敗）就跳橫幅請重整，

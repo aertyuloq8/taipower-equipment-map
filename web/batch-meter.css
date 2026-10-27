@@ -1003,6 +1003,45 @@
   gap: 5px;
   font-size: 11px;
 }
+.v2-batch-patrol-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.v2-batch-patrol-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  background: #fff1f2;
+  color: #e11d48;
+  border: 1px solid #fecdd3;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+.v2-batch-patrol-clear-btn:hover {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  color: #be123c;
+}
+/* 二次確認高亮醒目警告紅狀態 */
+.v2-batch-patrol-clear-btn.is-confirming {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #b91c1c;
+  animation: pulseClearBtn 0.8s infinite alternate;
+}
+@keyframes pulseClearBtn {
+  from { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  to { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0); }
+}
 .v2-batch-patrol-pill {
   display: inline-flex;
   align-items: center;
@@ -1163,6 +1202,14 @@
   .v2-batch-patrol-pill {
     padding: 2px 4px;
     font-size: 10px;
+  }
+  .v2-batch-patrol-actions {
+    gap: 3px;
+  }
+  .v2-batch-patrol-clear-btn {
+    min-height: 28px;
+    padding: 2px 6px;
+    font-size: 10.5px;
   }
   .v2-batch-patrol-toggle-btn {
     min-height: 28px;

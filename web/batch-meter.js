@@ -2043,6 +2043,53 @@
     }
   }
 
+  // 清空所有標記 (二次確認防誤觸機制)
+  let _clearAllPending = false;
+  let _clearAllTimer = null;
+
+  function resetClearAllBtn() {
+    _clearAllPending = false;
+    if (_clearAllTimer) {
+      clearTimeout(_clearAllTimer);
+      _clearAllTimer = null;
+    }
+    if (controls.clearAllBtn) {
+      controls.clearAllBtn.textContent = "🗑️ 清空清單";
+      controls.clearAllBtn.title = "清空此批次所有定位標記與資料";
+      controls.clearAllBtn.classList.remove("is-confirming");
+    }
+  }
+
+  function handleClearAllClick(e) {
+    if (e) e.stopPropagation();
+
+    if (!state.records || !state.records.length) {
+      showToast("目前沒有批次電表標記可清空！", "dup");
+      return;
+    }
+
+    if (!_clearAllPending) {
+      // 第一次點擊：進入二次確認狀態
+      _clearAllPending = true;
+      if (controls.clearAllBtn) {
+        controls.clearAllBtn.textContent = "⚠️ 確定清空？";
+        controls.clearAllBtn.title = "再次點擊將立即清空全部標記與資料 (4秒後自動取消)";
+        controls.clearAllBtn.classList.add("is-confirming");
+      }
+      showToast("⚠️ 請再次點擊「確定清空」以確認刪除全體清單", "dup");
+
+      if (_clearAllTimer) clearTimeout(_clearAllTimer);
+      _clearAllTimer = setTimeout(() => {
+        resetClearAllBtn();
+      }, 4000);
+      return;
+    }
+
+    // 第二次點擊：真正執行清空
+    resetClearAllBtn();
+    clearAllMarkers();
+  }
+
   // 清空所有標記
   function clearAllMarkers() {
     if (!state.records.length) return;
@@ -2053,7 +2100,7 @@
     localStorage.removeItem("tp_batch_meter_bookmarks_v1");
     renderBatchList();
     updateSummaryBadges(0, 0, 0);
-    showToast("已清空批次電表標記");
+    showToast("🗑️ 已清空批次電表標記與清單");
   }
 
   // 綁定所有使用者介面事件
@@ -2131,7 +2178,12 @@
     });
 
     controls.exportBtn?.addEventListener("click", exportToExcel);
-    controls.clearAllBtn?.addEventListener("click", clearAllMarkers);
+    controls.clearAllBtn?.addEventListener("click", handleClearAllClick);
+    document.addEventListener("click", (e) => {
+      if (_clearAllPending && !e.target.closest("#batchClearAllBtn")) {
+        resetClearAllBtn();
+      }
+    });
 
     // 條件篩選按鈕與手機抽屜控制
     controls.filterBtn?.addEventListener("click", openFilterDrawer);
