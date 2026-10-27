@@ -8,11 +8,13 @@
 const BOOKMARK_KEYS = {
   cadastre: "cadastre-bookmarks",
   address: "address-bookmarks",
+  batch: "batch-meter-bookmarks",
 };
 
 const LS_KEYS = {
   cadastre: "tp_cadastre_bookmarks_v1",
   address: "tp_address_bookmarks_v1",
+  batch: "tp_batch_meter_bookmarks_v1",
 };
 
 async function getDb() {

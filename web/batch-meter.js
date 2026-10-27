@@ -1704,18 +1704,28 @@
   function normalizeImportedRecords(records) {
     if (!Array.isArray(records)) return [];
     records.forEach(r => {
-      if (!r.addr && (r.address || r.fullAddress || r.rawAddress)) {
-        r.addr = r.address || r.fullAddress || r.rawAddress;
+      if (!r.addr && (r.address || r.fullAddress || r.rawAddress || r.name || r.title)) {
+        r.addr = r.address || r.fullAddress || r.rawAddress || r.name || r.title;
       }
-      if (!r.lat && r.coordinates && Number.isFinite(r.coordinates.lat)) {
-        r.lat = r.coordinates.lat;
-        r.lng = r.coordinates.lng;
+      // 支援 lat/lng, la/ln, coordinates.lat/lng, latDeg/lngDeg, y/x 與字串型態經緯度
+      const rawLat = (r.lat !== undefined && r.lat !== null && r.lat !== "")
+        ? r.lat
+        : (r.la !== undefined && r.la !== null && r.la !== ""
+            ? r.la
+            : (r.coordinates?.lat ?? r.latDeg ?? r.y));
+      const rawLng = (r.lng !== undefined && r.lng !== null && r.lng !== "")
+        ? r.lng
+        : (r.ln !== undefined && r.ln !== null && r.ln !== ""
+            ? r.ln
+            : (r.coordinates?.lng ?? r.lngDeg ?? r.x));
+      const numLat = typeof rawLat === "number" ? rawLat : parseFloat(rawLat);
+      const numLng = typeof rawLng === "number" ? rawLng : parseFloat(rawLng);
+      if (Number.isFinite(numLat) && Number.isFinite(numLng)) {
+        r.lat = numLat;
+        r.lng = numLng;
       }
-      if (!r.lat && r.latDeg && Number.isFinite(r.latDeg)) {
-        r.lat = r.latDeg;
-        r.lng = r.lngDeg;
-      }
-      if (!r.extra) r.extra = {};
+
+      if (!r.extra || typeof r.extra !== "object") r.extra = {};
       if (r.locType && !r.extra["定位型態"]) {
         r.extra["定位型態"] = r.locType === "doorplate" ? "🏠 門牌定位" : (r.locType === "fallback" ? "⚡ 圖號保底" : "⚡ 圖號定位");
       }
@@ -1815,6 +1825,7 @@
     }
     const clean = getCleanRecords();
     localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(clean));
+    showToast(`☁️ 正在上傳 ${clean.length} 筆批次電表至雲端...`);
     if (window.__bookmarkDrive) {
       window.__bookmarkDrive.upload("batch");
     } else {
@@ -1964,7 +1975,7 @@
     });
 
     // 監聽 Drive 還原事件
-    window.addEventListener("batchMetersRestored", () => {
+    window.addEventListener("batchMetersRestored", (e) => {
       try {
         const saved = JSON.parse(localStorage.getItem("tp_batch_meter_bookmarks_v1") || "[]");
         if (Array.isArray(saved) && saved.length > 0) {
@@ -1975,15 +1986,21 @@
           renderBatchList();
           updateSummaryBadges();
           updateFilterStatusUI(state.records.length);
+          setPanelOpen(true);
           switchTab("list");
           const map = getMap();
           if (map && state.layerGroup) {
             const bounds = state.layerGroup.getBounds();
             if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
           }
-          showToast(`☁️ 已從 Google Drive 還原 ${saved.length} 筆批次電表！`);
+          showToast(`☁️ 已從 Google Drive 還原 ${state.records.length} 筆批次電表！`);
+        } else {
+          showToast("還原失敗：備份檔內無有效電表資料", "error");
         }
-      } catch {}
+      } catch (err) {
+        console.error("還原批次電表失敗：", err);
+        showToast("還原解析錯誤：" + err.message, "error");
+      }
     });
 
     // 監聽彈窗單筆移除
@@ -2011,21 +2028,15 @@
     try {
       const cached = JSON.parse(localStorage.getItem("tp_batch_meter_bookmarks_v1") || "[]");
       if (Array.isArray(cached) && cached.length > 0) {
-        state.records = cached;
-        state.records.forEach(r => {
-          if (!r.extra) r.extra = {};
-          if (r.locType && !r.extra["定位型態"]) {
-            r.extra["定位型態"] = r.locType === "doorplate" ? "🏠 門牌定位" : (r.locType === "fallback" ? "⚡ 圖號保底" : "⚡ 圖號定位");
-          }
-          if (r.pole && !r.extra["土木設備"]) r.extra["土木設備"] = r.pole;
-          if (r.inspectTerm && !r.extra["檢定期限"]) r.extra["檢定期限"] = r.inspectTerm;
-        });
+        state.records = normalizeImportedRecords(cached);
         renderBatchMarkers();
         renderBatchList();
         updateSummaryBadges();
         updateFilterStatusUI(state.records.length);
       }
-    } catch {}
+    } catch (err) {
+      console.error("restoreLocalCachedBatch error:", err);
+    }
   }
 
   function boot(attempt = 0) {
