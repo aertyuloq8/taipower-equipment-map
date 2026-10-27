@@ -1391,13 +1391,13 @@
         ${popupCollapseHtml}
         <!-- 每戶卡片底部專屬操作：已跑隱藏、導航與移除按鈕 (手機排版適應) -->
         <div class="batch-popup-item-actions">
-          <button type="button" class="batch-popup-act-btn is-inspect ${r.inspected ? 'is-done' : ''}" data-act-uid="${r.uid}" onclick="window.__toggleBatchInspected?.('${r.uid}');" title="${r.inspected ? '點擊取消已跑並恢復顯示' : '標記此點已巡檢並隱藏'}">
+          <button type="button" class="batch-popup-act-btn is-inspect ${r.inspected ? 'is-done' : ''}" data-act-uid="${r.uid}" onclick="event.stopPropagation(); window.__toggleBatchInspected?.('${r.uid}');" title="${r.inspected ? '點擊取消已跑並恢復顯示' : '標記此點已巡檢並隱藏'}">
             ${r.inspected ? '✓ 已跑(復原)' : '👁️ 標記已跑'}
           </button>
-          <a class="batch-popup-act-btn is-nav popup-navigation-link" href="${googleNavUrl(r.lat, r.lng)}" target="_blank" rel="noopener" title="以 Google Maps 導航至此電表精確座標">
+          <a class="batch-popup-act-btn is-nav popup-navigation-link" href="${googleNavUrl(r.lat, r.lng)}" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="以 Google Maps 導航至此電表精確座標">
             🗺️ 導航
           </a>
-          <button type="button" class="batch-popup-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
+          <button type="button" class="batch-popup-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="event.stopPropagation(); window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
             🗑️ 移除
           </button>
         </div>
@@ -2136,7 +2136,7 @@
   window.__toggleBatchInspected = function(uid) { toggleRecordInspected(uid); };
   window.__removeBatchMeter = function(uid) { removeRecordByUid(uid); };
 
-  function toggleRecordInspected(uid) {
+    function toggleRecordInspected(uid) {
     const record = state.records.find(r => r.uid === uid);
     if (!record) return;
     record.inspected = !record.inspected;
@@ -2148,8 +2148,12 @@
 
     if (state.hideInspected && record.inspected) {
       getMap()?.closePopup();
+    } else if (!state.hideInspected && record.marker) {
+      // 顯示全部中時，保持彈窗開啟並即時呈現最新已跑/待巡檢狀態
+      record.marker.openPopup();
     }
-    showToast(record.inspected ? `✓ 已標記 #${record.seqNo} 為已跑 (已隱藏)` : `👁️ 已復原 #${record.seqNo} 為待巡檢`);
+    const hideSuffix = state.hideInspected ? " (已隱藏)" : "";
+    showToast(record.inspected ? `✓ 已標記 #${record.seqNo} 為已跑${hideSuffix}` : `👁️ 已復原 #${record.seqNo} 為待巡檢`);
   }
 
   // 永久刪除單筆 (其餘點位序號 seqNo 永久不變動)
@@ -2189,7 +2193,7 @@
     document.addEventListener("click", (e) => {
       // 1. 移除單筆
       const delBtn = e.target.closest(".batch-remove-single-btn");
-      if (delBtn) {
+      if (delBtn && !delBtn.hasAttribute("onclick")) {
         const uid = delBtn.dataset.removeUid;
         if (uid) {
           removeRecordByUid(uid);
@@ -2204,7 +2208,7 @@
 
       // 2. 標記已跑 / 復原切換
       const inspectBtn = e.target.closest(".is-inspect[data-act-uid]");
-      if (inspectBtn) {
+      if (inspectBtn && !inspectBtn.hasAttribute("onclick")) {
         const uid = inspectBtn.dataset.actUid;
         if (uid) {
           toggleRecordInspected(uid);
