@@ -1921,7 +1921,8 @@
     }
     const clean = getCleanRecords();
     localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(clean));
-    showToast(`☁️ 正在上傳 ${clean.length} 筆批次電表至雲端...`);
+    const doneCount = clean.filter(r => r.inspected).length;
+    showToast(`☁️ 正在上傳 ${clean.length} 筆電表 (含 ${doneCount} 筆已跑進度) 至雲端...`);
     if (window.__bookmarkDrive) {
       window.__bookmarkDrive.upload("batch");
     } else {
@@ -2120,7 +2121,8 @@
             const bounds = state.layerGroup.getBounds();
             if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
           }
-          showToast(`☁️ 已從 Google Drive 還原 ${state.records.length} 筆批次電表！`);
+          const doneCount = state.records.filter(r => r.inspected).length;
+          showToast(`☁️ 已從 Google Drive 還原 ${state.records.length} 筆電表 (已跑 ${doneCount} 筆已自動同步隱藏)！`);
         } else {
           showToast("還原失敗：備份檔內無有效電表資料", "error");
         }

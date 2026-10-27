@@ -5841,6 +5841,9 @@ window.__appBooted = true;
               try { bookmarks = JSON.parse(localStorage.getItem(cfg.lsKey) || "[]"); } catch {}
             }
             bookmarks = bookmarks.map(r => ({
+              seqNo: r.seqNo,
+              uid: r.uid,
+              inspected: Boolean(r.inspected),
               custNo: r.custNo || "",
               addr: r.addr || "",
               pole: r.pole || "",
@@ -5887,7 +5890,10 @@ window.__appBooted = true;
             const timeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
             const fileName = `${cfg.prefix}${timeStr}.json`;
             const blob = new Blob([JSON.stringify(bookmarks, null, 2)], { type: "application/json" });
-            const description = `${cfg.label} ${bookmarks.length} 筆 · 上傳於 ${now.toLocaleString("zh-TW")}`;
+            const doneCount = type === "batch" ? bookmarks.filter(r => r.inspected).length : 0;
+            const description = type === "batch"
+              ? `${cfg.label} ${bookmarks.length} 筆 (已跑 ${doneCount} 筆，待跑 ${bookmarks.length - doneCount} 筆) · 上傳於 ${now.toLocaleString("zh-TW")}`
+              : `${cfg.label} ${bookmarks.length} 筆 · 上傳於 ${now.toLocaleString("zh-TW")}`;
 
             await uploadZipToDrive(blob, fileName, null, "application/json", description);
 
@@ -6044,6 +6050,23 @@ window.__appBooted = true;
                 bookmarkAdded = downloaded.length;
               } else {
                 bookmarkMode = "merge";
+                if (type === "batch") {
+                  // 若為批次電表，雲端同步時更新本機對應記錄的 inspected 最新狀態
+                  const downloadedMap = new Map();
+                  downloaded.forEach(b => {
+                    const k = b.uid || (b.custNo ? `c_${b.custNo}` : (b.addr ? `a_${b.addr}` : null));
+                    if (k) downloadedMap.set(k, b);
+                  });
+                  currentBookmarks.forEach(b => {
+                    const k = b.uid || (b.custNo ? `c_${b.custNo}` : (b.addr ? `a_${b.addr}` : null));
+                    if (k && downloadedMap.has(k)) {
+                      const cloudRec = downloadedMap.get(k);
+                      if (cloudRec.inspected !== undefined) {
+                        b.inspected = Boolean(cloudRec.inspected);
+                      }
+                    }
+                  });
+                }
                 const existKeys = new Set(currentBookmarks.map(b => b.id || b.custNo || b.number || b.address || b.addr || JSON.stringify(b)));
                 const newItems = downloaded.filter(b => {
                   const k = b.id || b.custNo || b.number || b.address || b.addr || JSON.stringify(b);
