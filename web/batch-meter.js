@@ -162,8 +162,13 @@
   const doorplateCache = new Map();
   const poleSearchCache = new Map();
 
+  const digitToChinese = {
+    "1": "一", "2": "二", "3": "三", "4": "四", "5": "五",
+    "6": "六", "7": "七", "8": "八", "9": "九", "10": "十"
+  };
+
   function cleanAddrStr(s) {
-    return String(s || "").normalize("NFKC")
+    let str = String(s || "").normalize("NFKC")
       .replace(/[台臺]/g, "台")
       .replace(/[腳脚]/g, "腳")
       .replace(/[峰峯]/g, "峰")
@@ -173,6 +178,13 @@
       .replace(/[溝沟]/g, "溝")
       .replace(/[灣湾]/g, "灣")
       .replace(/[()\[\]（）\s]+/g, "");
+
+    // 支援「第1段 / 第一段」去除「第」字
+    str = str.replace(/第([一二三四五六七八九十\d]+)段/g, "$1段");
+    // 將阿拉伯數字段 (1段~10段) 自動轉換為國字段 (一段~十段)，100% 契合內政部國土測繪圖資
+    str = str.replace(/([1-9]|10)段/g, (_, num) => `${digitToChinese[num]}段`);
+
+    return str;
   }
 
   function extractCountyDistrict(addr) {
@@ -202,14 +214,21 @@
   }
 
   function extractDoorplateNumber(addr) {
-    const s = cleanAddrStr(addr).replace(/\d+鄰/g, "");
-    const m = s.match(/(\d+)(?:號[-－之]|[-－之])(\d+)/);
-    if (m) {
-      return { parent: m[1], sub: m[2], full: `${m[1]}-${m[2]}` };
+    let s = cleanAddrStr(addr).replace(/\d+鄰/g, "");
+    // 1. 帶子號：例如 47-1號、47號之1、47號-1、47之1號
+    const mSub = s.match(/(\d+)(?:號[-－之]|[-－之])(\d+)(?:號)?/);
+    if (mSub) {
+      return { parent: mSub[1], sub: mSub[2], full: `${mSub[1]}-${mSub[2]}` };
     }
-    const mSingle = s.match(/(\d+)(?:號)?/);
+    // 2. 標準單號：例如 47號、311號 (排除 363巷、36弄 等巷弄干擾)
+    const mSingle = s.match(/(\d+)號/);
     if (mSingle) {
       return { parent: mSingle[1], sub: "", full: mSingle[1] };
+    }
+    // 3. 無「號」字保底：取末尾數字 (例如 洋子20)
+    const mTrailing = s.match(/(\d+)(?:[-－之](\d+))?$/);
+    if (mTrailing) {
+      return { parent: mTrailing[1], sub: mTrailing[2] || "", full: mTrailing[2] ? `${mTrailing[1]}-${mTrailing[2]}` : mTrailing[1] };
     }
     return null;
   }
@@ -298,7 +317,7 @@
   }
 
   async function geocodeDoorplate(addr, expectedPt) {
-    const cleanAddr = String(addr || "").normalize("NFKC").trim();
+    const cleanAddr = cleanAddrStr(addr);
     if (!cleanAddr) return null;
 
     if (doorplateCache.has(cleanAddr)) {

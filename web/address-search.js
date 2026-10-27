@@ -68,6 +68,18 @@
   function setStatus(m){ controls.status.textContent = m; }
 
   // ---- GAS JSONP（與 cadastre-v2.js 相同方式呼叫 GAS）----
+  const digitToChinese = {
+    "1": "一", "2": "二", "3": "三", "4": "四", "5": "五",
+    "6": "六", "7": "七", "8": "八", "9": "九", "10": "十"
+  };
+
+  function cleanAddrWord(s) {
+    let str = String(s || "").normalize("NFKC").trim();
+    str = str.replace(/第([一二三四五六七八九十\d]+)段/g, "$1段");
+    str = str.replace(/([1-9]|10)段/g, (_, num) => `${digitToChinese[num]}段`);
+    return str;
+  }
+
   function gasJsonp(params){
     return new Promise((resolve, reject)=>{
       const cb = `__gas_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
@@ -87,7 +99,7 @@
 
   // ---- 國土測繪精確門牌清單（經 GAS 代理，與 maps.nlsc.gov.tw 一致）----
   async function fetchNLSC(q){
-    const addr = q.trim();
+    const addr = cleanAddrWord(q);
     if(!addr) return [];
     try{
       const data = await gasJsonp({ action: "addr", word: addr });
@@ -107,11 +119,12 @@
   // ---- 國土測繪精確座標（點選地址後，QuerySearch 回傳 LOCATION）----
   async function nlscGeo(addr){
     try{
-      const data = await gasJsonp({ action: "addrGeo", word: addr });
+      const clean = cleanAddrWord(addr);
+      const data = await gasJsonp({ action: "addrGeo", word: clean });
       const list = (data && Array.isArray(data.results)) ? data.results : [];
       if(list.length){
-        const plain = (s)=>String(s||"").normalize("NFKC").replace(/[()\[\]（）\s]+/g,"").replace(/號/g,"");
-        const norm = plain(addr);
+        const plain = (s)=>cleanAddrWord(s).replace(/[()[\]（）\s]+/g,"").replace(/號/g,"");
+        const norm = plain(clean);
         const exact = list.find(it=> plain(it.address) === norm) || list[0];
         if(Number.isFinite(exact.x) && Number.isFinite(exact.y)) return { la: exact.y, ln: exact.x };
       }
