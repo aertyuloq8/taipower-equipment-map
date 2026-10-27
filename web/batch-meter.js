@@ -2136,48 +2136,214 @@
   window.__toggleBatchInspected = function(uid) { toggleRecordInspected(uid); };
   window.__removeBatchMeter = function(uid) { removeRecordByUid(uid); };
 
-    function toggleRecordInspected(uid) {
+      // --- 局部精準更新 (O(1)) 效能核心：直接更新對應 DOM 與 Marker，避免全量重繪 ---
+  function updateCardInspectedUI(record) {
+    const card = document.querySelector(`.v2-batch-item[data-meter-uid="${record.uid}"]`);
+    if (!card) return;
+
+    card.classList.toggle("is-inspected", record.inspected);
+
+    const btn = card.querySelector(".batch-item-act-btn.is-inspect");
+    if (btn) {
+      btn.classList.toggle("is-done", record.inspected);
+      btn.textContent = record.inspected ? "✓ 已跑 (點擊復原)" : "👁️ 標記已跑";
+      btn.title = record.inspected ? "點擊取消已跑並恢復顯示" : "標記此點已巡檢並隱藏";
+    }
+
+    const titleSpan = card.querySelector(".v2-batch-item-title > span");
+    if (titleSpan) {
+      let badge = titleSpan.querySelector(".v2-batch-badge-inspected");
+      if (record.inspected && !badge) {
+        const span = document.createElement("span");
+        span.className = "v2-batch-badge-inspected";
+        span.textContent = "✓ 已跑";
+        titleSpan.appendChild(span);
+      } else if (!record.inspected && badge) {
+        badge.remove();
+      }
+    }
+
+    const isHidden = (state.hideInspected !== false && record.inspected) || Boolean(record.filteredOut);
+    card.style.display = isHidden ? "none" : "";
+  }
+
+  function updatePopupInspectedUI(record) {
+    const popupCard = document.querySelector(`.batch-popup-meter-item[data-popup-meter-uid="${record.uid}"]`);
+    if (!popupCard) return;
+
+    popupCard.classList.toggle("is-inspected", record.inspected);
+
+    const btn = popupCard.querySelector(".batch-popup-act-btn.is-inspect");
+    if (btn) {
+      btn.classList.toggle("is-done", record.inspected);
+      btn.textContent = record.inspected ? "✓ 已跑(復原)" : "👁️ 標記已跑";
+      btn.title = record.inspected ? "點擊取消已跑並恢復顯示" : "標記此點已巡檢並隱藏";
+    }
+
+    const titleStrong = popupCard.querySelector("strong");
+    if (titleStrong) {
+      let badge = titleStrong.querySelector(".v2-batch-badge-inspected");
+      if (record.inspected && !badge) {
+        const newBadge = document.createElement("span");
+        newBadge.className = "v2-batch-badge-inspected";
+        newBadge.textContent = "✓ 已跑";
+        titleStrong.appendChild(newBadge);
+      } else if (!record.inspected && badge) {
+        badge.remove();
+      }
+    }
+  }
+
+  function updateMarkerInspectedUI(record) {
+    if (!record.marker || !state.layerGroup) return;
+
+    const group = record.marker._batchClusterGroup || [{ r: record }];
+    const isClusterAllDone = group.every(g => g.r.inspected);
+    const isHiding = state.hideInspected !== false;
+
+    if (isHiding) {
+      if (record.inspected) {
+        if (isClusterAllDone) {
+          if (state.layerGroup.hasLayer(record.marker)) {
+            state.layerGroup.removeLayer(record.marker);
+          }
+          getMap()?.closePopup();
+        }
+      } else {
+        // 復原待巡檢：將圖標重新加回地圖圖層
+        if (!state.layerGroup.hasLayer(record.marker)) {
+          state.layerGroup.addLayer(record.marker);
+          if (state.showLabels && record.marker.getTooltip()) {
+            record.marker.openTooltip();
+          }
+        }
+      }
+    } else {
+      // 顯示全部中：保證圖標在地圖上，並切換 is-all-done 樣式
+      if (!state.layerGroup.hasLayer(record.marker)) {
+        state.layerGroup.addLayer(record.marker);
+        if (state.showLabels && record.marker.getTooltip()) {
+          record.marker.openTooltip();
+        }
+      }
+      const pin = record.marker.getElement()?.querySelector(".batch-marker-pin");
+      if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
+    }
+  }
+
+  // 標記已跑切換 (O(1) 局部即時更新)
+  function toggleRecordInspected(uid) {
     const record = state.records.find(r => r.uid === uid);
     if (!record) return;
     record.inspected = !record.inspected;
 
     localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
-    renderBatchMarkers();
-    renderBatchList();
+
+    // O(1) 局部精準操作：絕不重繪全體列表與地圖
+    updateCardInspectedUI(record);
+    updateMarkerInspectedUI(record);
+    updatePopupInspectedUI(record);
     updateSummaryBadges();
 
-    if (state.hideInspected && record.inspected) {
-      getMap()?.closePopup();
-    } else if (!state.hideInspected && record.marker) {
-      // 顯示全部中時，保持彈窗開啟並即時呈現最新已跑/待巡檢狀態
-      record.marker.openPopup();
-    }
     const hideSuffix = state.hideInspected ? " (已隱藏)" : "";
     showToast(record.inspected ? `✓ 已標記 #${record.seqNo} 為已跑${hideSuffix}` : `👁️ 已復原 #${record.seqNo} 為待巡檢`);
   }
 
-  // 永久刪除單筆 (其餘點位序號 seqNo 永久不變動)
+  // 永久刪除單筆 (O(1) 局部即時移除)
   function removeRecordByUid(uid) {
     const idx = state.records.findIndex(r => r.uid === uid);
     if (idx === -1) return;
     const removed = state.records.splice(idx, 1)[0];
+
+    // 1. 局部移除地圖圖標
     if (removed.marker && state.layerGroup) {
-      state.layerGroup.removeLayer(removed.marker);
+      const group = removed.marker._batchClusterGroup;
+      if (group && group.length > 1) {
+        const gIdx = group.findIndex(g => g.r.uid === uid);
+        if (gIdx !== -1) group.splice(gIdx, 1);
+        if (group.length === 0) {
+          state.layerGroup.removeLayer(removed.marker);
+        } else {
+          const primaryRec = group[0].r;
+          const pin = removed.marker.getElement()?.querySelector(".batch-marker-pin-main");
+          if (pin) pin.textContent = primaryRec.seqNo;
+          const badge = removed.marker.getElement()?.querySelector(".batch-marker-pin-badge");
+          if (badge) {
+            if (group.length > 1) badge.textContent = `+${group.length - 1}`;
+            else badge.remove();
+          }
+        }
+      } else {
+        state.layerGroup.removeLayer(removed.marker);
+      }
     }
+
+    // 2. 局部移除抽屜卡片
+    const card = document.querySelector(`.v2-batch-item[data-meter-uid="${uid}"]`);
+    card?.remove();
+
+    // 3. 局部移除地圖彈窗項目
+    const popupItem = document.querySelector(`.batch-popup-meter-item[data-popup-meter-uid="${uid}"]`);
+    popupItem?.remove();
+    const remainingInPopup = document.querySelectorAll(".batch-popup-meter-item");
+    if (!remainingInPopup || remainingInPopup.length === 0) {
+      getMap()?.closePopup();
+    }
+
     localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
-    renderBatchMarkers();
-    renderBatchList();
     updateSummaryBadges();
-    getMap()?.closePopup();
     showToast(`已移除 #${removed.seqNo} 標記`);
   }
 
-  // 切換是否隱藏已跑點位
+  // 切換是否隱藏已跑點位 (就地切換 DOM 與圖層，避免重算與重建)
   function toggleHideInspected() {
     state.hideInspected = !state.hideInspected;
     updatePatrolToggleUI();
-    renderBatchMarkers();
-    renderBatchList();
+
+    const isHiding = state.hideInspected !== false;
+    state.records.forEach(r => {
+      // 1. 卡片顯示狀態切換
+      const card = document.querySelector(`.v2-batch-item[data-meter-uid="${r.uid}"]`);
+      if (card) {
+        const isHidden = (isHiding && r.inspected) || Boolean(r.filteredOut);
+        card.style.display = isHidden ? "none" : "";
+      }
+
+      // 2. 地圖圖層切換
+      if (r.marker && state.layerGroup) {
+        const group = r.marker._batchClusterGroup || [{ r }];
+        const isClusterAllDone = group.every(g => g.r.inspected);
+
+        if (isHiding) {
+          if (isClusterAllDone) {
+            if (state.layerGroup.hasLayer(r.marker)) {
+              state.layerGroup.removeLayer(r.marker);
+            }
+          }
+        } else {
+          if (!state.layerGroup.hasLayer(r.marker)) {
+            state.layerGroup.addLayer(r.marker);
+            if (state.showLabels && r.marker.getTooltip()) {
+              r.marker.openTooltip();
+            }
+          }
+          const pin = r.marker.getElement()?.querySelector(".batch-marker-pin");
+          if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
+        }
+      }
+    });
+
+    if (isHiding) {
+      // 若當前開啟的彈窗所屬點位已被隱藏，關閉彈窗
+      const activePopupUid = document.querySelector(".batch-popup-meter-item")?.dataset?.popupMeterUid;
+      if (activePopupUid) {
+        const activeRec = state.records.find(r => r.uid === activePopupUid);
+        if (activeRec && activeRec.inspected) {
+          getMap()?.closePopup();
+        }
+      }
+    }
+
     updateSummaryBadges();
     showToast(state.hideInspected ? "已開啟：隱藏已跑點位" : "已開啟：顯示全部點位 (包含已跑)");
   }
