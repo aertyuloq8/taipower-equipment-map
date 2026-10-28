@@ -73,8 +73,23 @@
     "6": "六", "7": "七", "8": "八", "9": "九", "10": "十"
   };
 
+  const cityAbbrList = [
+    [/^南市/g, "台南市"],
+    [/^北市/g, "台北市"],
+    [/^高市/g, "高雄市"],
+    [/^中市/g, "台中市"],
+    [/^桃市/g, "桃園市"],
+    [/^基市/g, "基隆市"],
+    [/^竹市/g, "新竹市"],
+    [/^嘉市/g, "嘉義市"],
+    [/^新北(?!市)/g, "新北市"]
+  ];
+
   function cleanAddrWord(s) {
     let str = String(s || "").normalize("NFKC").trim();
+    for (const [re, rep] of cityAbbrList) {
+      str = str.replace(re, rep);
+    }
     str = str.replace(/第([一二三四五六七八九十\d]+)段/g, "$1段");
     str = str.replace(/([1-9]|10)段/g, (_, num) => `${digitToChinese[num]}段`);
     return str;
@@ -123,7 +138,7 @@
       const data = await gasJsonp({ action: "addrGeo", word: clean });
       const list = (data && Array.isArray(data.results)) ? data.results : [];
       if(list.length){
-        const plain = (s)=>cleanAddrWord(s).replace(/[()[\]（）\s]+/g,"").replace(/號/g,"");
+        const plain = (s)=>cleanAddrWord(s).replace(/[()\[\]（）\s]+/g,"").replace(/號/g,"");
         const norm = plain(clean);
         const exact = list.find(it=> plain(it.address) === norm) || list[0];
         if(Number.isFinite(exact.x) && Number.isFinite(exact.y)) return { la: exact.y, ln: exact.x };
@@ -246,10 +261,27 @@
     }
     list.innerHTML = addressBookmarks.map(b => {
       const hidden = b.visible === false;
+      const title = b.addr || b.address || b.custNo || "門牌標記";
+      let detail = b.detail || "";
+      if (!detail && (b.custNo || b.pole || b.code || b.meterNo || b.inspectTerm)) {
+        const parts = [];
+        if (b.custNo) parts.push(`電號: ${b.custNo}`);
+        if (b.pole) parts.push(`桿名: ${b.pole}`);
+        if (b.code) parts.push(`圖號: ${b.code}`);
+        if (b.meterNo) parts.push(`表號: ${b.meterNo}`);
+        if (b.inspectTerm) parts.push(`期限: ${b.inspectTerm}`);
+        detail = parts.join(" · ");
+      }
       return `
       <div class="v2-bookmark-item${hidden ? " is-hidden" : ""}" data-id="${escapeHtml(b.id)}">
         <div class="v2-bookmark-item-head">
-          <span class="v2-bookmark-item-label"><input type="checkbox" data-address-check="${escapeHtml(b.id)}" ${addressSelectedIds.has(b.id)?"checked":""}> <span class="v2-bookmark-item-title" title="${escapeHtml(b.addr)}">${escapeHtml(b.addr)}</span></span>
+          <span class="v2-bookmark-item-label">
+            <input type="checkbox" data-address-check="${escapeHtml(b.id)}" ${addressSelectedIds.has(b.id)?"checked":""}>
+            <span class="v2-bookmark-item-content" style="display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden;flex:1;">
+              <span class="v2-bookmark-item-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+              ${detail ? `<span class="v2-bookmark-item-sub" style="font-size:11px;color:#64748b;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(detail)}</span>` : ""}
+            </span>
+          </span>
           <div class="v2-bookmark-item-actions">
             <button type="button" data-address-action="toggle" data-id="${escapeHtml(b.id)}" title="${hidden ? "顯示" : "隱藏"}" aria-label="${hidden ? "顯示" : "隱藏"}">${hidden ? "🙈" : "👁️"}</button>
             <button type="button" data-address-action="remove" data-id="${escapeHtml(b.id)}" title="刪除" aria-label="刪除">🗑️</button>
@@ -268,22 +300,36 @@
     addressBookmarkLayers.clear();
     addressBookmarks.forEach(b => {
       if (b.visible === false) return;
-      if (!Number.isFinite(b.la) || !Number.isFinite(b.ln)) return;
+      const latVal = Number.isFinite(b.la) ? b.la : b.lat;
+      const lngVal = Number.isFinite(b.ln) ? b.ln : b.lng;
+      if (!Number.isFinite(latVal) || !Number.isFinite(lngVal)) return;
       try {
+        const title = b.addr || b.address || b.custNo || "門牌標記";
+        let detail = b.detail || "";
+        if (!detail && (b.custNo || b.pole || b.code || b.meterNo || b.inspectTerm)) {
+          const parts = [];
+          if (b.custNo) parts.push(`電號: ${b.custNo}`);
+          if (b.pole) parts.push(`桿名: ${b.pole}`);
+          if (b.code) parts.push(`圖號: ${b.code}`);
+          if (b.meterNo) parts.push(`表號: ${b.meterNo}`);
+          if (b.inspectTerm) parts.push(`期限: ${b.inspectTerm}`);
+          detail = parts.join(" · ");
+        }
+        const detailHtml = detail ? `<div style="font-size:12px;color:#64748b;margin-top:2px;">${escapeHtml(detail)}</div>` : "";
         const icon = L.divIcon({ className: "address-bookmark-icon", html: '<div style="width:14px;height:14px;background:#ef4444;border:2px solid #991b1b;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>', iconSize: [32,32], iconAnchor: [16,16], popupAnchor: [0,-16] });
-        const layer = L.marker([b.la, b.ln], { icon, interactive:true, bubblingMouseEvents:true, zIndexOffset: 500 }).addTo(map);
-        layer.bindPopup(`<div class="v2-cadastre-popup"><strong>${escapeHtml(b.addr)}</strong><div class="v2-cadastre-popup-actions" style="margin-top:6px;"><a class="popup-navigation-link" href="${googleNavUrl(b.la,b.ln)}" target="_blank" rel="noopener" style="margin-right:6px;">🗺️ 導航</a><button type="button" data-address-bookmark-hide="${escapeHtml(b.id)}" style="background:#f8fafc;color:#64748b;border:1px solid #cbd5e1;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">🙈 隱藏</button></div></div>`);
+        const layer = L.marker([latVal, lngVal], { icon, interactive:true, bubblingMouseEvents:true, zIndexOffset: 500 }).addTo(map);
+        layer.bindPopup(`<div class="v2-cadastre-popup"><strong>${escapeHtml(title)}</strong>${detailHtml}<div class="v2-cadastre-popup-actions" style="margin-top:6px;"><a class="popup-navigation-link" href="${googleNavUrl(latVal,lngVal)}" target="_blank" rel="noopener" style="margin-right:6px;">🗺️ 導航</a><button type="button" data-address-bookmark-hide="${escapeHtml(b.id)}" style="background:#f8fafc;color:#64748b;border:1px solid #cbd5e1;border-radius:5px;min-height:28px;padding:4px 8px;font-weight:800;cursor:pointer;">🙈 隱藏</button></div></div>`);
         addressBookmarkLayers.set(b.id, layer);
       } catch {}
     });
   }
   function addAddressBookmark(plate) {
     if (!plate || !Number.isFinite(plate.la) || !Number.isFinite(plate.ln)) { showToast("無可收藏的座標", "error"); return; }
-    const addrKey = plate.r || plate.addr;
-    const exists = addressBookmarks.some(b => b.addr === addrKey && Math.abs(b.la - plate.la) < 1e-6 && Math.abs(b.ln - plate.ln) < 1e-6);
+    const addrKey = plate.r || plate.addr || "門牌標記";
+    const exists = addressBookmarks.some(b => (b.addr === addrKey || b.address === addrKey) && Math.abs((b.la ?? b.lat) - plate.la) < 1e-6 && Math.abs((b.ln ?? b.lng) - plate.ln) < 1e-6);
     if (exists) { showToast(`已收藏過 ${addrKey}`, "dup"); return; }
     const id = `${plate.k || plate.addr}_${Date.now()}`;
-    addressBookmarks.push({ id, addr: addrKey, la: plate.la, ln: plate.ln, visible: true, createdAt: new Date().toISOString() });
+    addressBookmarks.push({ id, addr: addrKey, address: addrKey, la: plate.la, ln: plate.ln, lat: plate.la, lng: plate.ln, visible: true, createdAt: new Date().toISOString() });
     saveAddressBookmarks();
     renderAddressBookmarks();
     showToast(`已收藏 ${addrKey}`);
@@ -347,21 +393,22 @@
         // 手機上飛過去後把面板收起來，才看得到地圖
         if (window.matchMedia("(max-width: 768px)").matches) setPanelOpen(false);
       };
+      const latVal = Number.isFinite(bm.la) ? bm.la : bm.lat;
+      const lngVal = Number.isFinite(bm.ln) ? bm.ln : bm.lng;
+      if (!Number.isFinite(latVal) || !Number.isFinite(lngVal)) return;
       if (layer) {
-        map.flyTo([bm.la, bm.ln], Math.max(map.getZoom(), 19), { duration: 0.5 });
-        // 重抓圖層再開 popup：中間若發生重渲染，舊引用已失效
+        map.flyTo([latVal, lngVal], Math.max(map.getZoom(), 19), { duration: 0.5 });
         setTimeout(() => addressBookmarkLayers.get(id)?.openPopup(), 500);
         collapseForMap();
-      } else if (Number.isFinite(bm.la) && Number.isFinite(bm.ln)) {
-        // Bookmark was hidden, now visible but layer not yet created, re-render will create it
+      } else {
         collapseForMap();
         setTimeout(() => {
           const newLayer = addressBookmarkLayers.get(id);
           if (newLayer) {
-            map.flyTo([bm.la, bm.ln], Math.max(map.getZoom(), 19), { duration: 0.5 });
+            map.flyTo([latVal, lngVal], Math.max(map.getZoom(), 19), { duration: 0.5 });
             setTimeout(() => newLayer.openPopup(), 500);
           } else {
-            map.flyTo([bm.la, bm.ln], Math.max(map.getZoom(), 19), { duration: 0.5 });
+            map.flyTo([latVal, lngVal], Math.max(map.getZoom(), 19), { duration: 0.5 });
           }
         }, 100);
       }
@@ -464,6 +511,10 @@
     if(open){ closeOtherFloatingPanels(); controls.input.focus(); }
   }
   document.addEventListener("v2-inspection-open", ()=>setPanelOpen(false));
+  document.addEventListener("v2-cadastre-open", ()=>setPanelOpen(false));
+  document.addEventListener("v2-batch-open", ()=>setPanelOpen(false));
+  document.addEventListener("v2-search-open", ()=>setPanelOpen(false));
+  document.addEventListener("v2-layer-open", ()=>setPanelOpen(false));
   controls.toggle.addEventListener("click", ()=> setPanelOpen(!controls.panel.classList.contains("is-open")));
   controls.close?.addEventListener("click", ()=> setPanelOpen(false));
   controls.searchBtn?.addEventListener("click", ()=> performSearch());

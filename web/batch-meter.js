@@ -167,6 +167,18 @@
     "6": "六", "7": "七", "8": "八", "9": "九", "10": "十"
   };
 
+  const cityAbbrList = [
+    [/^南市/g, "台南市"],
+    [/^北市/g, "台北市"],
+    [/^高市/g, "高雄市"],
+    [/^中市/g, "台中市"],
+    [/^桃市/g, "桃園市"],
+    [/^基市/g, "基隆市"],
+    [/^竹市/g, "新竹市"],
+    [/^嘉市/g, "嘉義市"],
+    [/^新北(?!市)/g, "新北市"]
+  ];
+
   function cleanAddrStr(s) {
     let str = String(s || "").normalize("NFKC")
       .replace(/[台臺]/g, "台")
@@ -178,6 +190,11 @@
       .replace(/[溝沟]/g, "溝")
       .replace(/[灣湾]/g, "灣")
       .replace(/[()\[\]（）\s]+/g, "");
+
+    // 台電常見縣市簡稱正規化 (如 南市 -> 台南市, 北市 -> 台北市)
+    for (const [re, rep] of cityAbbrList) {
+      str = str.replace(re, rep);
+    }
 
     // 支援「第1段 / 第一段」去除「第」字
     str = str.replace(/第([一二三四五六七八九十\d]+)段/g, "$1段");
@@ -213,6 +230,23 @@
     return s;
   }
 
+  function extractSection(addr) {
+    const m = cleanAddrStr(addr).match(/([一二三四五六七八九十\d]+段)/);
+    return m ? m[1] : "";
+  }
+
+  function extractLane(addr) {
+    const s = cleanAddrStr(addr).replace(/\d+鄰/g, "");
+    const m = s.match(/(\d+)巷/);
+    return m ? m[1] : "";
+  }
+
+  function extractAlley(addr) {
+    const s = cleanAddrStr(addr).replace(/\d+鄰/g, "");
+    const m = s.match(/(\d+)弄/);
+    return m ? m[1] : "";
+  }
+
   function extractDoorplateNumber(addr) {
     let s = cleanAddrStr(addr).replace(/\d+鄰/g, "");
     // 1. 帶子號：例如 47-1號、47號之1、47號-1、47之1號
@@ -244,6 +278,18 @@
     return str;
   }
 
+  function canonicalStreetLaneNo(s) {
+    let str = cleanAddrStr(s);
+    str = str.replace(/^.*?[縣市]/, "").replace(/^.*?[區鄉鎮市]/, "");
+    str = str.replace(/^.*?里(?:\d+鄰)?/, "");
+    str = str.replace(/(\d+)號[-－之](\d+)(?:號)?/g, "$1-$2號");
+    str = str.replace(/(\d+)[-－之](\d+)號?/g, "$1-$2號");
+    str = str.replace(/[號].*?(?:[一二三四五六七八九十\d]+(?:[-－至到、][一二三四五六七八九十\d]+)?(?:樓|層|[Ff])).*$/g, "號");
+    str = str.replace(/(?:[一二三四五六七八九十\d]+(?:[-－至到、][一二三四五六七八九十\d]+)?(?:樓|層|[Ff])).*$/g, "");
+    str = str.replace(/號.*$/g, "");
+    return str;
+  }
+
   function getDistanceKm(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -258,18 +304,39 @@
     if (!Array.isArray(results) || results.length === 0) return null;
     const { county, district } = extractCountyDistrict(rawAddr);
     const targetCanonical = canonicalAddr(rawAddr);
+    const targetStreetNo = canonicalStreetLaneNo(rawAddr);
     const targetStreet = extractStreetOrVillage(rawAddr);
+    const targetSection = extractSection(rawAddr);
+    const targetLane = extractLane(rawAddr);
+    const targetAlley = extractAlley(rawAddr);
     const targetNum = extractDoorplateNumber(rawAddr);
 
     if (!targetNum) return null;
 
-    // 1. 第一優先：同縣市區、路/地名相符，且標準化門牌完全相符（含異體字、子號 158-3、80-11、98-1 等）
+    // 嚴格巷弄與路段階層相容性檢查：
+    // 1. 若原始地址沒寫「段」，候選門牌不可跨段；若有寫「段」，必須完全相同
+    // 2. 若原始地址沒寫「巷」，候選門牌嚴禁為巷內門牌；若有寫「巷」，巷號必須完全相符
+    // 3. 若原始地址沒寫「弄」，候選門牌嚴禁為弄內門牌；若有寫「弄」，弄號必須完全相符
+    function isLaneAlleySectionCompatible(itemAddr) {
+      if (targetSection && extractSection(itemAddr) !== targetSection) return false;
+      const itemLane = extractLane(itemAddr);
+      if (targetLane === "" && itemLane !== "") return false;
+      if (targetLane !== "" && itemLane !== targetLane) return false;
+      const itemAlley = extractAlley(itemAddr);
+      if (targetAlley === "" && itemAlley !== "") return false;
+      if (targetAlley !== "" && itemAlley !== targetAlley) return false;
+      return true;
+    }
+
+    // 1. 第一優先：同縣市區、路/地名相符，且標準化門牌完全相符（或路巷弄號完全相符）
     for (const item of results) {
       if (!Number.isFinite(item.x) || !Number.isFinite(item.y)) continue;
       const itemAddr = cleanAddrStr(item.address);
       if (county && !itemAddr.includes(county)) continue;
       if (district && !itemAddr.includes(district)) continue;
-      if (canonicalAddr(item.address) === targetCanonical) {
+      if (!isLaneAlleySectionCompatible(itemAddr)) continue;
+
+      if (canonicalAddr(item.address) === targetCanonical || canonicalStreetLaneNo(item.address) === targetStreetNo) {
         if (expectedPt && getDistanceKm(item.y, item.x, expectedPt.lat, expectedPt.lng) > 0.3) {
           console.warn(`[Batch] 門牌與現場電桿相差 ${getDistanceKm(item.y, item.x, expectedPt.lat, expectedPt.lng).toFixed(2)} km，自動以電桿現場為準`);
           return null; // 回傳 null 自動觸發保底使用現場電桿圖號定位
@@ -278,13 +345,14 @@
       }
     }
 
-    // 2. 第二優先：同縣市區、路/地名相符，完整號碼一致（例如「158號之3」比對「158-3號」）
+    // 2. 第二優先：路名、段數、巷、弄嚴格相符，且完整號碼一致（例如「158號之3」比對「158-3號」）
     for (const item of results) {
       if (!Number.isFinite(item.x) || !Number.isFinite(item.y)) continue;
       const itemAddr = cleanAddrStr(item.address);
       if (county && !itemAddr.includes(county)) continue;
       if (district && !itemAddr.includes(district)) continue;
       if (targetStreet && !itemAddr.includes(targetStreet)) continue;
+      if (!isLaneAlleySectionCompatible(itemAddr)) continue;
 
       const itemNum = extractDoorplateNumber(item.address);
       if (itemNum && itemNum.full === targetNum.full) {
@@ -295,13 +363,14 @@
       }
     }
 
-    // 3. 第三優先：母號相同（例如查詢 91號，回傳 91號之1），且距離現場電桿 <= 300 公尺
+    // 3. 第三優先：母號相同（例如查詢 91號，回傳 91號之1），巷弄階層嚴格相符，且距離現場電桿 <= 300 公尺
     for (const item of results) {
       if (!Number.isFinite(item.x) || !Number.isFinite(item.y)) continue;
       const itemAddr = cleanAddrStr(item.address);
       if (county && !itemAddr.includes(county)) continue;
       if (district && !itemAddr.includes(district)) continue;
       if (targetStreet && !itemAddr.includes(targetStreet)) continue;
+      if (!isLaneAlleySectionCompatible(itemAddr)) continue;
 
       const itemNum = extractDoorplateNumber(item.address);
       if (itemNum && itemNum.parent === targetNum.parent) {
