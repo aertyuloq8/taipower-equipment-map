@@ -1921,6 +1921,10 @@
 
   // 匯出帶座標與導航連結的 Excel
   async function exportToExcel() {
+    if (state.isReadOnlyShare) {
+      showToast("現場巡查模式禁止匯出資料！", "dup");
+      return;
+    }
     if (!state.records.length) {
       showToast("沒有標記結果可匯出！", "dup");
       return;
@@ -2049,6 +2053,10 @@
 
   // --- 本機檔案備份與讀取 (免登入、公司內網最佳、外勤手機零門檻互傳) ---
   function downloadBatchJson() {
+    if (state.isReadOnlyShare) {
+      showToast("現場巡查模式禁止下載備份檔！", "dup");
+      return;
+    }
     if (!state.records.length) {
       showToast("目前沒有批次電表標記可下載！", "dup");
       return;
@@ -2112,6 +2120,10 @@
   window.__getBatchRecords = () => getCleanRecords();
 
   function uploadBatchToDrive() {
+    if (state.isReadOnlyShare) {
+      showToast("現場巡查模式禁止上傳雲端！", "dup");
+      return;
+    }
     if (!state.records.length) {
       showToast("目前沒有批次電表標記可上傳！", "dup");
       return;
@@ -2857,6 +2869,10 @@
 
   // 點擊「分享連結」時：優先走 Google 雲端分享（可隨時作廢），備用純網址壓縮
   async function handleShareLinkClick() {
+    if (state.isReadOnlyShare) {
+      showToast("現場巡查模式禁止再次分享！", "dup");
+      return;
+    }
     if (!state.records || !state.records.length) {
       showToast("目前沒有批次電表標記可分享！請先進行標記。", "dup");
       return;
@@ -3045,11 +3061,25 @@
   function applyReadOnlyShareUI(totalCount) {
     if (!state.isReadOnlyShare) return;
 
+    // 1. 隱藏巡查排程列上的清除全部按鈕
     if (controls.clearAllBtn) controls.clearAllBtn.style.display = "none";
+
+    // 2. 隱藏「地圖視野與匯出管理」中的「📥 匯出 Excel」，僅保留「🔍 全體視野」
+    if (controls.exportBtn) controls.exportBtn.style.display = "none";
+
+    // 3. 徹底隱藏整個「🧰 跨裝置雲端與本機備份」折疊區塊 (含下載備份檔、分享連結、雲端備份等)
+    const backupAccordion = document.getElementById("batchBackupAccordion");
+    if (backupAccordion) backupAccordion.style.display = "none";
+
+    // 備援：確保所有備份/匯出子按鈕皆同步隱藏
+    const downloadJsonBtn = document.getElementById("batchDownloadJsonBtn");
+    const shareBtn = document.getElementById("batchShareBtn");
     const driveUploadBtn = document.getElementById("batchDriveUploadBtn");
     const driveRestoreBtn = document.getElementById("batchDriveRestoreBtn");
     const driveDeleteBtn = document.getElementById("batchDriveDeleteBtn");
     const restoreJsonBtn = document.getElementById("batchRestoreJsonBtn");
+    if (downloadJsonBtn) downloadJsonBtn.style.display = "none";
+    if (shareBtn) shareBtn.style.display = "none";
     if (driveUploadBtn) driveUploadBtn.style.display = "none";
     if (driveRestoreBtn) driveRestoreBtn.style.display = "none";
     if (driveDeleteBtn) driveDeleteBtn.style.display = "none";
@@ -3105,10 +3135,19 @@
       if (banner) banner.remove();
 
       if (controls.clearAllBtn) controls.clearAllBtn.style.display = "";
+      if (controls.exportBtn) controls.exportBtn.style.display = "";
+
+      const backupAccordion = document.getElementById("batchBackupAccordion");
+      if (backupAccordion) backupAccordion.style.display = "";
+
+      const downloadJsonBtn = document.getElementById("batchDownloadJsonBtn");
+      const shareBtn = document.getElementById("batchShareBtn");
       const driveUploadBtn = document.getElementById("batchDriveUploadBtn");
       const driveRestoreBtn = document.getElementById("batchDriveRestoreBtn");
       const driveDeleteBtn = document.getElementById("batchDriveDeleteBtn");
       const restoreJsonBtn = document.getElementById("batchRestoreJsonBtn");
+      if (downloadJsonBtn) downloadJsonBtn.style.display = "";
+      if (shareBtn) shareBtn.style.display = "";
       if (driveUploadBtn) driveUploadBtn.style.display = "";
       if (driveRestoreBtn) driveRestoreBtn.style.display = "";
       if (driveDeleteBtn) driveDeleteBtn.style.display = "";
