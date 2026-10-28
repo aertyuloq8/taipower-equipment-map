@@ -550,7 +550,6 @@
     exportBtn: null,
     clearAllBtn: null,
     shareBtn: null,
-    shareQuickBtn: null,
     toggleBgLabelsBtn: null,
     toggleLabelsBtn: null,
     filterBtn: null,
@@ -600,7 +599,6 @@
     controls.exportBtn = document.getElementById("batchMeterExportBtn");
     controls.clearAllBtn = document.getElementById("batchClearAllBtn");
     controls.shareBtn = document.getElementById("batchShareBtn");
-    controls.shareQuickBtn = document.getElementById("batchShareQuickBtn");
 
     controls.toggleBgLabelsBtn = document.getElementById("batchToggleBgLabelsBtn");
     controls.toggleLabelsBtn = document.getElementById("batchToggleLabelsBtn");
@@ -2248,9 +2246,8 @@
       e.target.value = "";
     });
 
-    // 專屬分享連結 (訪客唯讀巡查模式)
+    // 專屬分享短網址 (訪客唯讀巡查模式)
     controls.shareBtn?.addEventListener("click", generateShareLink);
-    controls.shareQuickBtn?.addEventListener("click", generateShareLink);
 
     // 雲端備份
     controls.driveUploadBtn?.addEventListener("click", uploadBatchToDrive);
@@ -2674,6 +2671,23 @@
     return Math.abs(h).toString(36);
   }
 
+  function cleanExtraForShare(extra, rec) {
+    if (!extra || typeof extra !== "object") return "";
+    const skipKeys = new Set([
+      "電號", "custno", "用電地址", "地址", "addr", "address",
+      "土木設備", "桿名", "設備", "pole", "圖號座標", "圖號", "code", "定位型態"
+    ]);
+    const filtered = {};
+    for (const [k, v] of Object.entries(extra)) {
+      const cleanK = String(k || "").trim();
+      const cleanV = String(v ?? "").trim();
+      if (!cleanK || !cleanV) continue;
+      if (skipKeys.has(cleanK) || skipKeys.has(cleanK.toLowerCase())) continue;
+      filtered[cleanK] = cleanV;
+    }
+    return Object.entries(filtered).map(([k, v]) => `${k}:${v}`).join(";");
+  }
+
   function tupleToRecord(t, idx) {
     const extra = {};
     if (t[11]) {
@@ -2684,17 +2698,32 @@
     }
     const isDoorplate = Number(t[9]) === 1;
     const isInspected = Number(t[10]) === 1;
+    const custNo = String(t[3] || "");
+    const addr = String(t[4] || "");
+    const pole = String(t[5] || "");
+    const code = String(t[6] || "");
+    const meterNo = String(t[7] || "");
+    const inspectTerm = String(t[8] || "");
+
+    if (custNo && !extra["電號"]) extra["電號"] = custNo;
+    if (addr && !extra["用電地址"]) extra["用電地址"] = addr;
+    if (pole && !extra["土木設備"]) extra["土木設備"] = pole;
+    if (code && !extra["圖號座標"]) extra["圖號座標"] = code;
+    if (meterNo && !extra["表號"]) extra["表號"] = meterNo;
+    if (inspectTerm && !extra["檢驗期別"]) extra["檢驗期別"] = inspectTerm;
+    if (!extra["定位型態"]) extra["定位型態"] = isDoorplate ? "🏠 門牌定位" : "⚡ 圖號定位";
+
     return {
       seqNo: Number(t[0]) || (idx + 1),
       uid: `bm_share_${Date.now()}_${t[0] || idx}_${Math.random().toString(36).slice(2, 6)}`,
       lat: Number(t[1]),
       lng: Number(t[2]),
-      custNo: String(t[3] || ""),
-      addr: String(t[4] || ""),
-      pole: String(t[5] || ""),
-      code: String(t[6] || ""),
-      meterNo: String(t[7] || ""),
-      inspectTerm: String(t[8] || ""),
+      custNo,
+      addr,
+      pole,
+      code,
+      meterNo,
+      inspectTerm,
       locType: isDoorplate ? "doorplate" : "grid",
       locLabel: isDoorplate ? "🏠 電子門牌精準定位（用戶住家）" : "⚡ 圖號座標定位（現場掛表電桿）",
       inspected: isInspected,
@@ -2710,6 +2739,45 @@
     } catch (e) {}
   }
 
+  async function createShortUrl(longUrl) {
+    // 1. 優先透過 is.gd 產生極簡短網址 (直接支援 CORS，且 301 重定向保留 Hash)
+    try {
+      const isGdUrl = `https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`;
+      const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const tid = ctrl ? setTimeout(() => ctrl.abort(), 4000) : null;
+      const res = await fetch(isGdUrl, { signal: ctrl?.signal, method: "GET" });
+      if (tid) clearTimeout(tid);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.shorturl) {
+          return json.shorturl;
+        }
+      }
+    } catch (e) {
+      console.warn("is.gd 短網址嘗試失敗，切換備用短網址服務：", e);
+    }
+
+    // 2. 備用：呼叫專屬 Vercel 邊緣 API 短網址轉址 (自動串接 TinyURL)
+    try {
+      const vercelEndpoint = "https://taipower-taiwan-map.vercel.app/api/shorten";
+      const ctrl2 = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const tid2 = ctrl2 ? setTimeout(() => ctrl2.abort(), 4500) : null;
+      const res2 = await fetch(`${vercelEndpoint}?url=${encodeURIComponent(longUrl)}`, { signal: ctrl2?.signal });
+      if (tid2) clearTimeout(tid2);
+      if (res2.ok) {
+        const json2 = await res2.json();
+        if (json2 && json2.shortUrl) {
+          return json2.shortUrl;
+        }
+      }
+    } catch (e2) {
+      console.warn("Vercel 短網址服務連線跳過：", e2);
+    }
+
+    // 3. 若均不可用 (如完全離線環境)，降級回傳完整壓縮網址
+    return longUrl;
+  }
+
   async function generateShareLink() {
     if (!state.records || !state.records.length) {
       showToast("目前沒有批次電表標記可分享！請先進行標記。", "dup");
@@ -2717,11 +2785,11 @@
     }
 
     try {
-      showToast("正在產生專屬分享連結…");
+      showToast("正在產生專屬短網址…");
       const compact = state.records.map(r => [
         r.seqNo,
-        Number(Number(r.lat).toFixed(6)),
-        Number(Number(r.lng).toFixed(6)),
+        Number(Number(r.lat).toFixed(5)),
+        Number(Number(r.lng).toFixed(5)),
         r.custNo || "",
         r.addr || "",
         r.pole || "",
@@ -2730,67 +2798,71 @@
         r.inspectTerm || "",
         r.locType === "doorplate" ? 1 : 0,
         r.inspected ? 1 : 0,
-        r.extra && typeof r.extra === "object" ? Object.entries(r.extra).map(([k, v]) => `${k}:${v}`).join(";") : ""
+        cleanExtraForShare(r.extra, r)
       ]);
 
       const b64 = await compressShareData(compact);
-      const url = `${location.origin}${location.pathname}#share=${b64}`;
+      const longUrl = `${location.origin}${location.pathname}#share=${b64}`;
+
+      const shortUrl = await createShortUrl(longUrl);
+      const isShort = Boolean(shortUrl && shortUrl !== longUrl);
 
       let copied = false;
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(url);
+          await navigator.clipboard.writeText(shortUrl);
           copied = true;
         }
       } catch (clipErr) {
         console.warn("自動寫入剪貼簿失敗，改由彈窗手動複製：", clipErr);
       }
 
-      showShareModal(url, state.records.length, copied);
+      showShareModal(shortUrl, longUrl, state.records.length, copied, isShort);
     } catch (err) {
       console.error("產生分享連結失敗：", err);
       showToast("產生分享連結失敗：" + err.message, "error");
     }
   }
 
-  function showShareModal(url, count, autoCopied) {
-    const isShortEnoughForQr = url.length <= 2200;
+  function showShareModal(shortUrl, longUrl, count, autoCopied, isShort) {
+    const displayUrl = shortUrl || longUrl;
     const content = `
       <div style="font-size:13px;line-height:1.5;color:#334155;">
         <div style="margin-bottom:10px;">
           ${autoCopied 
             ? `<div style="background:#ecfdf5;border:1px solid #10b981;border-radius:6px;padding:6px 10px;color:#065f46;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-                 <span>✅</span><span>連結已自動複製到剪貼簿！可直接貼至 LINE 或 Teams。</span>
+                 <span>✅</span><span>${isShort ? '專屬短網址已自動複製到剪貼簿！' : '專屬連結已自動複製到剪貼簿！'} 可直接貼至 LINE 或 Teams。</span>
                </div>`
             : ''}
           已將 <strong>${count}</strong> 只電表之現場座標、桿號與地址資料封裝為專屬分享連結：
         </div>
 
-        <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;">
-          <input type="text" id="bmShareUrlInput" readonly value="${escapeHtml(url)}" 
-            style="flex:1;padding:7px 10px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#0f172a;min-width:0;" 
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+          <input type="text" id="bmShareUrlInput" readonly value="${escapeHtml(displayUrl)}" 
+            style="flex:1;padding:7px 10px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#0f172a;min-width:0;font-family:monospace;" 
             onclick="this.select();" />
           <button type="button" id="bmShareCopyBtn" 
             style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
-            複製連結
+            複製短網址
           </button>
         </div>
 
-        ${isShortEnoughForQr ? `
-          <div style="text-align:center;margin:10px 0;padding:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;">
-            <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;">📱 或現場直接掃描 QR Code 開啟：</div>
-            <div id="bmShareQrContainer" style="display:inline-block;padding:6px;background:#fff;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1);min-height:140px;min-width:140px;"></div>
-          </div>
-        ` : `
-          <div style="font-size:11px;color:#64748b;background:#f8fafc;border-radius:6px;padding:6px 10px;margin-bottom:10px;">
-            💡 提示：點位數量較多（共 ${count} 筆），建議直接使用上方「複製連結」傳送至手機瀏覽器開啟。
-          </div>
-        `}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:11px;color:#64748b;">
+          <span>${isShort ? '⚡ 已啟用防 LINE 斷字短網址 (推薦)' : '⚠️ 完整原始網址'}</span>
+          <button type="button" id="bmToggleUrlModeBtn" style="background:none;border:none;color:#0f766e;cursor:pointer;font-size:11px;text-decoration:underline;">
+            ${isShort ? '切換為完整備用網址' : '切換為短網址'}
+          </button>
+        </div>
+
+        <div style="text-align:center;margin:10px 0;padding:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;">📱 或現場直接掃描 QR Code 開啟：</div>
+          <div id="bmShareQrContainer" style="display:inline-block;padding:6px;background:#fff;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1);min-height:140px;min-width:140px;"></div>
+        </div>
 
         <div style="font-size:11px;color:#0f766e;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;line-height:1.4;">
           🛡️ <strong>訪客權限保護保證：</strong><br>
-          • 他人點擊連結後直接在地圖上檢視、導航與縮放。<br>
-          • 他人可點擊「標記已跑」進行隱藏/巡檢，進度僅存在對方手機。<br>
+          • 推薦直接傳送<strong>短網址</strong>至 LINE，字數極短絕不斷字，對方點開立即載入地圖。<br>
+          • 他人可點擊看資料、導航與縮放；標記已跑進度僅存於對方手機。<br>
           • <strong>他人無法清空、刪除或移除點位</strong>，您的母檔絕對安全。
         </div>
       </div>
@@ -2808,15 +2880,18 @@
       setTimeout(() => {
         const copyBtn = document.getElementById("bmShareCopyBtn");
         const urlInput = document.getElementById("bmShareUrlInput");
+        const toggleBtn = document.getElementById("bmToggleUrlModeBtn");
+        let showingShort = isShort;
+
         if (copyBtn && urlInput) {
           copyBtn.onclick = async () => {
             try {
               urlInput.select();
-              await navigator.clipboard.writeText(url);
+              await navigator.clipboard.writeText(urlInput.value);
               copyBtn.textContent = "✓ 已複製！";
               copyBtn.style.background = "#10b981";
               setTimeout(() => {
-                copyBtn.textContent = "複製連結";
+                copyBtn.textContent = showingShort ? "複製短網址" : "複製連結";
                 copyBtn.style.background = "#0f766e";
               }, 2000);
             } catch (e) {
@@ -2827,13 +2902,23 @@
           };
         }
 
+        if (toggleBtn && urlInput && copyBtn) {
+          toggleBtn.onclick = () => {
+            showingShort = !showingShort;
+            urlInput.value = showingShort ? shortUrl : longUrl;
+            toggleBtn.textContent = showingShort ? "切換為完整備用網址" : "切換為短網址";
+            copyBtn.textContent = showingShort ? "複製短網址" : "複製連結";
+            urlInput.select();
+          };
+        }
+
         const qrContainer = document.getElementById("bmShareQrContainer");
         if (qrContainer) {
           ensureQRCode().then(() => {
             if (window.QRCode) {
               try {
                 new window.QRCode(qrContainer, {
-                  text: url,
+                  text: displayUrl,
                   width: 140,
                   height: 140,
                   correctLevel: window.QRCode.CorrectLevel.M
@@ -2846,7 +2931,7 @@
         }
       }, 50);
     } else {
-      window.prompt("已產生分享連結，請複製：", url);
+      window.prompt("已產生專屬短網址，請複製：", displayUrl);
     }
   }
 
@@ -2854,7 +2939,6 @@
     if (!state.isReadOnlyShare) return;
 
     if (controls.clearAllBtn) controls.clearAllBtn.style.display = "none";
-    if (controls.shareQuickBtn) controls.shareQuickBtn.style.display = "none";
     const driveUploadBtn = document.getElementById("batchDriveUploadBtn");
     const driveRestoreBtn = document.getElementById("batchDriveRestoreBtn");
     const driveDeleteBtn = document.getElementById("batchDriveDeleteBtn");
@@ -2912,7 +2996,6 @@
       if (banner) banner.remove();
 
       if (controls.clearAllBtn) controls.clearAllBtn.style.display = "";
-      if (controls.shareQuickBtn) controls.shareQuickBtn.style.display = "";
       const driveUploadBtn = document.getElementById("batchDriveUploadBtn");
       const driveRestoreBtn = document.getElementById("batchDriveRestoreBtn");
       const driveDeleteBtn = document.getElementById("batchDriveDeleteBtn");
@@ -2936,14 +3019,16 @@
   async function checkAndLoadSharedBatch() {
     let raw = "";
     const hash = window.location.hash || "";
-    const hashMatch = hash.match(/[#&]share=([A-Za-z0-9_-]+)/);
+    const hashMatch = hash.match(/[#&]share=([^&]+)/);
     if (hashMatch && hashMatch[1]) {
-      raw = hashMatch[1];
+      raw = decodeURIComponent(hashMatch[1]);
     }
     if (!raw) {
       const search = window.location.search || "";
-      const searchParams = new URLSearchParams(search);
-      raw = searchParams.get("share") || "";
+      const searchMatch = search.match(/[?&]share=([^&]+)/);
+      if (searchMatch && searchMatch[1]) {
+        raw = decodeURIComponent(searchMatch[1]);
+      }
     }
 
     if (!raw) return false;
@@ -2999,7 +3084,7 @@
     }
   }
 
-  async function boot(attempt = 0) {
+    async function boot(attempt = 0) {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => boot(0), { once: true });
       return;
