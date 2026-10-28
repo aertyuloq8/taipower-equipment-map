@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
     <link rel="stylesheet" href="cadastre.css" />
-    <link rel="stylesheet" href="batch-meter.css?v=2.6.6" />
+    <link rel="stylesheet" href="batch-meter.css?v=2.7.2" />
     <script type="module" src="./src/utils/cdn.js"></script>
 
     <link rel="stylesheet" href="./src/styles/main.css" />
@@ -386,7 +386,7 @@
             <summary>🧰 跨裝置雲端與本機備份</summary>
             <div class="panel-fold-body">
               <div class="folder-btn-group">
-                <button id="batchShareBtn" class="btn-action btn-share-link" type="button" title="一鍵產生專屬分享連結，他人可點擊看資料、導航與標記隱藏，但無法刪除母檔" style="background:#0f766e;color:#fff;font-weight:700;">🔗 產生分享連結</button>
+                <button id="batchShareBtn" class="btn-action btn-share-link" type="button" title="一鍵產生專屬分享短網址，他人可點擊看資料、導航與標記隱藏，但無法刪除母檔">🔗 分享連結</button>
                 <button id="batchDownloadJsonBtn" class="btn-action btn-export-zip" type="button" title="下載本機備份檔 (免登入、公司內網最佳)">💾 下載備份檔</button>
                 <button id="batchRestoreJsonBtn" class="btn-action btn-add-folder" type="button" title="讀取本機備份檔 (免登入)">📂 讀取備份檔</button>
                 <input type="file" id="batchJsonFileInput" accept=".json" style="display:none;" />
@@ -810,7 +810,7 @@
     <script src="src/utils/bookmark-db.js?v=2.6.3"></script>
     <script src="cadastre.js"></script>
     <script src="address-search.js?v=2.6.10"></script>
-    <script src="batch-meter.js?v=2.7.1"></script>
+    <script src="batch-meter.js?v=2.7.2"></script>
     <script src="sync.js"></script>
     <script>
     /* 版本對帳：主程式 5 秒內沒開機（舊 JS 配新殼 / 載入失敗）就跳橫幅請重整，

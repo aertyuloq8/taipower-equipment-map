@@ -269,6 +269,7 @@
       .btn-export-json { background: #fffbeb; color: #d97706; border: 1px dashed #d97706; }
       .btn-import-json { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }
       .btn-export-zip { background: #ecfeff; color: #0f766e; border: 1px dashed #0f766e; }
+      .btn-share-link { background: #ecfeff; color: #0f766e; border: 1px dashed #0f766e; }
       .btn-import-zip { background: #f5f3ff; color: #6d28d9; border: 1px dashed #6d28d9; }
 .btn-drive { background: #fff7ed; color: #c2410c; border: 1px dashed #c2410c; }
       .btn-drive-delete { background: #fef2f2; color: #dc2626; border: 1px dashed #dc2626; }

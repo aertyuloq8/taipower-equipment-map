@@ -708,6 +708,18 @@
 .v2-batch-fold .btn-action:hover {
   filter: brightness(0.96);
 }
+#batchShareBtn,
+.btn-share-link {
+  background: #ecfeff !important;
+  color: #0f766e !important;
+  border: 1px dashed #0f766e !important;
+}
+#batchShareBtn:hover,
+.btn-share-link:hover {
+  background: #cffafe !important;
+  color: #0d9488 !important;
+}
+
 #batchFitBoundsBtn,
 .v2-batch-btn-view,
 .v2-batch-action-btn.btn-sync {
