@@ -2247,7 +2247,7 @@
     });
 
     // 專屬分享短網址 (訪客唯讀巡查模式)
-    controls.shareBtn?.addEventListener("click", generateShareLink);
+    controls.shareBtn?.addEventListener("click", handleShareLinkClick);
 
     // 雲端備份
     controls.driveUploadBtn?.addEventListener("click", uploadBatchToDrive);
@@ -2598,7 +2598,15 @@
     }
   }
 
-  // --- 專屬分享連結與訪客巡查模式 (他人可點擊看資料、導航、縮放、標記已跑隱藏，但不能刪除移除) ---
+  // --- 專屬分享連結與訪客巡查模式 (方案二：綁定 Google 雲端硬碟，可透過刪除雲端作廢) ---
+
+  function getDriveShareProxyUrl(fileId) {
+    const host = typeof window !== "undefined" ? window.location.hostname : "";
+    const base = (host === "localhost" || host === "127.0.0.1" || host.includes("vercel.app"))
+      ? "/api/drive-share"
+      : "https://taipower-taiwan-map.vercel.app/api/drive-share";
+    return `${base}?id=${encodeURIComponent(fileId)}`;
+  }
 
   function ensureQRCode() {
     if (window.QRCode) return Promise.resolve();
@@ -2774,16 +2782,45 @@
       console.warn("Vercel 短網址服務連線跳過：", e2);
     }
 
-    // 3. 若均不可用 (如完全離線環境)，降級回傳完整壓縮網址
+    // 3. 降級回傳完整網址
     return longUrl;
   }
 
-  async function generateShareLink() {
+  // 點擊「分享連結」時：優先走 Google 雲端分享（可隨時作廢），備用純網址壓縮
+  async function handleShareLinkClick() {
     if (!state.records || !state.records.length) {
       showToast("目前沒有批次電表標記可分享！請先進行標記。", "dup");
       return;
     }
 
+    if (window.__bookmarkDrive && window.__bookmarkDrive.share) {
+      window.__bookmarkDrive.share("batch");
+    } else {
+      generateDirectHashShareLink();
+    }
+  }
+
+  // Google Drive 上傳成功後調用此展示分享彈窗
+  window.__showBatchShareModal = async function(targetUrl, count, fileName) {
+    showToast("正在產生專屬短網址…");
+    const shortUrl = await createShortUrl(targetUrl);
+    const isShort = Boolean(shortUrl && shortUrl !== targetUrl);
+
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shortUrl);
+        copied = true;
+      }
+    } catch (clipErr) {
+      console.warn("自動寫入剪貼簿失敗：", clipErr);
+    }
+
+    showShareModal(shortUrl, targetUrl, count, copied, isShort, fileName);
+  };
+
+  // 離線/未登入時的備用純前端壓縮分享
+  async function generateDirectHashShareLink() {
     try {
       showToast("正在產生專屬短網址…");
       const compact = state.records.map(r => [
@@ -2803,7 +2840,6 @@
 
       const b64 = await compressShareData(compact);
       const longUrl = `${location.origin}${location.pathname}#share=${b64}`;
-
       const shortUrl = await createShortUrl(longUrl);
       const isShort = Boolean(shortUrl && shortUrl !== longUrl);
 
@@ -2813,28 +2849,28 @@
           await navigator.clipboard.writeText(shortUrl);
           copied = true;
         }
-      } catch (clipErr) {
-        console.warn("自動寫入剪貼簿失敗，改由彈窗手動複製：", clipErr);
-      }
+      } catch (clipErr) {}
 
-      showShareModal(shortUrl, longUrl, state.records.length, copied, isShort);
+      showShareModal(shortUrl, longUrl, state.records.length, copied, isShort, "");
     } catch (err) {
       console.error("產生分享連結失敗：", err);
       showToast("產生分享連結失敗：" + err.message, "error");
     }
   }
 
-  function showShareModal(shortUrl, longUrl, count, autoCopied, isShort) {
+  function showShareModal(shortUrl, longUrl, count, autoCopied, isShort, fileName) {
     const displayUrl = shortUrl || longUrl;
+    const isCloudShare = Boolean(longUrl.includes("#drive="));
+
     const content = `
       <div style="font-size:13px;line-height:1.5;color:#334155;">
         <div style="margin-bottom:10px;">
           ${autoCopied 
             ? `<div style="background:#ecfdf5;border:1px solid #10b981;border-radius:6px;padding:6px 10px;color:#065f46;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-                 <span>✅</span><span>${isShort ? '專屬短網址已自動複製到剪貼簿！' : '專屬連結已自動複製到剪貼簿！'} 可直接貼至 LINE 或 Teams。</span>
+                 <span>✅</span><span>專屬短網址已自動複製到剪貼簿！可直接貼至 LINE 或 Teams。</span>
                </div>`
             : ''}
-          已將 <strong>${count}</strong> 只電表之現場座標、桿號與地址資料封裝為專屬分享連結：
+          已將 <strong>${count}</strong> 只電表打包發布為專屬巡查分享連結：
         </div>
 
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
@@ -2848,7 +2884,7 @@
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:11px;color:#64748b;">
-          <span>${isShort ? '⚡ 已啟用防 LINE 斷字短網址 (推薦)' : '⚠️ 完整原始網址'}</span>
+          <span>${isShort ? '⚡ 已啟用防 LINE 斷字短網址 (推薦)' : '⚠️ 完整網址'}</span>
           <button type="button" id="bmToggleUrlModeBtn" style="background:none;border:none;color:#0f766e;cursor:pointer;font-size:11px;text-decoration:underline;">
             ${isShort ? '切換為完整備用網址' : '切換為短網址'}
           </button>
@@ -2860,17 +2896,19 @@
         </div>
 
         <div style="font-size:11px;color:#0f766e;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;line-height:1.4;">
-          🛡️ <strong>訪客權限保護保證：</strong><br>
-          • 推薦直接傳送<strong>短網址</strong>至 LINE，字數極短絕不斷字，對方點開立即載入地圖。<br>
-          • 他人可點擊看資料、導航與縮放；標記已跑進度僅存於對方手機。<br>
-          • <strong>他人無法清空、刪除或移除點位</strong>，您的母檔絕對安全。
+          🛡️ <strong>Google 雲端作廢控制與安全保證：</strong><br>
+          ${isCloudShare ? `
+            • 🗑️ <strong>隨時作廢</strong>：若欲收回此連結，請直接點擊下方「<strong>🗑️ 刪除雲端</strong>」，勾選此筆 <code>${escapeHtml(fileName || '[分享] 檔案')}</code> 刪除，對方的短網址將<strong>立刻永久失效</strong>！<br>
+          ` : ''}
+          • 🧭 <strong>安全唯讀巡查</strong>：他人點開後只能檢視、導航與標記已跑，<strong>絕對無法刪除或竄改母檔</strong>。<br>
+          • 💬 <strong>極簡短網址防斷字</strong>：推薦直接傳送短網址至 LINE，字數極短絕不斷字，對方點開秒開地圖。
         </div>
       </div>
     `;
 
     if (window.GlobalModal && window.GlobalModal.show) {
       window.GlobalModal.show({
-        title: "🔗 批次電表現場巡查分享",
+        title: "🔗 批次電表現場巡查分享 (雲端可作廢)",
         content,
         type: "alert",
         confirmText: "關閉",
@@ -2985,7 +3023,9 @@
 
   function exitReadOnlyShareMode() {
     const doExit = () => {
-      let newHash = window.location.hash.replace(/[#&]share=[A-Za-z0-9_-]+/, "");
+      let newHash = window.location.hash
+        .replace(/[#&]drive=[A-Za-z0-9_-]+/, "")
+        .replace(/[#&]share=[A-Za-z0-9_-]+/, "");
       if (newHash === "#" || !newHash) newHash = "";
       history.replaceState(null, "", window.location.pathname + window.location.search + newHash);
 
@@ -3017,14 +3057,99 @@
   }
 
   async function checkAndLoadSharedBatch() {
-    let raw = "";
     const hash = window.location.hash || "";
+    const search = window.location.search || "";
+
+    // 1. 優先檢查是否為 Google Drive 雲端分享 (#drive=FILE_ID)
+    let driveFileId = "";
+    const driveHashMatch = hash.match(/[#&]drive=([A-Za-z0-9_-]+)/);
+    if (driveHashMatch && driveHashMatch[1]) {
+      driveFileId = driveHashMatch[1];
+    }
+    if (!driveFileId) {
+      const searchDriveMatch = search.match(/[?&]drive=([A-Za-z0-9_-]+)/);
+      if (searchDriveMatch && searchDriveMatch[1]) {
+        driveFileId = searchDriveMatch[1];
+      }
+    }
+
+    if (driveFileId) {
+      try {
+        showToast("正在載入雲端巡查分享資料…");
+        const proxyUrl = getDriveShareProxyUrl(driveFileId);
+        const res = await fetch(proxyUrl);
+
+        if (res.status === 404) {
+          if (window.GlobalModal && window.GlobalModal.alert) {
+            window.GlobalModal.alert("❌ <strong>此現場巡查分享已被發布者刪除作廢！</strong><br><br>發布同仁已從 Google 雲端刪除此批次分享檔，該網址已永久失效。");
+          } else {
+            alert("❌ 此現場巡查分享已被發布者刪除作廢！");
+          }
+          return false;
+        }
+
+        if (!res.ok) {
+          showToast("載入雲端分享失敗，請確認網路連線", "error");
+          return false;
+        }
+
+        const rawRecords = await res.json();
+        if (!Array.isArray(rawRecords) || !rawRecords.length) {
+          showToast("雲端資料格式錯誤或為空", "error");
+          return false;
+        }
+
+        state.isReadOnlyShare = true;
+        state.shareHash = hashString(driveFileId);
+        state.records = normalizeImportedRecords(rawRecords);
+
+        try {
+          const rawSaved = sessionStorage.getItem("tp_guest_inspected_" + state.shareHash);
+          if (rawSaved) {
+            const guestInspected = JSON.parse(rawSaved);
+            if (Array.isArray(guestInspected)) {
+              const set = new Set(guestInspected);
+              state.records.forEach(r => {
+                r.inspected = set.has(r.seqNo);
+              });
+            }
+          }
+        } catch (e) {}
+
+        renderBatchMarkers();
+        renderBatchList();
+        updatePatrolToggleUI();
+        updateSummaryBadges();
+        updateFilterStatusUI(state.records.length);
+        applyReadOnlyShareUI(state.records.length);
+
+        const map = getMap();
+        if (map && state.records.length > 0) {
+          const bounds = getBatchRecordsBounds();
+          if (bounds && bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+          }
+        }
+
+        switchTab("list");
+        setPanelOpen(true);
+
+        showToast(`📋 已載入現場巡查分享（共 ${state.records.length} 只電表，唯讀保護）`);
+        return true;
+      } catch (err) {
+        console.error("載入雲端分享失敗：", err);
+        showToast("載入雲端分享失敗：" + err.message, "error");
+        return false;
+      }
+    }
+
+    // 2. 備用：檢查是否為純前端壓縮分享 (#share=COMPACT_BASE64)
+    let raw = "";
     const hashMatch = hash.match(/[#&]share=([^&]+)/);
     if (hashMatch && hashMatch[1]) {
       raw = decodeURIComponent(hashMatch[1]);
     }
     if (!raw) {
-      const search = window.location.search || "";
       const searchMatch = search.match(/[?&]share=([^&]+)/);
       if (searchMatch && searchMatch[1]) {
         raw = decodeURIComponent(searchMatch[1]);

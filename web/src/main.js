@@ -5351,6 +5351,7 @@ window.__appBooted = true;
           else if (resume.type === "bookmark_upload") bookmarkDrive.upload(resume.subType);
           else if (resume.type === "bookmark_restore") bookmarkDrive.restore(resume.subType);
           else if (resume.type === "bookmark_delete") bookmarkDrive.deleteCloud(resume.subType);
+          else if (resume.type === "bookmark_share") bookmarkDrive.share(resume.subType);
           else GlobalModal.alert("Google 登入完成，請再按一次原本的功能。");
         };
         if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run);
@@ -6162,9 +6163,14 @@ window.__appBooted = true;
             }
 
             const rows = files.map((f) => {
+              const isShareFile = f.name.startsWith("[分享]");
+              const shareBadge = isShareFile
+                ? '<span style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-right:4px;">🔗 分享網址 (刪除即作廢)</span>'
+                : '<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-right:4px;">💾 備份檔</span>';
               const desc = f.description ? `<br><span style="color:#0f766e;font-size:11px;">📋 ${escapeHtml(f.description)}</span>` : "";
               return '<label style="display:block; padding:8px 4px; border-bottom:1px solid #e2e8f0; cursor:pointer;">' +
                 '<input type="checkbox" name="bookmarkDriveDeletePick" value="' + f.id + '"> ' +
+                shareBadge +
                 '<strong>' + escapeHtml(f.name) + '</strong><br>' +
                 '<span style="font-size:12px; color:#64748b; margin-left:20px;">' +
                 (f.createdTime ? new Date(f.createdTime).toLocaleString("zh-TW") : "") +
@@ -6210,6 +6216,77 @@ window.__appBooted = true;
             console.error(`${cfg.label} 刪除失敗：`, e);
             if (!e.message.includes("已取消")) {
               GlobalModal.alert(`刪除「${cfg.label}」雲端備份失敗：${e.message}`);
+            }
+          } finally {
+            clearDriveAccessToken();
+            if (button) { button.disabled = false; button.textContent = originalText; }
+          }
+        },
+
+        async share(type = "batch") {
+          const cfg = getBookmarkModuleConfig(type);
+          const button = document.getElementById("batchShareBtn");
+          const originalText = button ? button.textContent : "";
+          if (button) { button.disabled = true; button.textContent = "☁️ 登入 Google 中…"; }
+
+          window.__v2DriveResume = { type: "bookmark_share", subType: type };
+
+          let bookmarks = [];
+          if (type === "batch") {
+            if (window.__getBatchRecords) {
+              try { bookmarks = window.__getBatchRecords() || []; } catch {}
+            }
+            if (!bookmarks.length) {
+              try { bookmarks = JSON.parse(localStorage.getItem(cfg.lsKey) || "[]"); } catch {}
+            }
+          }
+
+          if (!bookmarks.length) {
+            GlobalModal.alert(`目前沒有「${cfg.label}」資料可分享。請先進行標記。`);
+            if (button) { button.disabled = false; button.textContent = originalText; }
+            return;
+          }
+
+          try {
+            await getDriveAccessToken();
+            if (button) button.textContent = "☁️ 建立分享中…";
+
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            const timeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+            const fileName = `[分享] 批次電表_${bookmarks.length}只_${timeStr}.json`;
+            const cleanBookmarks = bookmarks.map(r => {
+              const copy = { ...r };
+              delete copy.marker;
+              delete copy._marker;
+              return copy;
+            });
+            const blob = new Blob([JSON.stringify(cleanBookmarks, null, 2)], { type: "application/json" });
+            const description = `🔗 現場巡查專用分享檔 (${bookmarks.length} 只電表) · 刪除此檔即作廢分享網址 · 建立於 ${now.toLocaleString("zh-TW")}`;
+
+            const uploaded = await uploadZipToDrive(blob, fileName, null, "application/json", description);
+            const fileId = uploaded?.id;
+            if (!fileId) throw new Error("Google Drive 未回傳檔案識別碼");
+
+            // 設定公開檢視權限 (anyone with link can read)
+            try {
+              await driveFetch("https://www.googleapis.com/drive/v3/files/" + fileId + "/permissions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ role: "reader", type: "anyone" })
+              });
+            } catch (permErr) {
+              console.warn("設定公開權限警告：", permErr);
+            }
+
+            const targetUrl = `${location.origin}${location.pathname}#drive=${fileId}`;
+            if (window.__showBatchShareModal) {
+              await window.__showBatchShareModal(targetUrl, bookmarks.length, fileName);
+            }
+          } catch (e) {
+            console.error(`${cfg.label} 雲端分享失敗：`, e);
+            if (!e.message.includes("已取消")) {
+              GlobalModal.alert(`${cfg.label} 雲端分享失敗：${e.message}`);
             }
           } finally {
             clearDriveAccessToken();
@@ -8318,7 +8395,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?rev=33', { scope: './' })
+          navigator.serviceWorker.register('./service-worker.js?rev=34', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 
