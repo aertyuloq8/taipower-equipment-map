@@ -524,6 +524,8 @@
     bgLabelsHidden: true,   // 是否已隱藏底圖設備標籤
     activeFilters: {},      // 當前多條件篩選狀態: { [colKey]: Set([selectedValues]) }
     hideInspected: true,    // 是否隱藏已跑/已巡檢點位 (符合現場巡檢跑過隱藏之直覺體驗)
+    isReadOnlyShare: false, // 是否處於唯讀現場巡查分享模式 (他人僅能檢視、導航與標記隱藏，無法刪除)
+    shareHash: "",          // 當前載入之分享雜湊標識
   };
 
   const controls = {
@@ -547,6 +549,8 @@
     fitBoundsBtn: null,
     exportBtn: null,
     clearAllBtn: null,
+    shareBtn: null,
+    shareQuickBtn: null,
     toggleBgLabelsBtn: null,
     toggleLabelsBtn: null,
     filterBtn: null,
@@ -595,6 +599,8 @@
     controls.fitBoundsBtn = document.getElementById("batchFitBoundsBtn");
     controls.exportBtn = document.getElementById("batchMeterExportBtn");
     controls.clearAllBtn = document.getElementById("batchClearAllBtn");
+    controls.shareBtn = document.getElementById("batchShareBtn");
+    controls.shareQuickBtn = document.getElementById("batchShareQuickBtn");
 
     controls.toggleBgLabelsBtn = document.getElementById("batchToggleBgLabelsBtn");
     controls.toggleLabelsBtn = document.getElementById("batchToggleLabelsBtn");
@@ -1225,6 +1231,10 @@
 
   // 核心執行流程：解析並批次定位
   async function runBatchGeocoding() {
+    if (state.isReadOnlyShare) {
+      showToast("目前處於唯讀巡查模式，請先點擊上方「退出巡查」後再進行新資料標記！", "dup");
+      return;
+    }
     const rawText = controls.input.value.trim();
     if (!rawText) {
       showToast("請先在文字框貼上 Excel 清單資料！", "dup");
@@ -1528,9 +1538,11 @@
           <a class="batch-popup-act-btn is-nav popup-navigation-link" href="${googleNavUrl(r.lat, r.lng)}" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="以 Google Maps 導航至此電表精確座標">
             🗺️ 導航
           </a>
-          <button type="button" class="batch-popup-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="event.stopPropagation(); window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
-            🗑️ 移除
-          </button>
+          ${!state.isReadOnlyShare ? `
+            <button type="button" class="batch-popup-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="event.stopPropagation(); window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
+              🗑️ 移除
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1790,9 +1802,11 @@
                   🗺️ 導航
                 </a>
               ` : ""}
-              <button type="button" class="batch-item-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="event.stopPropagation(); window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
-                🗑️
-              </button>
+              ${!state.isReadOnlyShare ? `
+                <button type="button" class="batch-item-act-btn is-del batch-remove-single-btn" data-remove-uid="${r.uid}" data-remove-idx="${idx}" onclick="event.stopPropagation(); window.__removeBatchMeter?.('${r.uid}');" title="從清單與地圖中移除此電表">
+                  🗑️
+                </button>
+              ` : ''}
             </div>
           </div>
         </div>
@@ -2081,6 +2095,11 @@
 
   function handleClearAllClick(e) {
     if (e) e.stopPropagation();
+    if (state.isReadOnlyShare) {
+      showToast("此地圖為唯讀巡查模式，無法清空清單！", "dup");
+      resetClearAllBtn();
+      return;
+    }
 
     if (!state.records || !state.records.length) {
       showToast("目前沒有批次電表標記可清空！", "dup");
@@ -2111,6 +2130,10 @@
 
   // 清空所有標記
   function clearAllMarkers() {
+    if (state.isReadOnlyShare) {
+      showToast("此地圖為唯讀巡查模式，無法清空清單！", "dup");
+      return;
+    }
     if (!state.records.length) return;
     if (state.layerGroup) state.layerGroup.clearLayers();
     state.records = [];
@@ -2224,6 +2247,10 @@
       if (file) restoreBatchJson(file);
       e.target.value = "";
     });
+
+    // 專屬分享連結 (訪客唯讀巡查模式)
+    controls.shareBtn?.addEventListener("click", generateShareLink);
+    controls.shareQuickBtn?.addEventListener("click", generateShareLink);
 
     // 雲端備份
     controls.driveUploadBtn?.addEventListener("click", uploadBatchToDrive);
@@ -2423,7 +2450,11 @@
     if (!record) return;
     record.inspected = !record.inspected;
 
-    localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
+    if (state.isReadOnlyShare) {
+      saveGuestInspectedState();
+    } else {
+      localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
+    }
 
     // O(1) 局部精準操作：絕不重繪全體列表與地圖
     updateCardInspectedUI(record);
@@ -2437,6 +2468,10 @@
 
   // 永久刪除單筆 (O(1) 局部即時移除)
   function removeRecordByUid(uid) {
+    if (state.isReadOnlyShare) {
+      showToast("此地圖為唯讀巡查模式，無法移除點位！", "dup");
+      return;
+    }
     const idx = state.records.findIndex(r => r.uid === uid);
     if (idx === -1) return;
     const removed = state.records.splice(idx, 1)[0];
@@ -2566,14 +2601,416 @@
     }
   }
 
-  function boot(attempt = 0) {
+  // --- 專屬分享連結與訪客巡查模式 (他人可點擊看資料、導航、縮放、標記已跑隱藏，但不能刪除移除) ---
+
+  function ensureQRCode() {
+    if (window.QRCode) return Promise.resolve();
+    return new Promise((resolve) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+      s.onload = () => resolve();
+      s.onerror = () => resolve();
+      document.head.appendChild(s);
+    });
+  }
+
+  function uint8ArrayToBase64Url(bytes) {
+    let binary = "";
+    const len = bytes.byteLength;
+    const chunk = 0x8000;
+    for (let i = 0; i < len; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunk, len)));
+    }
+    return btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  }
+
+  function base64UrlToUint8Array(base64url) {
+    let base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4) {
+      base64 += "=";
+    }
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  async function compressShareData(data) {
+    const jsonStr = JSON.stringify(data);
+    if (typeof CompressionStream !== "undefined") {
+      const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+      const buffer = await new Response(stream).arrayBuffer();
+      return uint8ArrayToBase64Url(new Uint8Array(buffer));
+    }
+    return btoa(unescape(encodeURIComponent(jsonStr))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  async function decompressShareData(b64) {
+    if (typeof DecompressionStream !== "undefined") {
+      try {
+        const bytes = base64UrlToUint8Array(b64);
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        const text = await new Response(stream).text();
+        return JSON.parse(text);
+      } catch (err) {
+        console.warn("DecompressionStream 解壓失敗，嘗試降級解析：", err);
+      }
+    }
+    const base64 = b64.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonStr = decodeURIComponent(escape(atob(base64)));
+    return JSON.parse(jsonStr);
+  }
+
+  function hashString(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+    }
+    return Math.abs(h).toString(36);
+  }
+
+  function tupleToRecord(t, idx) {
+    const extra = {};
+    if (t[11]) {
+      String(t[11]).split(";").forEach(pair => {
+        const p = pair.split(":");
+        if (p[0]) extra[p[0]] = p.slice(1).join(":");
+      });
+    }
+    const isDoorplate = Number(t[9]) === 1;
+    const isInspected = Number(t[10]) === 1;
+    return {
+      seqNo: Number(t[0]) || (idx + 1),
+      uid: `bm_share_${Date.now()}_${t[0] || idx}_${Math.random().toString(36).slice(2, 6)}`,
+      lat: Number(t[1]),
+      lng: Number(t[2]),
+      custNo: String(t[3] || ""),
+      addr: String(t[4] || ""),
+      pole: String(t[5] || ""),
+      code: String(t[6] || ""),
+      meterNo: String(t[7] || ""),
+      inspectTerm: String(t[8] || ""),
+      locType: isDoorplate ? "doorplate" : "grid",
+      locLabel: isDoorplate ? "🏠 電子門牌精準定位（用戶住家）" : "⚡ 圖號座標定位（現場掛表電桿）",
+      inspected: isInspected,
+      extra: Object.keys(extra).length > 0 ? extra : null
+    };
+  }
+
+  function saveGuestInspectedState() {
+    if (!state.isReadOnlyShare || !state.shareHash) return;
+    try {
+      const inspectedSeqNos = state.records.filter(r => r.inspected).map(r => r.seqNo);
+      sessionStorage.setItem("tp_guest_inspected_" + state.shareHash, JSON.stringify(inspectedSeqNos));
+    } catch (e) {}
+  }
+
+  async function generateShareLink() {
+    if (!state.records || !state.records.length) {
+      showToast("目前沒有批次電表標記可分享！請先進行標記。", "dup");
+      return;
+    }
+
+    try {
+      showToast("正在產生專屬分享連結…");
+      const compact = state.records.map(r => [
+        r.seqNo,
+        Number(Number(r.lat).toFixed(6)),
+        Number(Number(r.lng).toFixed(6)),
+        r.custNo || "",
+        r.addr || "",
+        r.pole || "",
+        r.code || "",
+        r.meterNo || "",
+        r.inspectTerm || "",
+        r.locType === "doorplate" ? 1 : 0,
+        r.inspected ? 1 : 0,
+        r.extra && typeof r.extra === "object" ? Object.entries(r.extra).map(([k, v]) => `${k}:${v}`).join(";") : ""
+      ]);
+
+      const b64 = await compressShareData(compact);
+      const url = `${location.origin}${location.pathname}#share=${b64}`;
+
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+          copied = true;
+        }
+      } catch (clipErr) {
+        console.warn("自動寫入剪貼簿失敗，改由彈窗手動複製：", clipErr);
+      }
+
+      showShareModal(url, state.records.length, copied);
+    } catch (err) {
+      console.error("產生分享連結失敗：", err);
+      showToast("產生分享連結失敗：" + err.message, "error");
+    }
+  }
+
+  function showShareModal(url, count, autoCopied) {
+    const isShortEnoughForQr = url.length <= 2200;
+    const content = `
+      <div style="font-size:13px;line-height:1.5;color:#334155;">
+        <div style="margin-bottom:10px;">
+          ${autoCopied 
+            ? `<div style="background:#ecfdf5;border:1px solid #10b981;border-radius:6px;padding:6px 10px;color:#065f46;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                 <span>✅</span><span>連結已自動複製到剪貼簿！可直接貼至 LINE 或 Teams。</span>
+               </div>`
+            : ''}
+          已將 <strong>${count}</strong> 只電表之現場座標、桿號與地址資料封裝為專屬分享連結：
+        </div>
+
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;">
+          <input type="text" id="bmShareUrlInput" readonly value="${escapeHtml(url)}" 
+            style="flex:1;padding:7px 10px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#0f172a;min-width:0;" 
+            onclick="this.select();" />
+          <button type="button" id="bmShareCopyBtn" 
+            style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            複製連結
+          </button>
+        </div>
+
+        ${isShortEnoughForQr ? `
+          <div style="text-align:center;margin:10px 0;padding:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;">
+            <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;">📱 或現場直接掃描 QR Code 開啟：</div>
+            <div id="bmShareQrContainer" style="display:inline-block;padding:6px;background:#fff;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1);min-height:140px;min-width:140px;"></div>
+          </div>
+        ` : `
+          <div style="font-size:11px;color:#64748b;background:#f8fafc;border-radius:6px;padding:6px 10px;margin-bottom:10px;">
+            💡 提示：點位數量較多（共 ${count} 筆），建議直接使用上方「複製連結」傳送至手機瀏覽器開啟。
+          </div>
+        `}
+
+        <div style="font-size:11px;color:#0f766e;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;line-height:1.4;">
+          🛡️ <strong>訪客權限保護保證：</strong><br>
+          • 他人點擊連結後直接在地圖上檢視、導航與縮放。<br>
+          • 他人可點擊「標記已跑」進行隱藏/巡檢，進度僅存在對方手機。<br>
+          • <strong>他人無法清空、刪除或移除點位</strong>，您的母檔絕對安全。
+        </div>
+      </div>
+    `;
+
+    if (window.GlobalModal && window.GlobalModal.show) {
+      window.GlobalModal.show({
+        title: "🔗 批次電表現場巡查分享",
+        content,
+        type: "alert",
+        confirmText: "關閉",
+        onConfirm: () => {}
+      });
+
+      setTimeout(() => {
+        const copyBtn = document.getElementById("bmShareCopyBtn");
+        const urlInput = document.getElementById("bmShareUrlInput");
+        if (copyBtn && urlInput) {
+          copyBtn.onclick = async () => {
+            try {
+              urlInput.select();
+              await navigator.clipboard.writeText(url);
+              copyBtn.textContent = "✓ 已複製！";
+              copyBtn.style.background = "#10b981";
+              setTimeout(() => {
+                copyBtn.textContent = "複製連結";
+                copyBtn.style.background = "#0f766e";
+              }, 2000);
+            } catch (e) {
+              urlInput.select();
+              document.execCommand("copy");
+              copyBtn.textContent = "✓ 已複製！";
+            }
+          };
+        }
+
+        const qrContainer = document.getElementById("bmShareQrContainer");
+        if (qrContainer) {
+          ensureQRCode().then(() => {
+            if (window.QRCode) {
+              try {
+                new window.QRCode(qrContainer, {
+                  text: url,
+                  width: 140,
+                  height: 140,
+                  correctLevel: window.QRCode.CorrectLevel.M
+                });
+              } catch (qrErr) {
+                console.warn("QR Code 渲染跳過：", qrErr);
+              }
+            }
+          });
+        }
+      }, 50);
+    } else {
+      window.prompt("已產生分享連結，請複製：", url);
+    }
+  }
+
+  function applyReadOnlyShareUI(totalCount) {
+    if (!state.isReadOnlyShare) return;
+
+    if (controls.clearAllBtn) controls.clearAllBtn.style.display = "none";
+    if (controls.shareQuickBtn) controls.shareQuickBtn.style.display = "none";
+    const driveUploadBtn = document.getElementById("batchDriveUploadBtn");
+    const driveRestoreBtn = document.getElementById("batchDriveRestoreBtn");
+    const driveDeleteBtn = document.getElementById("batchDriveDeleteBtn");
+    const restoreJsonBtn = document.getElementById("batchRestoreJsonBtn");
+    if (driveUploadBtn) driveUploadBtn.style.display = "none";
+    if (driveRestoreBtn) driveRestoreBtn.style.display = "none";
+    if (driveDeleteBtn) driveDeleteBtn.style.display = "none";
+    if (restoreJsonBtn) restoreJsonBtn.style.display = "none";
+
+    let banner = document.getElementById("batchShareBanner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "batchShareBanner";
+      banner.style.cssText = "display:flex;align-items:center;justify-content:space-between;background:#ecfdf5;border:1px solid #10b981;border-radius:6px;padding:8px 10px;margin:2px 0 8px;font-size:12px;color:#065f46;";
+      banner.innerHTML = `
+        <div style="min-width:0;flex:1;padding-right:8px;">
+          <strong style="display:flex;align-items:center;gap:4px;font-size:13px;color:#065f46;">
+            <span>📋</span><span>現場巡查模式 (唯讀保護)</span>
+          </strong>
+          <div style="font-size:11px;color:#047857;margin-top:2px;">
+            共 <strong id="batchShareBannerCount">${totalCount}</strong> 只電表 · 可導航、縮放、標記已跑
+          </div>
+        </div>
+        <button id="batchExitShareBtn" type="button" 
+          style="background:#fff;border:1px solid #cbd5e1;border-radius:5px;padding:5px 9px;font-size:11px;font-weight:700;color:#475569;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.05);"
+          title="退出此分享畫面並恢復您本機的電表清單">
+          ✕ 退出巡查
+        </button>
+      `;
+
+      const trioRow = document.querySelector(".v2-batch-trio-row");
+      if (trioRow && trioRow.parentNode) {
+        trioRow.parentNode.insertBefore(banner, trioRow);
+      } else if (controls.panel) {
+        controls.panel.querySelector(".v2-cadastre-body")?.prepend(banner);
+      }
+
+      const exitBtn = document.getElementById("batchExitShareBtn");
+      if (exitBtn) {
+        exitBtn.onclick = () => exitReadOnlyShareMode();
+      }
+    }
+  }
+
+  function exitReadOnlyShareMode() {
+    const doExit = () => {
+      let newHash = window.location.hash.replace(/[#&]share=[A-Za-z0-9_-]+/, "");
+      if (newHash === "#" || !newHash) newHash = "";
+      history.replaceState(null, "", window.location.pathname + window.location.search + newHash);
+
+      state.isReadOnlyShare = false;
+      state.shareHash = "";
+
+      const banner = document.getElementById("batchShareBanner");
+      if (banner) banner.remove();
+
+      if (controls.clearAllBtn) controls.clearAllBtn.style.display = "";
+      if (controls.shareQuickBtn) controls.shareQuickBtn.style.display = "";
+      const driveUploadBtn = document.getElementById("batchDriveUploadBtn");
+      const driveRestoreBtn = document.getElementById("batchDriveRestoreBtn");
+      const driveDeleteBtn = document.getElementById("batchDriveDeleteBtn");
+      const restoreJsonBtn = document.getElementById("batchRestoreJsonBtn");
+      if (driveUploadBtn) driveUploadBtn.style.display = "";
+      if (driveRestoreBtn) driveRestoreBtn.style.display = "";
+      if (driveDeleteBtn) driveDeleteBtn.style.display = "";
+      if (restoreJsonBtn) restoreJsonBtn.style.display = "";
+
+      restoreLocalCachedBatch();
+      showToast("已退出現場巡查模式，已恢復本機電表資料！");
+    };
+
+    if (window.GlobalModal && window.GlobalModal.confirm) {
+      window.GlobalModal.confirm("確定退出現場巡查模式？將清除此分享畫面並恢復您本機的電表清單。", doExit);
+    } else {
+      if (window.confirm("確定退出現場巡查模式？將恢復您本機的電表清單。")) doExit();
+    }
+  }
+
+  async function checkAndLoadSharedBatch() {
+    let raw = "";
+    const hash = window.location.hash || "";
+    const hashMatch = hash.match(/[#&]share=([A-Za-z0-9_-]+)/);
+    if (hashMatch && hashMatch[1]) {
+      raw = hashMatch[1];
+    }
+    if (!raw) {
+      const search = window.location.search || "";
+      const searchParams = new URLSearchParams(search);
+      raw = searchParams.get("share") || "";
+    }
+
+    if (!raw) return false;
+
+    try {
+      const tuples = await decompressShareData(raw);
+      if (!Array.isArray(tuples) || !tuples.length) return false;
+
+      const records = tuples.map((t, idx) => tupleToRecord(t, idx));
+      if (!records.length) return false;
+
+      state.isReadOnlyShare = true;
+      state.shareHash = hashString(raw);
+      state.records = records;
+
+      try {
+        const rawSaved = sessionStorage.getItem("tp_guest_inspected_" + state.shareHash);
+        if (rawSaved) {
+          const guestInspected = JSON.parse(rawSaved);
+          if (Array.isArray(guestInspected)) {
+            const set = new Set(guestInspected);
+            state.records.forEach(r => {
+              r.inspected = set.has(r.seqNo);
+            });
+          }
+        }
+      } catch (e) {}
+
+      renderBatchMarkers();
+      renderBatchList();
+      updatePatrolToggleUI();
+      updateSummaryBadges();
+      updateFilterStatusUI(state.records.length);
+      applyReadOnlyShareUI(records.length);
+
+      const map = getMap();
+      if (map && state.records.length > 0) {
+        const bounds = getBatchRecordsBounds();
+        if (bounds && bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+        }
+      }
+
+      switchTab("list");
+      setPanelOpen(true);
+
+      showToast(`📋 已載入現場巡查分享（共 ${records.length} 只電表，唯讀保護）`);
+      return true;
+    } catch (err) {
+      console.error("解析分享資料失敗：", err);
+      showToast("載入分享資料失敗，可能連結不完整或損毀", "error");
+      return false;
+    }
+  }
+
+  async function boot(attempt = 0) {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => boot(0), { once: true });
       return;
     }
     initControls();
     bindEvents();
-    restoreLocalCachedBatch();
+
+    const loadedShare = await checkAndLoadSharedBatch();
+    if (!loadedShare) {
+      restoreLocalCachedBatch();
+    }
 
     const map = getMap();
     if (!map && attempt < 40) {
@@ -2582,6 +3019,12 @@
     }
     if (map) {
       setupMapViewportEvents(map);
+      if (loadedShare && state.records.length > 0) {
+        const bounds = getBatchRecordsBounds();
+        if (bounds && bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+        }
+      }
     }
   }
 

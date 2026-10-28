@@ -386,6 +386,7 @@
             <summary>🧰 跨裝置雲端與本機備份</summary>
             <div class="panel-fold-body">
               <div class="folder-btn-group">
+                <button id="batchShareBtn" class="btn-action btn-share-link" type="button" title="一鍵產生專屬分享連結，他人可點擊看資料、導航與標記隱藏，但無法刪除母檔" style="background:#0f766e;color:#fff;font-weight:700;">🔗 產生分享連結</button>
                 <button id="batchDownloadJsonBtn" class="btn-action btn-export-zip" type="button" title="下載本機備份檔 (免登入、公司內網最佳)">💾 下載備份檔</button>
                 <button id="batchRestoreJsonBtn" class="btn-action btn-add-folder" type="button" title="讀取本機備份檔 (免登入)">📂 讀取備份檔</button>
                 <input type="file" id="batchJsonFileInput" accept=".json" style="display:none;" />
@@ -415,6 +416,7 @@
               <span class="v2-batch-patrol-pill is-done" title="已完成巡檢電表數">已跑 <strong id="batchDoneCount">0</strong></span>
             </div>
             <div class="v2-batch-patrol-actions">
+              <button id="batchShareQuickBtn" class="v2-batch-patrol-share-btn" type="button" title="一鍵複製分享連結傳給同仁" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:3px;box-shadow:0 1px 2px rgba(0,0,0,0.1);">🔗 分享</button>
               <button id="batchClearAllBtn" class="v2-batch-patrol-clear-btn" type="button" title="清空此批次所有定位標記與資料">🗑️ 清空清單</button>
               <button id="batchToggleHideDoneBtn" class="v2-batch-patrol-toggle-btn is-active" type="button" title="點擊切換顯示或隱藏已跑點位">
                 <span id="batchToggleDoneIcon">👁️</span>
@@ -809,7 +811,7 @@
     <script src="src/utils/bookmark-db.js?v=2.6.3"></script>
     <script src="cadastre.js"></script>
     <script src="address-search.js?v=2.6.10"></script>
-    <script src="batch-meter.js?v=2.6.10"></script>
+    <script src="batch-meter.js?v=2.7.0"></script>
     <script src="sync.js"></script>
     <script>
     /* 版本對帳：主程式 5 秒內沒開機（舊 JS 配新殼 / 載入失敗）就跳橫幅請重整，
