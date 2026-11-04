@@ -384,6 +384,27 @@
         padding: 6px 10px;
       }
       .storage-persist-button:disabled { background: #ecfdf5; border-color: #86efac; color: #047857; cursor: default; }
+      .storage-clean-button {
+        background: #fff1f2;
+        border: 1px solid #fecdd3;
+        border-radius: 6px;
+        color: #be123c;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 800;
+        min-height: 34px;
+        padding: 6px 10px;
+        width: 100%;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+      }
+      .storage-clean-button:hover {
+        background: #ffe4e6;
+        border-color: #fda4af;
+      }
+      .storage-clean-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
       .photo-panel {
         border: 1px solid var(--line);
         border-radius: 6px;
