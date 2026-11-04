@@ -2660,6 +2660,14 @@ window.__appBooted = true;
         routeLayerVisible: false,
       };
       window.state = state;
+      window.verifyZipManifest = verifyZipManifest;
+      window.importZipBackup = importZipBackup;
+      window.createPhotoArchive = createPhotoArchive;
+      window.cleanOrphanPhotos = cleanOrphanPhotos;
+      window.ensureJSZip = ensureJSZip;
+      window.openPhotoDb = openPhotoDb;
+      window.putPhotoBlob = putPhotoBlob;
+      window.saveToLocalStorage = saveToLocalStorage;
 
       let editPhotoState = { recordId: null, existing: [], originalExisting: [], pending: [] };
       let editDraftState = { dirty: false, point: null, saveTimer: null, saveSequence: Promise.resolve(), restored: false };
