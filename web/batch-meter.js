@@ -183,7 +183,16 @@
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
         tx.objectStore(STORE_NAME).put(record);
-        tx.oncomplete = () => resolve(record);
+        tx.oncomplete = async () => {
+          try {
+            if (typeof window.__refreshBatchPhotoSlots === "function") {
+              await window.__refreshBatchPhotoSlots(uid);
+            } else if (typeof refreshBatchPhotoSlotsForUid === "function") {
+              await refreshBatchPhotoSlotsForUid(uid);
+            }
+          } catch (e) {}
+          resolve(record);
+        };
         tx.onerror = () => reject(tx.error);
       });
     },
@@ -228,7 +237,16 @@
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
         tx.objectStore(STORE_NAME).delete(`${uid}_${type}`);
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = async () => {
+          try {
+            if (typeof window.__refreshBatchPhotoSlots === "function") {
+              await window.__refreshBatchPhotoSlots(uid);
+            } else if (typeof refreshBatchPhotoSlotsForUid === "function") {
+              await refreshBatchPhotoSlotsForUid(uid);
+            }
+          } catch (e) {}
+          resolve();
+        };
         tx.onerror = () => reject(tx.error);
       });
     },
@@ -248,7 +266,14 @@
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
         tx.objectStore(STORE_NAME).clear();
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = async () => {
+          try {
+            if (typeof window.__refreshAllBatchPhotoSlots === "function") {
+              await window.__refreshAllBatchPhotoSlots();
+            }
+          } catch (e) {}
+          resolve();
+        };
         tx.onerror = () => reject(tx.error);
       });
     },
@@ -983,6 +1008,10 @@
     controls.templateBtn = document.getElementById("batchMeterTemplateBtn");
     controls.a4ReportBtn = document.getElementById("batchA4ReportBtn");
     controls.exportZipBtn = document.getElementById("batchExportZipBtn");
+    if (state.isReadOnlyShare) {
+      if (controls.a4ReportBtn) controls.a4ReportBtn.style.display = "none";
+      if (controls.exportZipBtn) controls.exportZipBtn.style.display = "none";
+    }
     controls.downloadJsonBtn = document.getElementById("batchDownloadJsonBtn");
     controls.restoreJsonBtn = document.getElementById("batchRestoreJsonBtn");
     controls.jsonFileInput = document.getElementById("batchJsonFileInput");
@@ -1899,6 +1928,7 @@
         <div style="color:#334155;font-size:11px;line-height:1.4;">📍 <strong>地址：</strong>${escapeHtml(r.addr || "--")}</div>
         ${chips.length > 0 ? `<div class="v2-batch-chips-row" style="margin-top:3px;">${chips.join("")}</div>` : ""}
         ${popupCollapseHtml}
+        ${!state.isReadOnlyShare ? `
         <!-- 雙相片槽：電表特寫與現場環境 -->
         <div class="batch-card-photo-actions" data-photo-uid="${r.uid}">
           <div class="batch-photo-slot" data-slot="meter">
@@ -1920,6 +1950,7 @@
             </div>
           </div>
         </div>
+        ` : ""}
         <!-- 每戶卡片底部專屬操作：已跑隱藏、導航與移除按鈕 (手機排版適應) -->
         <div class="batch-popup-item-actions">
           <button type="button" class="batch-popup-act-btn is-inspect ${r.inspected ? 'is-done' : ''}" data-act-uid="${r.uid}" onclick="event.stopPropagation(); window.__toggleBatchInspected?.('${r.uid}');" title="${r.inspected ? '點擊取消已跑並恢復顯示' : '標記此點已巡檢並隱藏'}">
@@ -2209,6 +2240,7 @@
           </div>
           ${chips.length > 0 ? `<div class="v2-batch-chips-row">${chips.join("")}</div>` : ""}
           ${cardCollapseHtml}
+          ${!state.isReadOnlyShare ? `
           <!-- 雙相片槽：電表特寫與現場環境 -->
           <div class="batch-card-photo-actions" data-photo-uid="${r.uid}">
             <div class="batch-photo-slot" data-slot="meter">
@@ -2230,6 +2262,7 @@
               </div>
             </div>
           </div>
+          ` : ""}
           <div class="v2-batch-item-footer">
             <button type="button" class="batch-item-act-btn is-inspect ${r.inspected ? 'is-done' : ''}" data-act-uid="${r.uid}" onclick="event.stopPropagation(); window.__toggleBatchInspected?.('${r.uid}');" title="${r.inspected ? '點擊取消已跑並恢復顯示' : '標記此點已巡檢並隱藏'}">
               ${r.inspected ? '✓ 已跑 (點擊復原)' : '👁️ 標記已跑'}
@@ -2355,6 +2388,10 @@
   }
 
   window.__triggerBatchPhoto = function(uid, type) {
+    if (state.isReadOnlyShare) {
+      showToast("此地圖為唯讀巡查模式，不支援拍照存證功能！", "dup");
+      return;
+    }
     if (!window.BatchPhotoDB) {
       showToast("批次相片資料庫模組載入中，請稍候重試", "error");
       return;
@@ -2409,12 +2446,34 @@
       if (rec) {
         rec._photoCount = (rec._photoCount || 0) + 1;
         updateRecordMarkerLabel(rec);
+        // 智慧判斷：拍照即代表已現場查驗，自動標記為已跑
+        setRecordInspectedState(rec, true);
       }
-      refreshBatchPhotoSlotsForUid(uid);
+      await refreshBatchPhotoSlotsForUid(uid);
     } catch (err) {
       console.error("照片儲存失敗：", err);
       showToast("照片儲存失敗：" + err.message, "error");
     }
+  }
+
+  function setRecordInspectedState(record, isInspected) {
+    if (!record) return;
+    record.inspected = Boolean(isInspected);
+    record.inspectDate = record.inspected ? (record.inspectDate || new Date().toLocaleString("zh-TW")) : "";
+
+    if (state.isReadOnlyShare) {
+      saveGuestInspectedState();
+    } else {
+      try {
+        localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
+      } catch (e) {}
+    }
+
+    // O(1) 局部精準操作：絕不重繪全體列表與地圖
+    updateCardInspectedUI(record);
+    updateMarkerInspectedUI(record);
+    updatePopupInspectedUI(record);
+    updateSummaryBadges();
   }
 
   async function refreshBatchPhotoSlotsForUid(uid) {
@@ -2423,10 +2482,30 @@
       const { meter, scene } = await window.BatchPhotoDB.getPhotosForUid(uid);
       updateSlotUI(uid, "meter", meter);
       updateSlotUI(uid, "scene", scene);
+
+      // 智慧連動判定：根據剩餘相片數自動判定是否已跑 (1張或2張皆為已跑，0張自動恢復為未跑)
+      const photoCount = (meter ? 1 : 0) + (scene ? 1 : 0);
+      const rec = state.records.find(r => r.uid === uid);
+      if (rec) {
+        rec._photoCount = photoCount;
+        updateRecordMarkerLabel(rec);
+        if (photoCount > 0 && !rec.inspected) {
+          setRecordInspectedState(rec, true);
+        } else if (photoCount === 0 && rec.inspected) {
+          setRecordInspectedState(rec, false);
+        }
+      }
     } catch (e) {
       console.warn("更新相片槽失敗：", e);
     }
   }
+
+  window.__refreshBatchPhotoSlots = refreshBatchPhotoSlotsForUid;
+  window.__refreshAllBatchPhotoSlots = async function() {
+    for (const r of state.records) {
+      await refreshBatchPhotoSlotsForUid(r.uid);
+    }
+  };
 
   function updateRecordMarkerLabel(record) {
     if (!record || !record.marker) return;
@@ -2524,12 +2603,12 @@
 
   window.__deleteBatchPhoto = async function(uid, type) {
     if (!window.BatchPhotoDB) return;
-    const label = type === "meter" ? "電表特寫" : "現場環境";
-    if (!confirm(`確定要刪除此筆【${label}】相片嗎？此動作無法復原。`)) return;
+    const label = type === "meter" ? "特寫照片" : "現場照片";
+    if (!confirm(`確定要刪除此筆【${label}】嗎？此動作無法復原。`)) return;
     try {
       await window.BatchPhotoDB.deletePhoto(uid, type);
-      showToast(`已刪除【${label}】相片`);
-      refreshBatchPhotoSlotsForUid(uid);
+      showToast(`已刪除【${label}】`);
+      await refreshBatchPhotoSlotsForUid(uid);
     } catch (e) {
       showToast("刪除相片失敗：" + e.message, "error");
     }
@@ -2636,9 +2715,18 @@
 
     printContainer.innerHTML = pagesHtml;
 
-    setTimeout(() => {
-      window.print();
-    }, 300);
+    // 等待所有 blob 圖片載入完成後再觸發列印，防空白與跑版
+    const imgs = Array.from(printContainer.querySelectorAll("img"));
+    await Promise.all(imgs.map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(res => {
+        img.onload = res;
+        img.onerror = res;
+      });
+    }));
+
+    await new Promise(r => setTimeout(r, 100));
+    window.print();
   }
 
   // --- 4. 方案 B：整批打包下載相片 ZIP 與離線 HTML 報告 ---
@@ -2783,7 +2871,7 @@
   <style>
     @page {
       size: A4 landscape;
-      margin: 8mm 6mm;
+      margin: 0;
     }
     * { box-sizing: border-box; }
     body {
@@ -2821,19 +2909,29 @@
       align-items: center;
     }
     .batch-a4-page {
-      width: 280mm;
-      height: 194mm;
+      width: 297mm;
+      height: 198mm;
+      max-height: 198mm;
       page-break-after: always;
       break-after: page;
+      page-break-inside: avoid;
+      break-inside: avoid;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      padding: 3mm 4mm;
+      padding: 6mm 10mm;
       border: 1px solid #94a3b8;
       background: #ffffff !important;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .batch-a4-page:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
     }
     .batch-a4-header {
+      flex: 0 0 auto;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -2847,19 +2945,21 @@
       color: #0f766e;
     }
     .batch-a4-meta-row {
-      font-size: 10.5pt;
+      font-size: 10pt;
       color: #1e293b;
       font-weight: 600;
       display: flex;
       gap: 5mm;
     }
     .batch-a4-photos-row {
+      flex: 1 1 auto;
+      min-height: 0;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 4mm;
-      flex: 1;
-      height: 174mm;
-      max-height: 174mm;
+      height: calc(198mm - 28mm);
+      max-height: calc(198mm - 28mm);
+      box-sizing: border-box;
     }
     .batch-a4-photos-row.is-single {
       grid-template-columns: 1fr;
@@ -2873,10 +2973,13 @@
       justify-content: center;
       overflow: hidden;
       height: 100%;
+      min-height: 0;
+      box-sizing: border-box;
     }
     .batch-a4-photo-img-wrap {
       width: 100%;
       height: 100%;
+      min-height: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -2891,16 +2994,44 @@
       max-height: 100%;
       object-fit: contain;
     }
+    .batch-a4-empty-photo {
+      font-size: 13pt;
+      color: #94a3b8;
+      font-weight: 600;
+    }
     @media print {
-      body { background: transparent; padding: 0; }
-      .no-print { display: none !important; }
-      .report-wrap { display: block; }
+      body {
+        background: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 297mm !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .report-wrap {
+        display: block !important;
+        width: 297mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       .batch-a4-page {
         box-shadow: none !important;
-        border: 1px solid #94a3b8 !important;
+        border: none !important;
         margin: 0 !important;
+        width: 297mm !important;
+        height: 198mm !important;
+        max-height: 198mm !important;
         page-break-after: always !important;
         break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        box-sizing: border-box !important;
+        padding: 6mm 10mm !important;
+      }
+      .batch-a4-page:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
       }
     }
   </style>
@@ -3404,6 +3535,42 @@
       }
     });
 
+    // 監聽巡檢進度列按鈕
+    if (controls.toggleHideDoneBtn) {
+      controls.toggleHideDoneBtn.addEventListener("click", () => {
+        toggleHideInspected();
+      });
+    }
+
+    // 監聽標記已跑與單筆移除
+    document.addEventListener("click", (e) => {
+      // 1. 移除單筆
+      const delBtn = e.target.closest(".batch-remove-single-btn");
+      if (delBtn && !delBtn.hasAttribute("onclick")) {
+        const uid = delBtn.dataset.removeUid;
+        if (uid) {
+          removeRecordByUid(uid);
+          return;
+        }
+        const idx = parseInt(delBtn.dataset.removeIdx, 10);
+        if (!isNaN(idx) && state.records[idx]) {
+          removeRecordByUid(state.records[idx].uid);
+        }
+        return;
+      }
+
+      // 2. 標記已跑 / 復原切換
+      const inspectBtn = e.target.closest(".is-inspect[data-act-uid]");
+      if (inspectBtn && !inspectBtn.hasAttribute("onclick")) {
+        const uid = inspectBtn.dataset.actUid;
+        if (uid) {
+          toggleRecordInspected(uid);
+        }
+        return;
+      }
+    });
+  }
+
   // 標記已跑切換 (依永久 uid 鎖定)
   window.__toggleBatchInspected = function(uid) { toggleRecordInspected(uid); };
   window.__removeBatchMeter = function(uid) { removeRecordByUid(uid); };
@@ -3525,19 +3692,7 @@
   function toggleRecordInspected(uid) {
     const record = state.records.find(r => r.uid === uid);
     if (!record) return;
-    record.inspected = !record.inspected;
-
-    if (state.isReadOnlyShare) {
-      saveGuestInspectedState();
-    } else {
-      localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
-    }
-
-    // O(1) 局部精準操作：絕不重繪全體列表與地圖
-    updateCardInspectedUI(record);
-    updateMarkerInspectedUI(record);
-    updatePopupInspectedUI(record);
-    updateSummaryBadges();
+    setRecordInspectedState(record, !record.inspected);
 
     const hideSuffix = state.hideInspected ? " (已隱藏)" : "";
     showToast(record.inspected ? `✓ 已標記 #${record.seqNo} 為已跑${hideSuffix}` : `👁️ 已復原 #${record.seqNo} 為待巡檢`);
@@ -3624,42 +3779,6 @@
 
     updateSummaryBadges();
     showToast(state.hideInspected ? "已開啟：隱藏已跑點位" : "已開啟：顯示全部點位 (包含已跑)");
-  }
-
-    // 監聽巡檢進度列按鈕
-    if (controls.toggleHideDoneBtn) {
-      controls.toggleHideDoneBtn.addEventListener("click", () => {
-        toggleHideInspected();
-      });
-    }
-
-    // 監聽標記已跑與單筆移除
-    document.addEventListener("click", (e) => {
-      // 1. 移除單筆
-      const delBtn = e.target.closest(".batch-remove-single-btn");
-      if (delBtn && !delBtn.hasAttribute("onclick")) {
-        const uid = delBtn.dataset.removeUid;
-        if (uid) {
-          removeRecordByUid(uid);
-          return;
-        }
-        const idx = parseInt(delBtn.dataset.removeIdx, 10);
-        if (!isNaN(idx) && state.records[idx]) {
-          removeRecordByUid(state.records[idx].uid);
-        }
-        return;
-      }
-
-      // 2. 標記已跑 / 復原切換
-      const inspectBtn = e.target.closest(".is-inspect[data-act-uid]");
-      if (inspectBtn && !inspectBtn.hasAttribute("onclick")) {
-        const uid = inspectBtn.dataset.actUid;
-        if (uid) {
-          toggleRecordInspected(uid);
-        }
-        return;
-      }
-    });
   }
 
   // 嘗試還原本地暫存
