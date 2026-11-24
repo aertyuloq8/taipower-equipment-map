@@ -134,17 +134,17 @@
     return false;
   }
 
-  // 電子門牌經緯度查詢（支援 Adapter 與 GAS JSONP 雙通道）
-  function gasJsonpDoorplate(addr) {
+  // 電子門牌經緯度查詢（支援 Adapter 與 GAS JSONP 雙通道，含冷啟動保護與自動重試）
+  function gasJsonpDoorplateSingle(addr, timeoutMs = 12000) {
     return new Promise((resolve) => {
       const gasBase = String(window.CADASTRE_GAS_URL || "").trim();
       if (!gasBase) return resolve(null);
       const cb = `__bm_gas_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const script = document.createElement("script");
-      const timer = setTimeout(() => { cleanup(); resolve(null); }, 8000);
+      const timer = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
       const cleanup = () => {
         try { delete window[cb]; } catch (e) {}
-        script.remove();
+        if (script.parentNode) script.remove();
         clearTimeout(timer);
       };
       window[cb] = (data) => {
@@ -156,6 +156,21 @@
       script.src = gasBase + "?" + usp.toString();
       document.head.appendChild(script);
     });
+  }
+
+  async function gasJsonpDoorplate(addr) {
+    let data = await gasJsonpDoorplateSingle(addr, 12000);
+    if (data && (data.ok || Array.isArray(data.results)) && Array.isArray(data.results) && data.results.length > 0) {
+      return data;
+    }
+    // 若明確有回傳 ok: true 且 results 是空陣列，代表國土測繪查無此門牌，不需重試
+    if (data && data.ok && Array.isArray(data.results) && data.results.length === 0) {
+      return data;
+    }
+    // 首次超時或網路抖動時，退避 800ms 自動重試 1 次（伺服器此時已熱機甦醒）
+    await new Promise(r => setTimeout(r, 800));
+    data = await gasJsonpDoorplateSingle(addr, 10000);
+    return data;
   }
 
   // 建立門牌與桿號查詢快取，避免重複地址反覆呼叫網路
@@ -411,7 +426,7 @@
     } catch (e) {
       console.warn("門牌查詢失敗：", e.message);
     }
-    doorplateCache.set(cleanAddr, null);
+    // 嚴防負向快取：連線逾時或暫時性異常時絕不寫入 null，僅保留有效結果於快取中
     return null;
   }
 
@@ -1334,7 +1349,11 @@
     const CONCURRENCY = 3;
     let nextIndex = 0;
 
-    async function processNextRecord() {
+    async function processNextRecord(workerId) {
+      if (workerId > 0) {
+        // 錯開並行線程初次發起時間，避免多線程同一毫秒同時發起請求
+        await new Promise(r => setTimeout(r, workerId * 250));
+      }
       while (nextIndex < total) {
         const i = nextIndex++;
         const r = records[i];
@@ -1423,6 +1442,8 @@
               r.locLabel = "⚡ 門牌查無或偏離，轉用現場電桿圖號定位";
               fallbackCount++;
             }
+            // 平滑節流間隔：每筆門牌查詢後微休眠 200ms，徹底避開國土測繪防爬蟲限流
+            await new Promise(res => setTimeout(res, 200));
           } else if (r.code && typeof tpcFunc === "function") {
             const pt = resolvePoleCoord(r.code);
             if (pt && Number.isFinite(pt.lat) && Number.isFinite(pt.lng)) {
@@ -1465,7 +1486,7 @@
     const poolSize = Math.min(CONCURRENCY, total);
     const workers = [];
     for (let w = 0; w < poolSize; w++) {
-      workers.push(processNextRecord());
+      workers.push(processNextRecord(w));
     }
     await Promise.all(workers);
 

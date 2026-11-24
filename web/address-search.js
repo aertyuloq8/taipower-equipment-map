@@ -95,12 +95,16 @@
     return str;
   }
 
-  function gasJsonp(params){
+  function gasJsonpSingle(params, timeoutMs = 12000){
     return new Promise((resolve, reject)=>{
       const cb = `__gas_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
       const script = document.createElement("script");
-      const timer = setTimeout(()=>{ cleanup(); reject(new Error("GAS 連線逾時")); }, 9000);
-      const cleanup = ()=>{ try{ delete window[cb]; }catch(e){} script.remove(); clearTimeout(timer); };
+      const timer = setTimeout(()=>{ cleanup(); reject(new Error("GAS 連線逾時")); }, timeoutMs);
+      const cleanup = ()=>{
+        try{ delete window[cb]; }catch(e){}
+        if (script.parentNode) script.remove();
+        clearTimeout(timer);
+      };
       window[cb] = (data)=>{ cleanup(); resolve(data); };
       const base = String(window.CADASTRE_GAS_URL || "").trim();
       if(!base){ cleanup(); reject(new Error("未設定 GAS 網址")); return; }
@@ -110,6 +114,22 @@
       script.onerror = ()=>{ cleanup(); reject(new Error("GAS 連線失敗")); };
       document.head.appendChild(script);
     });
+  }
+
+  async function gasJsonp(params){
+    try {
+      const data = await gasJsonpSingle(params, 12000);
+      if (data && (data.ok || Array.isArray(data.results))) return data;
+    } catch (e) {
+      // 首次超時或失敗時，微休眠後自動重試 1 次（此時伺服器已熱機）
+      try {
+        await new Promise(r => setTimeout(r, 800));
+        return await gasJsonpSingle(params, 10000);
+      } catch (err) {
+        throw err;
+      }
+    }
+    return null;
   }
 
   // ---- 國土測繪精確門牌清單（經 GAS 代理，與 maps.nlsc.gov.tw 一致）----
@@ -126,6 +146,20 @@
           state.platesByKey.set(key, plate);
           return plate;
         });
+      }
+      // 智慧雙軌補強：若 action=addr 清單查無結果，且使用者輸入的是具體門牌號碼（例如含有數字號），自動升級以 action=addrGeo 定位
+      if(/\d+號?$/.test(addr)){
+        const geoData = await gasJsonp({ action: "addrGeo", word: addr });
+        const geoList = (geoData && Array.isArray(geoData.results)) ? geoData.results : [];
+        if(geoList.length){
+          return geoList.map((item, i)=>{
+            const addrStr = item.address || addr;
+            const key = `nlsc_geo_${i}_${addrStr}`;
+            const plate = { r: addrStr, d: "", la: item.y, ln: item.x, k: key, addr: addrStr };
+            state.platesByKey.set(key, plate);
+            return plate;
+          });
+        }
       }
     }catch(e){ console.warn("NLSC(GAS) 失敗", e.message); }
     return [];
