@@ -812,7 +812,6 @@
     <script src="src/utils/bookmark-db.js?v=2.6.3"></script>
     <script src="cadastre.js"></script>
     <script src="address-search.js?v=2.6.13"></script>
-    <script src="batch-photo-db.js?v=2.8.0"></script>
     <script src="batch-meter.js?v=2.8.0"></script>
     <script src="sync.js"></script>
     <script>
@@ -834,7 +833,21 @@
           var reloadBtn = document.getElementById("pwaUpdateReload");
           if (reloadBtn && !reloadBtn.__skewWired) {
             reloadBtn.__skewWired = true;
-            reloadBtn.addEventListener("click", function () { window.location.reload(); });
+            reloadBtn.addEventListener("click", async function () {
+              reloadBtn.disabled = true;
+              reloadBtn.textContent = "正在清除快取...";
+              try {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  for (let r of regs) await r.unregister();
+                }
+                if (window.caches) {
+                  const keys = await caches.keys();
+                  for (let k of keys) await caches.delete(k);
+                }
+              } catch (e) {}
+              window.location.reload();
+            });
           }
         } catch (e) {}
       }, 1000);
