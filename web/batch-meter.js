@@ -163,13 +163,22 @@
     if (data && (data.ok || Array.isArray(data.results)) && Array.isArray(data.results) && data.results.length > 0) {
       return data;
     }
-    // 若明確有回傳 ok: true 且 results 是空陣列，代表國土測繪查無此門牌，不需重試
-    if (data && data.ok && Array.isArray(data.results) && data.results.length === 0) {
-      return data;
-    }
-    // 首次超時或網路抖動時，退避 800ms 自動重試 1 次（伺服器此時已熱機甦醒）
+    // 實證發現：國土測繪伺服器在節點抖動時，偶爾會隨機回傳 results: [] (count: 0)
+    // 必須退避 800ms 進行第 1 次自動重試，避開節點抖動
     await new Promise(r => setTimeout(r, 800));
     data = await gasJsonpDoorplateSingle(addr, 10000);
+    if (data && (data.ok || Array.isArray(data.results)) && Array.isArray(data.results) && data.results.length > 0) {
+      return data;
+    }
+    // 若依然無結果，且包含「台」或「臺」，交換異體字進行第 2 次容錯重試（NLSC 內部索引存在台臺差異）
+    if (addr.includes("台") || addr.includes("臺")) {
+      const altAddr = addr.includes("台") ? addr.replace(/台/g, "臺") : addr.replace(/臺/g, "台");
+      await new Promise(r => setTimeout(r, 500));
+      const altData = await gasJsonpDoorplateSingle(altAddr, 8000);
+      if (altData && (altData.ok || Array.isArray(altData.results)) && Array.isArray(altData.results) && altData.results.length > 0) {
+        return altData;
+      }
+    }
     return data;
   }
 

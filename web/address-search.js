@@ -149,8 +149,13 @@
       }
       // 智慧雙軌補強：若 action=addr 清單查無結果，且使用者輸入的是具體門牌號碼（例如含有數字號），自動升級以 action=addrGeo 定位
       if(/\d+號?$/.test(addr)){
-        const geoData = await gasJsonp({ action: "addrGeo", word: addr });
-        const geoList = (geoData && Array.isArray(geoData.results)) ? geoData.results : [];
+        let geoData = await gasJsonp({ action: "addrGeo", word: addr });
+        let geoList = (geoData && Array.isArray(geoData.results)) ? geoData.results : [];
+        if(!geoList.length && (addr.includes("台") || addr.includes("臺"))){
+          const altAddr = addr.includes("台") ? addr.replace(/台/g, "臺") : addr.replace(/臺/g, "台");
+          geoData = await gasJsonp({ action: "addrGeo", word: altAddr });
+          geoList = (geoData && Array.isArray(geoData.results)) ? geoData.results : [];
+        }
         if(geoList.length){
           return geoList.map((item, i)=>{
             const addrStr = item.address || addr;

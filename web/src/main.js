@@ -2254,7 +2254,7 @@ window.__appBooted = true;
           
           const verLink = document.createElement("a");
           verLink.href = "javascript:void(0)";
-          verLink.textContent = "系統版本：v2.7.6-tn";
+          verLink.textContent = "系統版本：v2.7.7-tn";
           verLink.style.cssText = "color:#0f766e; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;";
           verLink.title = "點擊切換至【全台土木設備分布地圖】";
           verLink.addEventListener("click", (e) => {
