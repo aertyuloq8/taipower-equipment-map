@@ -103,7 +103,6 @@
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
     // 浮水印參數設定
-    const typeLabel = meta.type === "meter" ? "【特寫照片】" : (meta.type === "scene" ? "【現場環境】" : "【現場照片】");
     const custNoText = meta.custNo ? `電號: ${meta.custNo}` : "";
     const timeText = meta.timeStr || formatNowTime();
     const addrText = meta.addr ? `地址: ${meta.addr}` : "";
@@ -111,7 +110,7 @@
     const codeText = meta.code ? `圖號: ${meta.code}` : "";
     const gpsText = meta.gps ? `GPS: ${meta.gps}` : "";
 
-    const line1 = `現場拍照 ${typeLabel} ${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
+    const line1 = `現場拍照${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
     let line2 = [addrText, codeText, poleText].filter(Boolean).join(" | ");
     if (gpsText) line2 += ` | ${gpsText}`;
 
@@ -1929,23 +1928,23 @@
         ${chips.length > 0 ? `<div class="v2-batch-chips-row" style="margin-top:3px;">${chips.join("")}</div>` : ""}
         ${popupCollapseHtml}
         ${!state.isReadOnlyShare ? `
-        <!-- 雙相片槽：電表特寫與現場環境 -->
+        <!-- 雙相片槽：拍照存證 -->
         <div class="batch-card-photo-actions" data-photo-uid="${r.uid}">
           <div class="batch-photo-slot" data-slot="meter">
-            <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_meter" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'meter');" title="拍攝電表特寫 (表號/指數/鉛封)">
-              📷 特寫拍照
+            <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_meter" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'meter');" title="拍攝照片存證">
+              📷 拍照
             </button>
             <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_meter" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'meter');">
-              <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_meter" alt="電表特寫" />
+              <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_meter" alt="照片1" />
               <button type="button" class="batch-photo-thumb-del" onclick="event.stopPropagation(); window.__deleteBatchPhoto('${r.uid}', 'meter');" title="刪除此相片">×</button>
             </div>
           </div>
           <div class="batch-photo-slot" data-slot="scene">
-            <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_scene" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'scene');" title="拍攝現場環境 (桿位/箱體/門面)">
-              📷 現場拍照
+            <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_scene" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'scene');" title="拍攝照片存證">
+              📷 拍照
             </button>
             <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_scene" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'scene');">
-              <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_scene" alt="現場環境" />
+              <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_scene" alt="照片2" />
               <button type="button" class="batch-photo-thumb-del" onclick="event.stopPropagation(); window.__deleteBatchPhoto('${r.uid}', 'scene');" title="刪除此相片">×</button>
             </div>
           </div>
@@ -2241,23 +2240,23 @@
           ${chips.length > 0 ? `<div class="v2-batch-chips-row">${chips.join("")}</div>` : ""}
           ${cardCollapseHtml}
           ${!state.isReadOnlyShare ? `
-          <!-- 雙相片槽：電表特寫與現場環境 -->
+          <!-- 雙相片槽：拍照存證 -->
           <div class="batch-card-photo-actions" data-photo-uid="${r.uid}">
             <div class="batch-photo-slot" data-slot="meter">
-              <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_meter" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'meter');" title="拍攝電表特寫 (表號/指數/鉛封)">
-                📷 特寫拍照
+              <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_meter" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'meter');" title="拍攝照片存證">
+                📷 拍照
               </button>
               <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_meter" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'meter');">
-                <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_meter" alt="電表特寫" />
+                <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_meter" alt="照片1" />
                 <button type="button" class="batch-photo-thumb-del" onclick="event.stopPropagation(); window.__deleteBatchPhoto('${r.uid}', 'meter');" title="刪除此相片">×</button>
               </div>
             </div>
             <div class="batch-photo-slot" data-slot="scene">
-              <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_scene" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'scene');" title="拍攝現場環境 (桿位/箱體/門面)">
-                📷 現場拍照
+              <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_scene" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'scene');" title="拍攝照片存證">
+                📷 拍照
               </button>
               <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_scene" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'scene');">
-                <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_scene" alt="現場環境" />
+                <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_scene" alt="照片2" />
                 <button type="button" class="batch-photo-thumb-del" onclick="event.stopPropagation(); window.__deleteBatchPhoto('${r.uid}', 'scene');" title="刪除此相片">×</button>
               </div>
             </div>
@@ -2533,14 +2532,14 @@
       const url = URL.createObjectURL(photoRecord.blob);
       btns.forEach(b => {
         b.classList.add("has-photo");
-        b.innerHTML = type === "meter" ? "📷 特寫 ✓" : "📷 現場 ✓";
+        b.innerHTML = "📷 拍照 ✓";
       });
       wraps.forEach(w => { w.style.display = "block"; });
       imgs.forEach(i => { i.src = url; });
     } else {
       btns.forEach(b => {
         b.classList.remove("has-photo");
-        b.innerHTML = type === "meter" ? "📷 特寫拍照" : "📷 現場拍照";
+        b.innerHTML = "📷 拍照";
       });
       wraps.forEach(w => { w.style.display = "none"; });
       imgs.forEach(i => { i.src = ""; });
@@ -2551,14 +2550,18 @@
     if (!window.BatchPhotoDB) return;
     try {
       const allPhotos = await window.BatchPhotoDB.getAllPhotos();
+      state.records.forEach(r => { r._photoCount = 0; });
+      const validUids = new Set(state.records.map(r => r.uid));
       const photoMap = new Map();
       allPhotos.forEach(p => {
-        photoMap.set(p.id, p);
         const parts = p.id.split("_");
         parts.pop();
         const pUid = parts.join("_");
-        const r = state.records.find(rec => rec.uid === pUid);
-        if (r) r._photoCount = (r._photoCount || 0) + 1;
+        if (validUids.has(pUid)) {
+          photoMap.set(p.id, p);
+          const r = state.records.find(rec => rec.uid === pUid);
+          if (r) r._photoCount = (r._photoCount || 0) + 1;
+        }
       });
 
       state.records.forEach(r => {
@@ -2603,11 +2606,10 @@
 
   window.__deleteBatchPhoto = async function(uid, type) {
     if (!window.BatchPhotoDB) return;
-    const label = type === "meter" ? "特寫照片" : "現場照片";
-    if (!confirm(`確定要刪除此筆【${label}】嗎？此動作無法復原。`)) return;
+    if (!confirm("確定要刪除此相片嗎？此動作無法復原。")) return;
     try {
       await window.BatchPhotoDB.deletePhoto(uid, type);
-      showToast(`已刪除【${label}】`);
+      showToast("已刪除相片");
       await refreshBatchPhotoSlotsForUid(uid);
     } catch (e) {
       showToast("刪除相片失敗：" + e.message, "error");
@@ -2647,13 +2649,13 @@
       let meterImgHtml = "";
       if (meterPhoto && meterPhoto.blob) {
         const url = URL.createObjectURL(meterPhoto.blob);
-        meterImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="特寫照片" />`;
+        meterImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="照片1" />`;
       }
 
       let sceneImgHtml = "";
       if (scenePhoto && scenePhoto.blob) {
         const url = URL.createObjectURL(scenePhoto.blob);
-        sceneImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="現場照片" />`;
+        sceneImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="照片2" />`;
       }
 
       const hasAnyPhoto = Boolean(meterPhoto || scenePhoto);
@@ -2743,30 +2745,40 @@
     try {
       await ensureJSZip();
       const allPhotos = await window.BatchPhotoDB.getAllPhotos();
-      if (!allPhotos || !allPhotos.length) {
-        showToast("💡 目前尚未拍攝任何照片！您可先在卡片上拍照存證，或直接點「📥 匯出 Excel」。", "dup");
+      const validUids = new Set(state.records.map(r => r.uid));
+      const relevantPhotos = (allPhotos || []).filter(p => validUids.has(p.uid));
+
+      if (!relevantPhotos || !relevantPhotos.length) {
+        showToast("💡 目前這批電表尚未拍攝任何照片！您可先在卡片上拍照存證，或直接點「📥 匯出 Excel」。", "dup");
         return;
       }
 
-      showToast(`📦 正在打包 ${allPhotos.length} 張存證照片與 A4 離線報告...`, "dup");
+      // 自動清理 IndexedDB 歷史殘留的孤兒幽靈相片
+      if (allPhotos.length > relevantPhotos.length) {
+        allPhotos.filter(p => !validUids.has(p.uid)).forEach(p => {
+          try { window.BatchPhotoDB.deletePhoto(p.uid, p.type); } catch {}
+        });
+      }
+
+      showToast(`📦 正在打包 ${relevantPhotos.length} 張存證照片與 A4 離線報告...`, "dup");
       const zip = new JSZip();
       const photosFolder = zip.folder("photos");
       const photoMap = new Map();
-      allPhotos.forEach(p => photoMap.set(p.id, p));
+      relevantPhotos.forEach(p => photoMap.set(p.id, p));
 
       const photoCsvRows = [["序號", "電號", "地址", "圖號座標", "桿名", "照片類別", "照片檔名", "拍攝時間"]];
       
-      allPhotos.forEach(photo => {
+      relevantPhotos.forEach(photo => {
         const record = state.records.find(r => r.uid === photo.uid) || {};
         const seq = record.seqNo || "";
         const custNo = record.custNo || "無電號";
-        const typeName = photo.type === "meter" ? "01特寫" : "02現場";
+        const typeNum = photo.type === "meter" ? "01" : "02";
+        const typeLabel = photo.type === "meter" ? "照片1" : "照片2";
         const cleanAddr = (record.addr || record.code || "無地址").replace(/[\\/:*?"<>|#]/g, "_");
-        // 檔名不再使用 '#' 作為前綴，避免部分系統與瀏覽器 URL hash 衝突
-        const fileName = `${seq}_${custNo}_${typeName}_${cleanAddr}.jpg`;
+        const fileName = `${seq}_${custNo}_${typeNum}_${cleanAddr}.jpg`;
         
         photosFolder.file(fileName, photo.blob);
-        photoCsvRows.push([seq, custNo, record.addr || "", record.code || "", record.pole || "", typeName, fileName, photo.timeStr || ""]);
+        photoCsvRows.push([seq, custNo, record.addr || "", record.code || "", record.pole || "", typeLabel, fileName, photo.timeStr || ""]);
       });
 
       const offlineHtml = generateOfflineHtmlReport(state.records, photoMap);
@@ -2777,13 +2789,13 @@
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const dateStr = new Date().toISOString().slice(0, 10);
-      const downloadName = `現場拍照存證_${dateStr}_共${allPhotos.length}張.zip`;
+      const downloadName = `現場拍照存證_${dateStr}_共${relevantPhotos.length}張.zip`;
       
       const a = document.createElement("a");
       a.href = URL.createObjectURL(zipBlob);
       a.download = downloadName;
       a.click();
-      showToast(`✅ ZIP 壓縮檔打包完成（共 ${allPhotos.length} 張照片）！`);
+      showToast(`✅ ZIP 壓縮檔打包完成（共 ${relevantPhotos.length} 張照片）！`);
     } catch (e) {
       console.error("ZIP 打包失敗：", e);
       showToast("ZIP 打包失敗：" + e.message, "error");
@@ -2801,11 +2813,11 @@
       const custNo = r.custNo || "無電號";
       const cleanAddr = (r.addr || r.code || "無地址").replace(/[\\/:*?"<>|#]/g, "_");
 
-      const meterFileName = meterPhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_01特寫_${cleanAddr}.jpg`) : "";
-      const sceneFileName = scenePhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_02現場_${cleanAddr}.jpg`) : "";
+      const meterFileName = meterPhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_01_${cleanAddr}.jpg`) : "";
+      const sceneFileName = scenePhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_02_${cleanAddr}.jpg`) : "";
 
-      let meterImgHtml = meterFileName ? `<img class="batch-a4-photo-img" src="${meterFileName}" alt="特寫照片" />` : "";
-      let sceneImgHtml = sceneFileName ? `<img class="batch-a4-photo-img" src="${sceneFileName}" alt="現場照片" />` : "";
+      let meterImgHtml = meterFileName ? `<img class="batch-a4-photo-img" src="${meterFileName}" alt="照片1" />` : "";
+      let sceneImgHtml = sceneFileName ? `<img class="batch-a4-photo-img" src="${sceneFileName}" alt="照片2" />` : "";
 
       const hasAnyPhoto = Boolean(meterPhoto || scenePhoto);
       let photosRowHtml = "";
@@ -3335,7 +3347,7 @@
   }
 
   // 清空所有標記
-  function clearAllMarkers() {
+  async function clearAllMarkers() {
     if (state.isReadOnlyShare) {
       showToast("此地圖為唯讀巡查模式，無法清空清單！", "dup");
       return;
@@ -3346,9 +3358,13 @@
     state.activeFilters = {};
     updateFilterStatusUI(0);
     localStorage.removeItem("tp_batch_meter_bookmarks_v1");
+    // 同步清空批次相片資料庫，徹底杜絕幽靈相片殘留
+    if (window.BatchPhotoDB) {
+      try { await window.BatchPhotoDB.clearAllPhotos(); } catch (e) {}
+    }
     renderBatchList();
     updateSummaryBadges(0, 0, 0);
-    showToast("🗑️ 已清空批次電表標記與清單");
+    showToast("🗑️ 已清空批次電表標記、清單與存證相片");
   }
 
   // 綁定所有使用者介面事件
@@ -3743,9 +3759,14 @@
       getMap()?.closePopup();
     }
 
+    // 4. 同步清除該點位存證照片，避免成為無主幽靈相片
+    if (window.BatchPhotoDB) {
+      try { window.BatchPhotoDB.deletePhotosForUid(uid); } catch (e) {}
+    }
+
     localStorage.setItem("tp_batch_meter_bookmarks_v1", JSON.stringify(getCleanRecords()));
     updateSummaryBadges();
-    showToast(`已移除 #${removed.seqNo} 標記`);
+    showToast(`已移除 #${removed.seqNo} 標記與相片`);
   }
 
   // 切換是否隱藏已跑點位 (就地切換 DOM 與圖層，避免重算與重建)

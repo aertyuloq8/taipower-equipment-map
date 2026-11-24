@@ -83,7 +83,6 @@
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
     // 浮水印參數設定
-    const typeLabel = meta.type === "meter" ? "【電表特寫】" : (meta.type === "scene" ? "【現場環境】" : "【現場存證】");
     const custNoText = meta.custNo ? `電號: ${meta.custNo}` : "";
     const timeText = meta.timeStr || formatNowTime();
     const addrText = meta.addr ? `地址: ${meta.addr}` : "";
@@ -91,7 +90,7 @@
     const codeText = meta.code ? `圖號: ${meta.code}` : "";
     const gpsText = meta.gps ? `GPS: ${meta.gps}` : "";
 
-    const line1 = `⚡ 台電巡查存證 ${typeLabel} ${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
+    const line1 = `現場拍照${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
     let line2 = [addrText, codeText, poleText].filter(Boolean).join(" | ");
     if (gpsText) line2 += ` | ${gpsText}`;
 
