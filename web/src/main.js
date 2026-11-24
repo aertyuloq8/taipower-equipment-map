@@ -2253,8 +2253,8 @@ window.__appBooted = true;
           verWrap.style.cssText = "margin-top:10px; padding-top:6px; border-top:1px dashed #e2e8f0; text-align:center;";
           const verLink = document.createElement("a");
           verLink.href = "javascript:void(0)";
-          verLink.textContent = "v2.6.0-tn";
-          verLink.style.cssText = "color:#94a3b8; font-size:10px; text-decoration:none; opacity:0.6; cursor:pointer;";
+          verLink.textContent = "系統版本：v2.7.6-tn (最新版)";
+          verLink.style.cssText = "color:#0f766e; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;";
           verLink.title = "系統版本資訊";
           verLink.addEventListener("click", (e) => {
             e.preventDefault();
