@@ -63,7 +63,49 @@
     });
   }
 
-  // 壓縮圖片並壓製台電現場防偽浮水印
+  function formatCustNo(val) {
+    if (!val) return "";
+    const s = String(val).trim();
+    const digits = s.replace(/\D/g, "");
+    if (digits.length === 11) {
+      return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 8)}-${digits.slice(8, 10)}-${digits.slice(10, 11)}`;
+    } else if (digits.length === 9) {
+      return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 9)}`;
+    } else if (digits.length === 8) {
+      return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 8)}`;
+    }
+    return s;
+  }
+
+  function wrapWatermarkSegments(ctx, segments, maxWidth) {
+    const lines = [];
+    let current = "";
+    const pushCharWrapped = (str) => {
+      let buf = "";
+      for (const ch of str) {
+        if (buf && ctx.measureText(buf + ch).width > maxWidth) {
+          lines.push(buf);
+          buf = ch;
+        } else {
+          buf += ch;
+        }
+      }
+      return buf;
+    };
+    segments.filter(Boolean).forEach((seg) => {
+      const candidate = current ? `${current} | ${seg}` : seg;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        current = candidate;
+      } else {
+        if (current) lines.push(current);
+        current = ctx.measureText(seg).width <= maxWidth ? seg : pushCharWrapped(seg);
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  // 壓縮圖片並壓製現場防偽浮水印（自動依畫寬折行，確保長地址與經緯度完整顯示不裁切）
   async function compressAndWatermark(fileOrBlob, meta = {}) {
     const img = await loadImage(fileOrBlob);
     const maxSide = 1600; // 存檔與報表輸出之高畫質尺寸 (足供 13x18cm 巨幅列印)
@@ -82,41 +124,60 @@
     // 繪製原始影像
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
-    // 浮水印參數設定
-    const custNoText = meta.custNo ? `電號: ${meta.custNo}` : "";
+    // 浮水印參數設定（電號統一套用 '-' 分段格式）
+    const formattedCust = formatCustNo(meta.custNo);
+    const custNoText = formattedCust ? `電號: ${formattedCust}` : "";
     const timeText = meta.timeStr || formatNowTime();
     const addrText = meta.addr ? `地址: ${meta.addr}` : "";
     const poleText = meta.pole ? `桿名: ${meta.pole}` : "";
     const codeText = meta.code ? `圖號: ${meta.code}` : "";
     const gpsText = meta.gps ? `GPS: ${meta.gps}` : "";
 
-    const line1 = `現場拍照${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
-    let line2 = [addrText, codeText, poleText].filter(Boolean).join(" | ");
-    if (gpsText) line2 += ` | ${gpsText}`;
+    // 依照畫布大小自適應字體尺寸與安全邊距
+    const fontSize = Math.max(13, Math.round(targetW * 0.022));
+    const subFontSize = Math.max(12, Math.round(fontSize * 0.88));
+    const lineHeight1 = Math.round(fontSize * 1.38);
+    const lineHeight2 = Math.round(subFontSize * 1.38);
+    const padding = Math.max(10, Math.round(fontSize * 0.75));
+    const maxTextW = Math.max(80, targetW - padding * 2);
 
-    // 依照畫布大小自適應字體尺寸
-    const fontSize = Math.max(14, Math.round(targetW * 0.022));
-    const lineHeight = Math.round(fontSize * 1.4);
-    const padding = Math.round(fontSize * 0.8);
-    const boxH = padding * 2 + lineHeight * 2;
+    const font1 = `600 ${fontSize}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
+    const font2 = `400 ${subFontSize}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
 
-    // 半透明漸層黑底遮罩
-    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-    ctx.fillRect(0, targetH - boxH, targetW, boxH);
+    ctx.font = font1;
+    const lines1 = wrapWatermarkSegments(ctx, ["現場拍照", custNoText, `時間: ${timeText}`], maxTextW);
+
+    ctx.font = font2;
+    const lines2 = wrapWatermarkSegments(ctx, [addrText, codeText, poleText, gpsText], maxTextW);
+
+    const boxH = padding * 2 + lines1.length * lineHeight1 + lines2.length * lineHeight2;
+    const boxTop = Math.max(0, targetH - boxH);
+
+    // 半透明黑底遮罩
+    ctx.fillStyle = "rgba(0, 0, 0, 0.68)";
+    ctx.fillRect(0, boxTop, targetW, targetH - boxTop);
 
     // 醒目黃色標示線
     ctx.fillStyle = "#eab308";
-    ctx.fillRect(0, targetH - boxH, targetW, 3);
+    ctx.fillRect(0, boxTop, targetW, 3);
 
-    // 繪製白色文字
-    ctx.font = `600 ${fontSize}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.fillStyle = "#ffffff";
+    // 繪製逐行文字
     ctx.textBaseline = "middle";
+    let curY = boxTop + padding;
 
-    ctx.fillText(line1, padding, targetH - boxH + padding + lineHeight * 0.5);
-    ctx.font = `400 ${Math.round(fontSize * 0.9)}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.font = font1;
+    ctx.fillStyle = "#ffffff";
+    lines1.forEach((line) => {
+      ctx.fillText(line, padding, curY + lineHeight1 * 0.5);
+      curY += lineHeight1;
+    });
+
+    ctx.font = font2;
     ctx.fillStyle = "#f3f4f6";
-    ctx.fillText(line2, padding, targetH - boxH + padding + lineHeight * 1.5);
+    lines2.forEach((line) => {
+      ctx.fillText(line, padding, curY + lineHeight2 * 0.5);
+      curY += lineHeight2;
+    });
 
     // 轉換為 JPEG Blob (品質 0.85，兼顧清晰度與輕量)
     const blob = await new Promise((res) => {

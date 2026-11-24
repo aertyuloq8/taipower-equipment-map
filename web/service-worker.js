@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-r52";
+const CACHE_NAME = "equipment-map-photo-edition-r53";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 5000;
 const TILE_CACHE_TRIM = 4000;
@@ -70,7 +70,7 @@ self.addEventListener("fetch", (event) => {
   const isDropdownData = /\/data\/cadastral-dropdowns-tw\.json$/.test(url.pathname);
   const isCadastreAsset = /\/cadastre(-config)?\.(js|css)$/.test(url.pathname);
   const isSyncAsset = /\/sync\.js$/.test(url.pathname);
-  const isBatchAsset = /\/batch-meter\.(js|css)$/.test(url.pathname);
+  const isBatchAsset = /\/(batch-meter\.(js|css)|batch-photo-db\.js)$/.test(url.pathname);
   const isArchiveWorker = /\/archive-worker\.js$/.test(url.pathname);
   const isRemoteAsset = REMOTE_ASSETS.some(asset => asset === request.url);
   const isTileRequest = /^(https:\/\/wmts\.nlsc\.gov\.tw\/|https:\/\/[a-z]\.tile\.openstreetmap\.org\/)/.test(url.href);

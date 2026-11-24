@@ -83,7 +83,35 @@
     });
   }
 
-  // 壓縮圖片並壓製台電現場防偽浮水印
+  function wrapWatermarkSegments(ctx, segments, maxWidth) {
+    const lines = [];
+    let current = "";
+    const pushCharWrapped = (str) => {
+      let buf = "";
+      for (const ch of str) {
+        if (buf && ctx.measureText(buf + ch).width > maxWidth) {
+          lines.push(buf);
+          buf = ch;
+        } else {
+          buf += ch;
+        }
+      }
+      return buf;
+    };
+    segments.filter(Boolean).forEach((seg) => {
+      const candidate = current ? `${current} | ${seg}` : seg;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        current = candidate;
+      } else {
+        if (current) lines.push(current);
+        current = ctx.measureText(seg).width <= maxWidth ? seg : pushCharWrapped(seg);
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  // 壓縮圖片並壓製現場防偽浮水印（自動依畫寬折行，確保長地址與經緯度完整顯示不裁切）
   async function compressAndWatermark(fileOrBlob, meta = {}) {
     const img = await loadImage(fileOrBlob);
     const maxSide = 1600; // 存檔與報表輸出之高畫質尺寸 (足供 13x18cm 巨幅列印)
@@ -102,41 +130,60 @@
     // 繪製原始影像
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
-    // 浮水印參數設定
-    const custNoText = meta.custNo ? `電號: ${meta.custNo}` : "";
+    // 浮水印參數設定（電號統一套用 '-' 分段格式）
+    const formattedCust = formatCustNo(meta.custNo);
+    const custNoText = formattedCust ? `電號: ${formattedCust}` : "";
     const timeText = meta.timeStr || formatNowTime();
     const addrText = meta.addr ? `地址: ${meta.addr}` : "";
     const poleText = meta.pole ? `桿名: ${meta.pole}` : "";
     const codeText = meta.code ? `圖號: ${meta.code}` : "";
     const gpsText = meta.gps ? `GPS: ${meta.gps}` : "";
 
-    const line1 = `現場拍照${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
-    let line2 = [addrText, codeText, poleText].filter(Boolean).join(" | ");
-    if (gpsText) line2 += ` | ${gpsText}`;
+    // 依照畫布大小自適應字體尺寸與安全邊距
+    const fontSize = Math.max(13, Math.round(targetW * 0.022));
+    const subFontSize = Math.max(12, Math.round(fontSize * 0.88));
+    const lineHeight1 = Math.round(fontSize * 1.38);
+    const lineHeight2 = Math.round(subFontSize * 1.38);
+    const padding = Math.max(10, Math.round(fontSize * 0.75));
+    const maxTextW = Math.max(80, targetW - padding * 2);
 
-    // 依照畫布大小自適應字體尺寸
-    const fontSize = Math.max(14, Math.round(targetW * 0.022));
-    const lineHeight = Math.round(fontSize * 1.4);
-    const padding = Math.round(fontSize * 0.8);
-    const boxH = padding * 2 + lineHeight * 2;
+    const font1 = `600 ${fontSize}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
+    const font2 = `400 ${subFontSize}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
 
-    // 半透明漸層黑底遮罩
-    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-    ctx.fillRect(0, targetH - boxH, targetW, boxH);
+    ctx.font = font1;
+    const lines1 = wrapWatermarkSegments(ctx, ["現場拍照", custNoText, `時間: ${timeText}`], maxTextW);
+
+    ctx.font = font2;
+    const lines2 = wrapWatermarkSegments(ctx, [addrText, codeText, poleText, gpsText], maxTextW);
+
+    const boxH = padding * 2 + lines1.length * lineHeight1 + lines2.length * lineHeight2;
+    const boxTop = Math.max(0, targetH - boxH);
+
+    // 半透明黑底遮罩
+    ctx.fillStyle = "rgba(0, 0, 0, 0.68)";
+    ctx.fillRect(0, boxTop, targetW, targetH - boxTop);
 
     // 醒目黃色標示線
     ctx.fillStyle = "#eab308";
-    ctx.fillRect(0, targetH - boxH, targetW, 3);
+    ctx.fillRect(0, boxTop, targetW, 3);
 
-    // 繪製白色文字
-    ctx.font = `600 ${fontSize}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.fillStyle = "#ffffff";
+    // 繪製逐行文字
     ctx.textBaseline = "middle";
+    let curY = boxTop + padding;
 
-    ctx.fillText(line1, padding, targetH - boxH + padding + lineHeight * 0.5);
-    ctx.font = `400 ${Math.round(fontSize * 0.9)}px "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.font = font1;
+    ctx.fillStyle = "#ffffff";
+    lines1.forEach((line) => {
+      ctx.fillText(line, padding, curY + lineHeight1 * 0.5);
+      curY += lineHeight1;
+    });
+
+    ctx.font = font2;
     ctx.fillStyle = "#f3f4f6";
-    ctx.fillText(line2, padding, targetH - boxH + padding + lineHeight * 1.5);
+    lines2.forEach((line) => {
+      ctx.fillText(line, padding, curY + lineHeight2 * 0.5);
+      curY += lineHeight2;
+    });
 
     // 轉換為 JPEG Blob (品質 0.85，兼顧清晰度與輕量)
     const blob = await new Promise((res) => {
@@ -1154,6 +1201,54 @@
     }
   }
 
+  function shouldHideRecordCard(r) {
+    if (!r) return true;
+    if (r.filteredOut) return true;
+    if (state.hideInspected !== false && r.inspected && !r._keepVisibleWhileEditing) return true;
+    return false;
+  }
+
+  function shouldHideMarkerGroup(marker) {
+    const group = marker?._batchClusterGroup;
+    if (!group || !group.length) return false;
+    const hasVisibleFilter = group.some(item => !item.r.filteredOut);
+    if (!hasVisibleFilter) return true;
+    if (state.hideInspected === false) return false;
+    const hasOpenPopup = Boolean(marker.isPopupOpen && marker.isPopupOpen());
+    const hasEditingHold = group.some(item => item.r._keepVisibleWhileEditing);
+    if (hasOpenPopup || hasEditingHold) return false;
+    return group.every(item => item.r.inspected);
+  }
+
+  function releaseEditingHold(exceptUid = null) {
+    (state.records || []).forEach(r => {
+      if (!r._keepVisibleWhileEditing || r.uid === exceptUid) return;
+      if (r.marker?.isPopupOpen && r.marker.isPopupOpen()) return;
+      r._keepVisibleWhileEditing = false;
+      updateCardInspectedUI(r);
+      updateMarkerInspectedUI(r);
+      updatePopupInspectedUI(r);
+    });
+  }
+
+  window.__finishEditingBatchPhoto = function(uid) {
+    const rec = state.records.find(r => r.uid === uid);
+    if (!rec) return;
+    rec._keepVisibleWhileEditing = false;
+    updateCardInspectedUI(rec);
+    updatePopupInspectedUI(rec);
+    if (rec.marker?.isPopupOpen && rec.marker.isPopupOpen() && state.hideInspected !== false) {
+      const group = rec.marker._batchClusterGroup || [{ r: rec }];
+      if (group.every(g => g.r.inspected && !g.r._keepVisibleWhileEditing)) {
+        getMap()?.closePopup();
+      }
+    }
+    updateMarkerInspectedUI(rec);
+    if (state.hideInspected !== false && rec.inspected) {
+      showToast(`✓ 已完成並隱藏 #${rec.seqNo}`);
+    }
+  };
+
   // ============================================================
   // 地圖標籤視野裁切 (Viewport Culling)
   // 僅將目前螢幕可視範圍（加 25% 平移緩衝區）內的 Marker 與 Tooltip 掛載至 DOM
@@ -1183,7 +1278,6 @@
 
     // 視野邊界加 25% 緩衝區（平移拖曳時邊緣無感加載，不產生突然跳出的突兀感）
     const bounds = map.getBounds().pad(0.25);
-    const isHidingInspected = state.hideInspected !== false;
 
     // 收集所有唯一 Marker
     const uniqueMarkers = new Set();
@@ -1196,19 +1290,10 @@
 
     uniqueMarkers.forEach(marker => {
       const group = marker._batchClusterGroup;
-
-      // 1. 條件篩選檢查：群組內所有項目若全被過濾，直接不顯示
-      const hasVisibleFilter = group ? group.some(item => !item.r.filteredOut) : true;
-      if (!hasVisibleFilter) {
-        if (state.layerGroup.hasLayer(marker)) {
-          state.layerGroup.removeLayer(marker);
-        }
-        return;
-      }
-
-      // 2. 巡檢已跑隱藏檢查：群組內所有項目若全已跑且開啟隱藏，直接不顯示
       const isClusterAllDone = group ? group.every(item => item.r.inspected) : false;
-      if (isHidingInspected && isClusterAllDone) {
+
+      // 1 & 2. 條件篩選與已跑隱藏檢查（正在開啟彈窗或編輯續拍時暫不移除）
+      if (shouldHideMarkerGroup(marker)) {
         if (state.layerGroup.hasLayer(marker)) {
           state.layerGroup.removeLayer(marker);
         }
@@ -1286,8 +1371,27 @@
       const photoSlots = popupNode.querySelectorAll(".batch-card-photo-actions");
       photoSlots.forEach(slot => {
         const uid = slot.dataset.photoUid;
-        if (uid) refreshBatchPhotoSlotsForUid(uid);
+        if (uid) {
+          const rec = state.records.find(r => r.uid === uid);
+          if (rec) updatePopupInspectedUI(rec);
+          refreshBatchPhotoSlotsForUid(uid);
+        }
       });
+    });
+    map.on("popupclose", (e) => {
+      const marker = e.popup?._source;
+      const group = marker?._batchClusterGroup;
+      if (!group || !group.length) return;
+      // 待 Leaflet 完成 popup 關閉狀態更新後，再自動收合已完成拍照的點位與卡片
+      setTimeout(() => {
+        group.forEach(item => {
+          if (item.r._keepVisibleWhileEditing) {
+            item.r._keepVisibleWhileEditing = false;
+            updateCardInspectedUI(item.r);
+          }
+        });
+        updateMarkerInspectedUI(group[0].r);
+      }, 0);
     });
   }
 
@@ -1396,7 +1500,6 @@
   // 套用當前篩選狀態至地圖標記與結果清單
   function applyFilters() {
     let filterMatchesCount = 0;
-    const isHiding = state.hideInspected !== false;
 
     state.records.forEach((r, idx) => {
       const matches = isRecordVisible(r);
@@ -1406,8 +1509,7 @@
       // 1. 清單卡片聯動 (正交判定：條件篩選排除 OR 巡檢已跑隱藏)
       const card = controls.list?.querySelector(`.v2-batch-item[data-meter-idx="${idx}"]`);
       if (card) {
-        const isHidden = Boolean(r.filteredOut) || (isHiding && r.inspected);
-        card.style.display = isHidden ? "none" : "";
+        card.style.display = shouldHideRecordCard(r) ? "none" : "";
       }
     });
 
@@ -2217,7 +2319,7 @@
       if (!r.seqNo) r.seqNo = idx + 1;
       if (!r.uid) r.uid = "bm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + r.seqNo;
 
-      const isHidden = (state.hideInspected !== false && r.inspected) || Boolean(r.filteredOut);
+      const isHidden = shouldHideRecordCard(r);
       const navUrl = (Number.isFinite(r.lat) && Number.isFinite(r.lng)) ? googleNavUrl(r.lat, r.lng) : "";
 
       return `
@@ -2290,6 +2392,7 @@
     controls.list.querySelectorAll(".v2-batch-item").forEach(el => {
       el.addEventListener("click", () => {
         const uid = el.dataset.meterUid;
+        releaseEditingHold(uid);
         const r = state.records.find(item => item.uid === uid) || state.records[parseInt(el.dataset.meterIdx, 10)];
         const map = getMap();
         if (map && r && Number.isFinite(r.lat) && Number.isFinite(r.lng)) {
@@ -2440,14 +2543,18 @@
         type
       };
       await window.BatchPhotoDB.savePhoto(uid, record.custNo, type, file, meta);
-      showToast(`✅ 現場相片已安全存證！`);
       const rec = state.records.find(r => r.uid === uid);
       if (rec) {
+        releaseEditingHold(uid);
+        rec._keepVisibleWhileEditing = Boolean(state.hideInspected !== false);
         rec._photoCount = (rec._photoCount || 0) + 1;
         updateRecordMarkerLabel(rec);
-        // 智慧判斷：拍照即代表已現場查驗，自動標記為已跑
+        // 智慧判斷：拍照即代表已現場查驗，自動標記為已跑，同時保留目前操作中的標籤與卡片以利續拍第2張或刪照
         setRecordInspectedState(rec, true);
       }
+      showToast(rec && rec._keepVisibleWhileEditing
+        ? "✅ 已拍照並標記已跑！暫保留顯示供續拍或刪照，關閉彈窗或點擊「完成隱藏」後自動收合"
+        : "✅ 現場相片已安全存證！");
       await refreshBatchPhotoSlotsForUid(uid);
     } catch (err) {
       console.error("照片儲存失敗：", err);
@@ -2458,6 +2565,9 @@
   function setRecordInspectedState(record, isInspected) {
     if (!record) return;
     record.inspected = Boolean(isInspected);
+    if (!record.inspected) {
+      record._keepVisibleWhileEditing = false;
+    }
     record.inspectDate = record.inspected ? (record.inspectDate || new Date().toLocaleString("zh-TW")) : "";
 
     if (state.isReadOnlyShare) {
@@ -2617,60 +2727,27 @@
   };
 
   // --- 3. 方案 A：A4 橫式滿版 13x18cm (2) 巡查存證報告輸出 ---
-  async function openA4PrintReport() {
-    if (!state.records.length) {
-      showToast("目前沒有批次電表可產出報告！", "dup");
-      return;
-    }
+  let _printBlobUrls = [];
 
-    showToast("🖨️ 正在整合相片與排版 A4 橫式報告...", "dup");
-    let allPhotos = [];
-    if (window.BatchPhotoDB) {
-      try { allPhotos = await window.BatchPhotoDB.getAllPhotos(); } catch {}
-    }
-    const photoMap = new Map();
-    allPhotos.forEach(p => photoMap.set(p.id, p));
-
-    let printContainer = document.getElementById("batchA4PrintContainer");
-    if (!printContainer) {
-      printContainer = document.createElement("div");
-      printContainer.id = "batchA4PrintContainer";
-      document.body.appendChild(printContainer);
-    }
-
+  function buildA4ReportPagesHtml(records, resolveImgSrcs) {
     const todayStr = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" });
-    const recordsToPrint = state.records;
-
-    const pagesHtml = recordsToPrint.map((r, idx) => {
-      const meterPhoto = photoMap.get(`${r.uid}_meter`);
-      const scenePhoto = photoMap.get(`${r.uid}_scene`);
+    return records.map((r, idx) => {
+      const { meterSrc, sceneSrc } = resolveImgSrcs(r) || {};
       const formattedCustNo = formatCustNo(r.custNo);
+      const meterImgHtml = meterSrc ? `<img class="batch-a4-photo-img" src="${meterSrc}" alt="照片1" />` : "";
+      const sceneImgHtml = sceneSrc ? `<img class="batch-a4-photo-img" src="${sceneSrc}" alt="照片2" />` : "";
 
-      let meterImgHtml = "";
-      if (meterPhoto && meterPhoto.blob) {
-        const url = URL.createObjectURL(meterPhoto.blob);
-        meterImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="照片1" />`;
-      }
-
-      let sceneImgHtml = "";
-      if (scenePhoto && scenePhoto.blob) {
-        const url = URL.createObjectURL(scenePhoto.blob);
-        sceneImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="照片2" />`;
-      }
-
-      const hasAnyPhoto = Boolean(meterPhoto || scenePhoto);
       let photosRowHtml = "";
-
-      if (!hasAnyPhoto) {
+      if (!meterSrc && !sceneSrc) {
         photosRowHtml = `
-          <div class="batch-a4-photos-row" style="grid-template-columns: 1fr;">
-            <div class="batch-a4-photo-box" style="justify-content: center; align-items: center; background: #f8fafc;">
-              <div style="font-size: 16pt; font-weight: 700; color: #0f766e; margin-bottom: 8px;">✓ 現場合格</div>
+          <div class="batch-a4-photos-row is-single">
+            <div class="batch-a4-photo-box is-empty-status" style="flex-direction: column; justify-content: center; align-items: center; background: #f8fafc; gap: 8px; text-align: center;">
+              <div style="font-size: 16pt; font-weight: 700; color: #0f766e;">✓ 現場合格</div>
               <div style="font-size: 12pt; color: #64748b;">本戶現場查對完成，無相片紀錄</div>
             </div>
           </div>
         `;
-      } else if (meterPhoto && scenePhoto) {
+      } else if (meterSrc && sceneSrc) {
         photosRowHtml = `
           <div class="batch-a4-photos-row">
             <div class="batch-a4-photo-box">
@@ -2706,7 +2783,7 @@
             </div>
             <div style="text-align: right; font-size: 10pt; color: #475569;">
               <div>日期：<strong>${todayStr}</strong></div>
-              <div style="font-size: 9pt; color: #64748b; margin-top: 1mm;">第 ${idx + 1} 頁 / 共 ${recordsToPrint.length} 頁</div>
+              <div style="font-size: 9pt; color: #64748b; margin-top: 1mm;">第 ${idx + 1} 頁 / 共 ${records.length} 頁</div>
             </div>
           </div>
 
@@ -2714,6 +2791,47 @@
         </div>
       `;
     }).join("");
+  }
+
+  async function openA4PrintReport() {
+    if (!state.records.length) {
+      showToast("目前沒有批次電表可產出報告！", "dup");
+      return;
+    }
+
+    showToast("🖨️ 正在整合相片與排版 A4 橫式報告...", "dup");
+    _printBlobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+    _printBlobUrls = [];
+
+    let allPhotos = [];
+    if (window.BatchPhotoDB) {
+      try { allPhotos = await window.BatchPhotoDB.getAllPhotos(); } catch {}
+    }
+    const photoMap = new Map();
+    allPhotos.forEach(p => photoMap.set(p.id, p));
+
+    let printContainer = document.getElementById("batchA4PrintContainer");
+    if (!printContainer) {
+      printContainer = document.createElement("div");
+      printContainer.id = "batchA4PrintContainer";
+      document.body.appendChild(printContainer);
+    }
+
+    const pagesHtml = buildA4ReportPagesHtml(state.records, (r) => {
+      const meterPhoto = photoMap.get(`${r.uid}_meter`);
+      const scenePhoto = photoMap.get(`${r.uid}_scene`);
+      let meterSrc = "";
+      let sceneSrc = "";
+      if (meterPhoto && meterPhoto.blob) {
+        meterSrc = URL.createObjectURL(meterPhoto.blob);
+        _printBlobUrls.push(meterSrc);
+      }
+      if (scenePhoto && scenePhoto.blob) {
+        sceneSrc = URL.createObjectURL(scenePhoto.blob);
+        _printBlobUrls.push(sceneSrc);
+      }
+      return { meterSrc, sceneSrc };
+    });
 
     printContainer.innerHTML = pagesHtml;
 
@@ -2803,77 +2921,17 @@
   }
 
   function generateOfflineHtmlReport(records, photoMap) {
-    const todayStr = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" });
-    
-    const pagesHtml = records.map((r, idx) => {
+    const pagesHtml = buildA4ReportPagesHtml(records, (r) => {
       const meterPhoto = photoMap.get(`${r.uid}_meter`);
       const scenePhoto = photoMap.get(`${r.uid}_scene`);
-      const formattedCustNo = formatCustNo(r.custNo);
       const seq = r.seqNo;
       const custNo = r.custNo || "無電號";
       const cleanAddr = (r.addr || r.code || "無地址").replace(/[\\/:*?"<>|#]/g, "_");
-
-      const meterFileName = meterPhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_01_${cleanAddr}.jpg`) : "";
-      const sceneFileName = scenePhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_02_${cleanAddr}.jpg`) : "";
-
-      let meterImgHtml = meterFileName ? `<img class="batch-a4-photo-img" src="${meterFileName}" alt="照片1" />` : "";
-      let sceneImgHtml = sceneFileName ? `<img class="batch-a4-photo-img" src="${sceneFileName}" alt="照片2" />` : "";
-
-      const hasAnyPhoto = Boolean(meterPhoto || scenePhoto);
-      let photosRowHtml = "";
-
-      if (!hasAnyPhoto) {
-        photosRowHtml = `
-          <div class="batch-a4-photos-row" style="grid-template-columns: 1fr;">
-            <div class="batch-a4-photo-box" style="justify-content: center; align-items: center; background: #f8fafc;">
-              <div style="font-size: 16pt; font-weight: 700; color: #0f766e; margin-bottom: 8px;">✓ 現場合格</div>
-              <div style="font-size: 12pt; color: #64748b;">本戶現場查對完成，無相片紀錄</div>
-            </div>
-          </div>
-        `;
-      } else if (meterPhoto && scenePhoto) {
-        photosRowHtml = `
-          <div class="batch-a4-photos-row">
-            <div class="batch-a4-photo-box">
-              <div class="batch-a4-photo-img-wrap">${meterImgHtml}</div>
-            </div>
-            <div class="batch-a4-photo-box">
-              <div class="batch-a4-photo-img-wrap">${sceneImgHtml}</div>
-            </div>
-          </div>
-        `;
-      } else {
-        const singleImg = meterImgHtml || sceneImgHtml;
-        photosRowHtml = `
-          <div class="batch-a4-photos-row is-single">
-            <div class="batch-a4-photo-box">
-              <div class="batch-a4-photo-img-wrap">${singleImg}</div>
-            </div>
-          </div>
-        `;
-      }
-
-      return `
-        <div class="batch-a4-page">
-          <div class="batch-a4-header">
-            <div>
-              <div class="batch-a4-title">現場拍照 #${r.seqNo}</div>
-              <div class="batch-a4-meta-row" style="margin-top: 1.5mm;">
-                <span>電號：<strong>${escapeHtml(formattedCustNo || "--")}</strong></span>
-                <span>用電地址：<strong>${escapeHtml(r.addr || "--")}</strong></span>
-                <span>圖號/桿名：<strong>${escapeHtml(r.code || "--")} ${r.pole ? "(" + escapeHtml(r.pole) + ")" : ""}</strong></span>
-              </div>
-            </div>
-            <div style="text-align: right; font-size: 10pt; color: #475569;">
-              <div>日期：<strong>${todayStr}</strong></div>
-              <div style="font-size: 9pt; color: #64748b; margin-top: 1mm;">第 ${idx + 1} 頁 / 共 ${records.length} 頁</div>
-            </div>
-          </div>
-
-          ${photosRowHtml}
-        </div>
-      `;
-    }).join("");
+      return {
+        meterSrc: meterPhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_01_${cleanAddr}.jpg`) : "",
+        sceneSrc: scenePhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_02_${cleanAddr}.jpg`) : ""
+      };
+    });
 
     return `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -3591,6 +3649,27 @@
   window.__toggleBatchInspected = function(uid) { toggleRecordInspected(uid); };
   window.__removeBatchMeter = function(uid) { removeRecordByUid(uid); };
 
+  function syncHoldBarDOM(container, record, hintText) {
+    if (!container || !record) return;
+    const showHold = Boolean(state.hideInspected !== false && record.inspected && record._keepVisibleWhileEditing && !state.isReadOnlyShare);
+    let bar = container.querySelector(".batch-editing-hold-bar");
+    if (showHold) {
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.className = "batch-editing-hold-bar";
+        bar.innerHTML = `
+          <span>${hintText}</span>
+          <button type="button" class="batch-editing-hold-btn" onclick="event.stopPropagation(); window.__finishEditingBatchPhoto?.('${record.uid}');">✓ 完成隱藏</button>
+        `;
+        const anchor = container.querySelector(".v2-batch-item-footer, .batch-popup-item-actions");
+        if (anchor) container.insertBefore(bar, anchor);
+        else container.appendChild(bar);
+      }
+    } else if (bar) {
+      bar.remove();
+    }
+  }
+
       // --- 局部精準更新 (O(1)) 效能核心：直接更新對應 DOM 與 Marker，避免全量重繪 ---
   function updateCardInspectedUI(record) {
     const card = document.querySelector(`.v2-batch-item[data-meter-uid="${record.uid}"]`);
@@ -3618,8 +3697,8 @@
       }
     }
 
-    const isHidden = (state.hideInspected !== false && record.inspected) || Boolean(record.filteredOut);
-    card.style.display = isHidden ? "none" : "";
+    syncHoldBarDOM(card, record, "📸 已標記已跑，暫保留供續拍第 2 張或刪照");
+    card.style.display = shouldHideRecordCard(record) ? "none" : "";
   }
 
   function updatePopupInspectedUI(record) {
@@ -3647,6 +3726,8 @@
         badge.remove();
       }
     }
+
+    syncHoldBarDOM(popupCard, record, "📸 已標記已跑（關閉彈窗後自動隱藏）");
   }
 
   function updateMarkerInspectedUI(record) {
@@ -3654,60 +3735,40 @@
 
     const group = record.marker._batchClusterGroup || [{ r: record }];
     const isClusterAllDone = group.every(g => g.r.inspected);
-    const isHiding = state.hideInspected !== false;
     const map = getMap();
     const bounds = map ? map.getBounds().pad(0.25) : null;
     const inView = bounds ? bounds.contains(record.marker.getLatLng()) : true;
 
-    // 條件篩選檢查：若群組內所有項目均已被條件篩選排除，則不應顯示於地圖
-    const hasVisibleFilter = group.some(item => !item.r.filteredOut);
-    if (!hasVisibleFilter) {
+    if (shouldHideMarkerGroup(record.marker)) {
       if (state.layerGroup.hasLayer(record.marker)) {
         state.layerGroup.removeLayer(record.marker);
+      }
+      if (record.marker.isPopupOpen && record.marker.isPopupOpen()) {
+        getMap()?.closePopup();
       }
       return;
     }
 
-    if (isHiding) {
-      if (record.inspected) {
-        if (isClusterAllDone) {
-          if (state.layerGroup.hasLayer(record.marker)) {
-            state.layerGroup.removeLayer(record.marker);
-          }
-          getMap()?.closePopup();
-        }
-      } else {
-        // 復原待巡檢：若在可視視野內，將圖標重新加回地圖圖層
-        if (inView) {
-          if (!state.layerGroup.hasLayer(record.marker)) {
-            state.layerGroup.addLayer(record.marker);
-            if (state.showLabels && record.marker.getTooltip()) {
-              record.marker.openTooltip();
-            }
-          }
+    // 保留或還原可視範圍內點位，並同步已跑半透明標記樣式
+    if (inView) {
+      if (!state.layerGroup.hasLayer(record.marker)) {
+        state.layerGroup.addLayer(record.marker);
+        if (state.showLabels && record.marker.getTooltip()) {
+          record.marker.openTooltip();
         }
       }
-    } else {
-      // 顯示全部中：若在可視視野內，保證圖標在地圖上，並切換 is-all-done 樣式
-      if (inView) {
-        if (!state.layerGroup.hasLayer(record.marker)) {
-          state.layerGroup.addLayer(record.marker);
-          if (state.showLabels && record.marker.getTooltip()) {
-            record.marker.openTooltip();
-          }
-        }
-      }
-      const pin = record.marker.getElement()?.querySelector(".batch-marker-pin");
-      if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
-      const tooltipEl = record.marker.getTooltip()?.getElement();
-      if (tooltipEl) tooltipEl.classList.toggle("is-all-done", isClusterAllDone);
     }
+    const pin = record.marker.getElement()?.querySelector(".batch-marker-pin");
+    if (pin) pin.classList.toggle("is-all-done", isClusterAllDone);
+    const tooltipEl = record.marker.getTooltip()?.getElement();
+    if (tooltipEl) tooltipEl.classList.toggle("is-all-done", isClusterAllDone);
   }
 
   // 標記已跑切換 (O(1) 局部即時更新)
   function toggleRecordInspected(uid) {
     const record = state.records.find(r => r.uid === uid);
     if (!record) return;
+    record._keepVisibleWhileEditing = false;
     setRecordInspectedState(record, !record.inspected);
 
     const hideSuffix = state.hideInspected ? " (已隱藏)" : "";
@@ -3776,12 +3837,8 @@
 
     const isHiding = state.hideInspected !== false;
     state.records.forEach(r => {
-      // 1. 卡片顯示狀態切換
-      const card = document.querySelector(`.v2-batch-item[data-meter-uid="${r.uid}"]`);
-      if (card) {
-        const isHidden = (isHiding && r.inspected) || Boolean(r.filteredOut);
-        card.style.display = isHidden ? "none" : "";
-      }
+      r._keepVisibleWhileEditing = false;
+      updateCardInspectedUI(r);
     });
 
     // 2. 地圖圖層與視野動態裁切

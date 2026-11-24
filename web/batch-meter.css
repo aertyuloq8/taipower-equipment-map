@@ -1362,6 +1362,42 @@
   background: #475569;
 }
 
+/* --- 拍照後保留編輯提示列 (供續拍第 2 張或刪照，關閉彈窗或點擊完成後自動收合) --- */
+.batch-editing-hold-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #065f46;
+}
+.batch-editing-hold-btn {
+  flex: 0 0 auto;
+  min-height: 24px !important;
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  background: #059669 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 4px !important;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.batch-editing-hold-btn:hover {
+  background: #047857 !important;
+}
+
+#batchA4PrintContainer {
+  display: none;
+}
+
 /* --- A4 橫式滿版列印專用樣式 --- */
 @media print {
   @page {
@@ -1373,7 +1409,12 @@
     padding: 0 !important;
     background: #ffffff !important;
     width: 297mm !important;
-    height: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
   }
   /* 將非列印主體徹底移出排版流，避免隱形 DOM 佔據千像素引發空白分頁 */
   body > :not(#batchA4PrintContainer) {
@@ -1383,23 +1424,22 @@
     display: block !important;
     position: static !important;
     width: 297mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
   }
   .batch-a4-page {
     width: 297mm !important;
-    height: 198mm !important;
-    max-height: 198mm !important;
+    height: 202mm !important;
+    max-height: 202mm !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     box-sizing: border-box !important;
     padding: 6mm 10mm !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
+    display: block !important;
     overflow: hidden !important;
     background: #ffffff !important;
     border: none !important;
@@ -1409,7 +1449,6 @@
     break-after: avoid !important;
   }
   .batch-a4-header {
-    flex: 0 0 auto !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
@@ -1430,13 +1469,11 @@
     gap: 5mm !important;
   }
   .batch-a4-photos-row {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 4mm !important;
-    height: calc(198mm - 28mm) !important;
-    max-height: calc(198mm - 28mm) !important;
+    height: calc(202mm - 34mm) !important;
+    max-height: calc(202mm - 34mm) !important;
     box-sizing: border-box !important;
   }
   .batch-a4-photos-row.is-single {
@@ -1453,6 +1490,11 @@
     height: 100% !important;
     min-height: 0 !important;
     box-sizing: border-box !important;
+  }
+  .batch-a4-photo-box.is-empty-status {
+    flex-direction: column !important;
+    gap: 8px !important;
+    text-align: center !important;
   }
   .batch-a4-photo-img-wrap {
     width: 100% !important;
