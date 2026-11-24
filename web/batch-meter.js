@@ -130,13 +130,13 @@
     // 繪製原始影像
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
-    // 浮水印參數設定（電號統一套用 '-' 分段格式）
+    // 浮水印參數設定（電號統一套用 '-' 分段格式，地址與「圖號 / 設備 / GPS」分開獨立成行）
     const formattedCust = formatCustNo(meta.custNo);
     const custNoText = formattedCust ? `電號: ${formattedCust}` : "";
     const timeText = meta.timeStr || formatNowTime();
     const addrText = meta.addr ? `地址: ${meta.addr}` : "";
-    const poleText = meta.pole ? `桿名: ${meta.pole}` : "";
     const codeText = meta.code ? `圖號: ${meta.code}` : "";
+    const poleText = meta.pole ? `設備: ${meta.pole}` : "";
     const gpsText = meta.gps ? `GPS: ${meta.gps}` : "";
 
     // 依照畫布大小自適應字體尺寸與安全邊距
@@ -154,7 +154,9 @@
     const lines1 = wrapWatermarkSegments(ctx, ["現場拍照", custNoText, `時間: ${timeText}`], maxTextW);
 
     ctx.font = font2;
-    const lines2 = wrapWatermarkSegments(ctx, [addrText, codeText, poleText, gpsText], maxTextW);
+    const addrLines = addrText ? wrapWatermarkSegments(ctx, [addrText], maxTextW) : [];
+    const equipLines = wrapWatermarkSegments(ctx, [codeText, poleText, gpsText], maxTextW);
+    const lines2 = [...addrLines, ...equipLines];
 
     const boxH = padding * 2 + lines1.length * lineHeight1 + lines2.length * lineHeight2;
     const boxTop = Math.max(0, targetH - boxH);
