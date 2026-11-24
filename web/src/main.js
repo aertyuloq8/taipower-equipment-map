@@ -2254,7 +2254,7 @@ window.__appBooted = true;
           
           const verLink = document.createElement("a");
           verLink.href = "javascript:void(0)";
-          verLink.textContent = "系統版本：v2.8.0-tn";
+          verLink.textContent = "系統版本：v2.8.1-tn";
           verLink.style.cssText = "color:#0f766e; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;";
           verLink.title = "點擊切換至【全台土木設備分布地圖】";
           verLink.addEventListener("click", (e) => {
@@ -8654,7 +8654,7 @@ function renderDefectStats() {
         });
 
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?rev=52', { scope: './' })
+          navigator.serviceWorker.register('./service-worker.js?rev=53', { scope: './' })
             .then((registration) => {
               console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
 

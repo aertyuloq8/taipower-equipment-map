@@ -103,7 +103,7 @@
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
     // 浮水印參數設定
-    const typeLabel = meta.type === "meter" ? "【電表特寫】" : (meta.type === "scene" ? "【現場環境】" : "【現場存證】");
+    const typeLabel = meta.type === "meter" ? "【特寫照片】" : (meta.type === "scene" ? "【現場環境】" : "【現場照片】");
     const custNoText = meta.custNo ? `電號: ${meta.custNo}` : "";
     const timeText = meta.timeStr || formatNowTime();
     const addrText = meta.addr ? `地址: ${meta.addr}` : "";
@@ -111,7 +111,7 @@
     const codeText = meta.code ? `圖號: ${meta.code}` : "";
     const gpsText = meta.gps ? `GPS: ${meta.gps}` : "";
 
-    const line1 = `⚡ 台電巡查存證 ${typeLabel} ${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
+    const line1 = `現場拍照 ${typeLabel} ${custNoText ? " | " + custNoText : ""} | 時間: ${timeText}`;
     let line2 = [addrText, codeText, poleText].filter(Boolean).join(" | ");
     if (gpsText) line2 += ` | ${gpsText}`;
 
@@ -1252,6 +1252,15 @@
     map.on("move", onMoveThrottled);
     map.on("moveend", onMoveEnd);
     map.on("zoomend", onMoveEnd);
+    map.on("popupopen", (e) => {
+      const popupNode = e.popup?.getElement?.();
+      if (!popupNode) return;
+      const photoSlots = popupNode.querySelectorAll(".batch-card-photo-actions");
+      photoSlots.forEach(slot => {
+        const uid = slot.dataset.photoUid;
+        if (uid) refreshBatchPhotoSlotsForUid(uid);
+      });
+    });
   }
 
   // 取得所有有效批次紀錄的完整經緯度邊界（獨立於地圖圖層狀態，確保全體視野始終精確）
@@ -1894,7 +1903,7 @@
         <div class="batch-card-photo-actions" data-photo-uid="${r.uid}">
           <div class="batch-photo-slot" data-slot="meter">
             <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_meter" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'meter');" title="拍攝電表特寫 (表號/指數/鉛封)">
-              📷 電表特寫
+              📷 特寫拍照
             </button>
             <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_meter" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'meter');">
               <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_meter" alt="電表特寫" />
@@ -1903,7 +1912,7 @@
           </div>
           <div class="batch-photo-slot" data-slot="scene">
             <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_scene" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'scene');" title="拍攝現場環境 (桿位/箱體/門面)">
-              📷 現場環境
+              📷 現場拍照
             </button>
             <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_scene" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'scene');">
               <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_scene" alt="現場環境" />
@@ -1927,6 +1936,28 @@
         </div>
       </div>
     `;
+  }
+
+  async function populateBatchPhotoBadges() {
+    if (!window.BatchPhotoDB) return;
+    try {
+      const allPhotos = await window.BatchPhotoDB.getAllPhotos();
+      if (!allPhotos || !allPhotos.length) return;
+      const countMap = new Map();
+      allPhotos.forEach(p => {
+        const parts = p.id.split("_");
+        parts.pop();
+        const uid = parts.join("_");
+        countMap.set(uid, (countMap.get(uid) || 0) + 1);
+      });
+      state.records.forEach(r => {
+        const cnt = countMap.get(r.uid) || 0;
+        if (r._photoCount !== cnt) {
+          r._photoCount = cnt;
+          updateRecordMarkerLabel(r);
+        }
+      });
+    } catch (e) {}
   }
 
   // 繪製地圖標記點與醒目文字標籤
@@ -1996,11 +2027,14 @@
 
       // 2. 地圖醒目標籤 Tooltip (同座標整合顯示，徹底避免疊在一起)
       let labelHtml = "";
+      const hasPhotoBadge = Boolean(primaryRec._photoCount && primaryRec._photoCount > 0);
+      const photoBadgeHtml = hasPhotoBadge ? `<span class="batch-label-photo-badge" title="已存證 ${primaryRec._photoCount} 張相片">📷${primaryRec._photoCount > 1 ? primaryRec._photoCount : ""}</span>` : "";
+
       if (!isCluster) {
         const formattedCustNo = formatCustNo(primaryRec.custNo);
         labelHtml = `
           <div class="batch-map-label ${badgeClass}">
-            <span class="batch-label-index">#${primaryRec.seqNo}</span>
+            <span class="batch-label-index">#${primaryRec.seqNo}</span>${photoBadgeHtml}
             <span class="batch-label-text">${escapeHtml(primaryRec.addr || primaryRec.code || formattedCustNo)}</span>
             ${primaryRec.pole ? `<span class="batch-label-pole">(${escapeHtml(primaryRec.pole)})</span>` : ""}
           </div>
@@ -2017,6 +2051,7 @@
           <div class="batch-map-label ${badgeClass} is-cluster-label">
             <div class="batch-map-label-header">
               <span class="batch-label-index">${indicesStr}</span>
+              ${group.some(g => g.r._photoCount > 0) ? '<span class="batch-label-photo-badge" title="群組內已有存證相片">📷</span>' : ''}
               <span class="batch-label-multi-badge">${tagText}</span>
             </div>
             <div class="batch-label-text">${escapeHtml(displayAddrText)}</div>
@@ -2096,6 +2131,7 @@
     updateBatchViewportCulling();
 
     applyFilters();
+    populateBatchPhotoBadges();
   }
 
   // 渲染分頁 2 的結果卡片
@@ -2177,7 +2213,7 @@
           <div class="batch-card-photo-actions" data-photo-uid="${r.uid}">
             <div class="batch-photo-slot" data-slot="meter">
               <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_meter" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'meter');" title="拍攝電表特寫 (表號/指數/鉛封)">
-                📷 電表特寫
+                📷 特寫拍照
               </button>
               <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_meter" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'meter');">
                 <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_meter" alt="電表特寫" />
@@ -2186,7 +2222,7 @@
             </div>
             <div class="batch-photo-slot" data-slot="scene">
               <button type="button" class="batch-photo-btn" id="photo_btn_${r.uid}_scene" onclick="event.stopPropagation(); window.__triggerBatchPhoto('${r.uid}', 'scene');" title="拍攝現場環境 (桿位/箱體/門面)">
-                📷 現場環境
+                📷 現場拍照
               </button>
               <div class="batch-photo-thumb-wrap" id="photo_thumb_${r.uid}_scene" style="display:none;" onclick="event.stopPropagation(); window.__previewBatchPhoto('${r.uid}', 'scene');">
                 <img class="batch-photo-thumb-img" id="photo_img_${r.uid}_scene" alt="現場環境" />
@@ -2282,13 +2318,13 @@
         const ws = XLSX.utils.aoa_to_sheet(templateData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "批次電表公版範本");
-        XLSX.writeFile(wb, "台電批次電表巡檢_公版標準範本.xlsx");
+        XLSX.writeFile(wb, "批次電表_公版標準範本.xlsx");
         showToast("📥 公版 Excel 範本下載成功，已同時複製標準格式至剪貼簿！");
       } catch (err) {
         const blob = new Blob(["\uFEFF" + templateData.map(r => r.join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "台電批次電表巡檢_公版標準範本.csv";
+        a.download = "批次電表_公版標準範本.csv";
         a.click();
         showToast("📥 公版 CSV 範本下載成功，已同時複製標準格式至剪貼簿！");
       }
@@ -2368,7 +2404,12 @@
         type
       };
       await window.BatchPhotoDB.savePhoto(uid, record.custNo, type, file, meta);
-      showToast(`✅ ${type === "meter" ? "【電表特寫】" : "【現場環境】"} 已安全存證！`);
+      showToast(`✅ 現場相片已安全存證！`);
+      const rec = state.records.find(r => r.uid === uid);
+      if (rec) {
+        rec._photoCount = (rec._photoCount || 0) + 1;
+        updateRecordMarkerLabel(rec);
+      }
       refreshBatchPhotoSlotsForUid(uid);
     } catch (err) {
       console.error("照片儲存失敗：", err);
@@ -2387,6 +2428,23 @@
     }
   }
 
+  function updateRecordMarkerLabel(record) {
+    if (!record || !record.marker) return;
+    try {
+      const badgeClass = record.locType === "doorplate" ? "is-doorplate" : (record.locType === "fallback" ? "is-fallback" : "is-grid");
+      const photoBadgeHtml = record._photoCount > 0 ? `<span class="batch-label-photo-badge" title="已存證 ${record._photoCount} 張相片">📷${record._photoCount > 1 ? record._photoCount : ""}</span>` : "";
+      const formattedCustNo = formatCustNo(record.custNo);
+      const labelHtml = `
+        <div class="batch-map-label ${badgeClass}">
+          <span class="batch-label-index">#${record.seqNo}</span>${photoBadgeHtml}
+          <span class="batch-label-text">${escapeHtml(record.addr || record.code || formattedCustNo)}</span>
+          ${record.pole ? `<span class="batch-label-pole">(${escapeHtml(record.pole)})</span>` : ""}
+        </div>
+      `;
+      record.marker.setTooltipContent(labelHtml);
+    } catch (e) {}
+  }
+
   function updateSlotUI(uid, type, photoRecord) {
     const btns = document.querySelectorAll(`[id="photo_btn_${uid}_${type}"]`);
     const wraps = document.querySelectorAll(`[id="photo_thumb_${uid}_${type}"]`);
@@ -2403,7 +2461,7 @@
     } else {
       btns.forEach(b => {
         b.classList.remove("has-photo");
-        b.innerHTML = type === "meter" ? "📷 電表特寫" : "📷 現場環境";
+        b.innerHTML = type === "meter" ? "📷 特寫拍照" : "📷 現場拍照";
       });
       wraps.forEach(w => { w.style.display = "none"; });
       imgs.forEach(i => { i.src = ""; });
@@ -2415,7 +2473,14 @@
     try {
       const allPhotos = await window.BatchPhotoDB.getAllPhotos();
       const photoMap = new Map();
-      allPhotos.forEach(p => { photoMap.set(p.id, p); });
+      allPhotos.forEach(p => {
+        photoMap.set(p.id, p);
+        const parts = p.id.split("_");
+        parts.pop();
+        const pUid = parts.join("_");
+        const r = state.records.find(rec => rec.uid === pUid);
+        if (r) r._photoCount = (r._photoCount || 0) + 1;
+      });
 
       state.records.forEach(r => {
         const meter = photoMap.get(`${r.uid}_meter`) || null;
@@ -2477,7 +2542,7 @@
       return;
     }
 
-    showToast("🖨️ 正在整合相片與排版 A4 橫式存證報告...", "dup");
+    showToast("🖨️ 正在整合相片與排版 A4 橫式報告...", "dup");
     let allPhotos = [];
     if (window.BatchPhotoDB) {
       try { allPhotos = await window.BatchPhotoDB.getAllPhotos(); } catch {}
@@ -2503,41 +2568,45 @@
       let meterImgHtml = "";
       if (meterPhoto && meterPhoto.blob) {
         const url = URL.createObjectURL(meterPhoto.blob);
-        meterImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="電表特寫" />`;
-      } else {
-        meterImgHtml = `<div class="batch-a4-empty-photo">（無電表特寫照片）</div>`;
+        meterImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="特寫照片" />`;
       }
 
       let sceneImgHtml = "";
       if (scenePhoto && scenePhoto.blob) {
         const url = URL.createObjectURL(scenePhoto.blob);
-        sceneImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="現場環境" />`;
-      } else {
-        sceneImgHtml = `<div class="batch-a4-empty-photo">（無現場環境照片）</div>`;
+        sceneImgHtml = `<img class="batch-a4-photo-img" src="${url}" alt="現場照片" />`;
       }
 
       const hasAnyPhoto = Boolean(meterPhoto || scenePhoto);
-
       let photosRowHtml = "";
+
       if (!hasAnyPhoto) {
         photosRowHtml = `
           <div class="batch-a4-photos-row" style="grid-template-columns: 1fr;">
             <div class="batch-a4-photo-box" style="justify-content: center; align-items: center; background: #f8fafc;">
-              <div style="font-size: 16pt; font-weight: 700; color: #0f766e; margin-bottom: 8px;">✓ 現場查驗正常</div>
-              <div style="font-size: 11pt; color: #64748b;">本戶現場查驗合格，未留存照片紀錄</div>
+              <div style="font-size: 16pt; font-weight: 700; color: #0f766e; margin-bottom: 8px;">✓ 現場合格</div>
+              <div style="font-size: 12pt; color: #64748b;">本戶現場查對完成，無相片紀錄</div>
+            </div>
+          </div>
+        `;
+      } else if (meterPhoto && scenePhoto) {
+        photosRowHtml = `
+          <div class="batch-a4-photos-row">
+            <div class="batch-a4-photo-box">
+              <div class="batch-a4-photo-img-wrap">${meterImgHtml}</div>
+            </div>
+            <div class="batch-a4-photo-box">
+              <div class="batch-a4-photo-img-wrap">${sceneImgHtml}</div>
             </div>
           </div>
         `;
       } else {
+        // 只有 1 張照片：單格置中放大滿版
+        const singleImg = meterImgHtml || sceneImgHtml;
         photosRowHtml = `
-          <div class="batch-a4-photos-row">
+          <div class="batch-a4-photos-row is-single">
             <div class="batch-a4-photo-box">
-              <div class="batch-a4-photo-label">📷 電表特寫照片 (13 × 18 公分巨幅)</div>
-              <div class="batch-a4-photo-img-wrap">${meterImgHtml}</div>
-            </div>
-            <div class="batch-a4-photo-box">
-              <div class="batch-a4-photo-label">📷 現場環境照片 (13 × 18 公分巨幅)</div>
-              <div class="batch-a4-photo-img-wrap">${sceneImgHtml}</div>
+              <div class="batch-a4-photo-img-wrap">${singleImg}</div>
             </div>
           </div>
         `;
@@ -2547,31 +2616,20 @@
         <div class="batch-a4-page">
           <div class="batch-a4-header">
             <div>
-              <div class="batch-a4-title">⚡ 台灣電力公司 現場巡查存證卡 #${r.seqNo}</div>
-              <div class="batch-a4-meta-row" style="margin-top: 2mm;">
+              <div class="batch-a4-title">現場拍照 #${r.seqNo}</div>
+              <div class="batch-a4-meta-row" style="margin-top: 1.5mm;">
                 <span>電號：<strong>${escapeHtml(formattedCustNo || "--")}</strong></span>
                 <span>用電地址：<strong>${escapeHtml(r.addr || "--")}</strong></span>
                 <span>圖號/桿名：<strong>${escapeHtml(r.code || "--")} ${r.pole ? "(" + escapeHtml(r.pole) + ")" : ""}</strong></span>
               </div>
             </div>
             <div style="text-align: right; font-size: 10pt; color: #475569;">
-              <div>查驗日期：<strong>${todayStr}</strong></div>
-              <div>狀態：<strong style="color: ${r.inspected ? '#15803d' : '#0f766e'};">${r.inspected ? '✓ 已巡查' : '待巡查'}</strong></div>
+              <div>日期：<strong>${todayStr}</strong></div>
+              <div style="font-size: 9pt; color: #64748b; margin-top: 1mm;">第 ${idx + 1} 頁 / 共 ${recordsToPrint.length} 頁</div>
             </div>
           </div>
 
           ${photosRowHtml}
-
-          <div class="batch-a4-footer">
-            <div>
-              <span>備註事項：${escapeHtml(r.extra?.["現場備註"] || r.extra?.["備註"] || "正常合格")}</span>
-            </div>
-            <div style="display: flex; gap: 12mm;">
-              <span>巡查人員簽章：__________________</span>
-              <span>主管核章：__________________</span>
-              <span>第 ${idx + 1} 頁 / 共 ${recordsToPrint.length} 頁</span>
-            </div>
-          </div>
         </div>
       `;
     }).join("");
@@ -2590,7 +2648,7 @@
       return;
     }
     if (!window.BatchPhotoDB) {
-      showToast("批次相片模組未就緒", "error");
+      showToast("相片模組未就緒", "error");
       return;
     }
 
@@ -2602,7 +2660,7 @@
         return;
       }
 
-      showToast(`📦 正在打包 ${allPhotos.length} 張存證照片與離線報告...`, "dup");
+      showToast(`📦 正在打包 ${allPhotos.length} 張存證照片與 A4 離線報告...`, "dup");
       const zip = new JSZip();
       const photosFolder = zip.folder("photos");
       const photoMap = new Map();
@@ -2614,23 +2672,24 @@
         const record = state.records.find(r => r.uid === photo.uid) || {};
         const seq = record.seqNo || "";
         const custNo = record.custNo || "無電號";
-        const typeName = photo.type === "meter" ? "01電表特寫" : "02現場環境";
-        const cleanAddr = (record.addr || record.code || "無地址").replace(/[\\/:*?"<>|]/g, "_");
-        const fileName = `#${seq}_${custNo}_${typeName}_${cleanAddr}.jpg`;
+        const typeName = photo.type === "meter" ? "01特寫" : "02現場";
+        const cleanAddr = (record.addr || record.code || "無地址").replace(/[\\/:*?"<>|#]/g, "_");
+        // 檔名不再使用 '#' 作為前綴，避免部分系統與瀏覽器 URL hash 衝突
+        const fileName = `${seq}_${custNo}_${typeName}_${cleanAddr}.jpg`;
         
         photosFolder.file(fileName, photo.blob);
         photoCsvRows.push([seq, custNo, record.addr || "", record.code || "", record.pole || "", typeName, fileName, photo.timeStr || ""]);
       });
 
       const offlineHtml = generateOfflineHtmlReport(state.records, photoMap);
-      zip.file("批次現場巡查報告.html", offlineHtml);
+      zip.file("現場拍照存證報告.html", offlineHtml);
 
       const csvContent = "\uFEFF" + photoCsvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-      zip.file("巡查清單與相片明細.csv", csvContent);
+      zip.file("現場相片明細清單.csv", csvContent);
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const dateStr = new Date().toISOString().slice(0, 10);
-      const downloadName = `批次電表巡檢相片存證_${dateStr}_共${allPhotos.length}張.zip`;
+      const downloadName = `現場拍照存證_${dateStr}_共${allPhotos.length}張.zip`;
       
       const a = document.createElement("a");
       a.href = URL.createObjectURL(zipBlob);
@@ -2645,59 +2704,214 @@
 
   function generateOfflineHtmlReport(records, photoMap) {
     const todayStr = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" });
+    
+    const pagesHtml = records.map((r, idx) => {
+      const meterPhoto = photoMap.get(`${r.uid}_meter`);
+      const scenePhoto = photoMap.get(`${r.uid}_scene`);
+      const formattedCustNo = formatCustNo(r.custNo);
+      const seq = r.seqNo;
+      const custNo = r.custNo || "無電號";
+      const cleanAddr = (r.addr || r.code || "無地址").replace(/[\\/:*?"<>|#]/g, "_");
+
+      const meterFileName = meterPhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_01特寫_${cleanAddr}.jpg`) : "";
+      const sceneFileName = scenePhoto ? "photos/" + encodeURIComponent(`${seq}_${custNo}_02現場_${cleanAddr}.jpg`) : "";
+
+      let meterImgHtml = meterFileName ? `<img class="batch-a4-photo-img" src="${meterFileName}" alt="特寫照片" />` : "";
+      let sceneImgHtml = sceneFileName ? `<img class="batch-a4-photo-img" src="${sceneFileName}" alt="現場照片" />` : "";
+
+      const hasAnyPhoto = Boolean(meterPhoto || scenePhoto);
+      let photosRowHtml = "";
+
+      if (!hasAnyPhoto) {
+        photosRowHtml = `
+          <div class="batch-a4-photos-row" style="grid-template-columns: 1fr;">
+            <div class="batch-a4-photo-box" style="justify-content: center; align-items: center; background: #f8fafc;">
+              <div style="font-size: 16pt; font-weight: 700; color: #0f766e; margin-bottom: 8px;">✓ 現場合格</div>
+              <div style="font-size: 12pt; color: #64748b;">本戶現場查對完成，無相片紀錄</div>
+            </div>
+          </div>
+        `;
+      } else if (meterPhoto && scenePhoto) {
+        photosRowHtml = `
+          <div class="batch-a4-photos-row">
+            <div class="batch-a4-photo-box">
+              <div class="batch-a4-photo-img-wrap">${meterImgHtml}</div>
+            </div>
+            <div class="batch-a4-photo-box">
+              <div class="batch-a4-photo-img-wrap">${sceneImgHtml}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        const singleImg = meterImgHtml || sceneImgHtml;
+        photosRowHtml = `
+          <div class="batch-a4-photos-row is-single">
+            <div class="batch-a4-photo-box">
+              <div class="batch-a4-photo-img-wrap">${singleImg}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="batch-a4-page">
+          <div class="batch-a4-header">
+            <div>
+              <div class="batch-a4-title">現場拍照 #${r.seqNo}</div>
+              <div class="batch-a4-meta-row" style="margin-top: 1.5mm;">
+                <span>電號：<strong>${escapeHtml(formattedCustNo || "--")}</strong></span>
+                <span>用電地址：<strong>${escapeHtml(r.addr || "--")}</strong></span>
+                <span>圖號/桿名：<strong>${escapeHtml(r.code || "--")} ${r.pole ? "(" + escapeHtml(r.pole) + ")" : ""}</strong></span>
+              </div>
+            </div>
+            <div style="text-align: right; font-size: 10pt; color: #475569;">
+              <div>日期：<strong>${todayStr}</strong></div>
+              <div style="font-size: 9pt; color: #64748b; margin-top: 1mm;">第 ${idx + 1} 頁 / 共 ${records.length} 頁</div>
+            </div>
+          </div>
+
+          ${photosRowHtml}
+        </div>
+      `;
+    }).join("");
+
     return `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>台灣電力公司 批次現場巡查存證報告</title>
+  <title>現場拍照存證報告</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-    .header { background: #0f766e; color: #fff; padding: 16px 24px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-    .card { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .card-title { font-size: 16px; font-weight: 700; color: #0f766e; margin-bottom: 8px; }
-    .card-meta { font-size: 13px; color: #475569; margin-bottom: 12px; }
-    .photos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .photo-box { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #0f172a; text-align: center; }
-    .photo-title { background: #334155; color: #fff; font-size: 12px; font-weight: 700; padding: 4px; }
-    .photo-box img { max-width: 100%; height: 260px; object-fit: contain; display: block; margin: 0 auto; cursor: pointer; }
-    .no-photo { height: 160px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; background: #f1f5f9; }
+    @page {
+      size: A4 landscape;
+      margin: 8mm 6mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", "Segoe UI", sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      margin: 0;
+      padding: 16px;
+    }
+    .no-print {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 16px;
+      position: sticky;
+      top: 12px;
+      z-index: 1000;
+    }
+    .print-btn {
+      background: #0f766e;
+      color: #ffffff;
+      border: none;
+      border-radius: 20px;
+      padding: 10px 22px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      transition: background 0.15s;
+    }
+    .print-btn:hover { background: #115e59; }
+    .report-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
+    .batch-a4-page {
+      width: 280mm;
+      height: 194mm;
+      page-break-after: always;
+      break-after: page;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding: 3mm 4mm;
+      border: 1px solid #94a3b8;
+      background: #ffffff !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .batch-a4-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #0f766e;
+      padding-bottom: 2mm;
+      margin-bottom: 2.5mm;
+    }
+    .batch-a4-title {
+      font-size: 15pt;
+      font-weight: 700;
+      color: #0f766e;
+    }
+    .batch-a4-meta-row {
+      font-size: 10.5pt;
+      color: #1e293b;
+      font-weight: 600;
+      display: flex;
+      gap: 5mm;
+    }
+    .batch-a4-photos-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4mm;
+      flex: 1;
+      height: 174mm;
+      max-height: 174mm;
+    }
+    .batch-a4-photos-row.is-single {
+      grid-template-columns: 1fr;
+    }
+    .batch-a4-photo-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      height: 100%;
+    }
+    .batch-a4-photo-img-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 1mm;
+      background: #ffffff;
+    }
+    .batch-a4-photo-img {
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    @media print {
+      body { background: transparent; padding: 0; }
+      .no-print { display: none !important; }
+      .report-wrap { display: block; }
+      .batch-a4-page {
+        box-shadow: none !important;
+        border: 1px solid #94a3b8 !important;
+        margin: 0 !important;
+        page-break-after: always !important;
+        break-after: page !important;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <h2 style="margin:0;">⚡ 台灣電力公司 批次現場巡查存證報告</h2>
-      <div style="font-size:13px;opacity:0.9;margin-top:4px;">產生日期：${todayStr} · 共 ${records.length} 戶</div>
-    </div>
+  <div class="no-print">
+    <button class="print-btn" onclick="window.print()">🖨️ 一鍵列印 A4 存證報告 / 另存 PDF</button>
   </div>
-  ${records.map(r => {
-    const meterPhoto = photoMap.get(r.uid + "_meter");
-    const scenePhoto = photoMap.get(r.uid + "_scene");
-    const seq = r.seqNo;
-    const custNo = r.custNo || "無電號";
-    const cleanAddr = (r.addr || r.code || "無地址").replace(/[\\/:*?"<>|]/g, "_");
-    const meterFileName = meterPhoto ? "photos/#" + seq + "_" + custNo + "_01電表特寫_" + cleanAddr + ".jpg" : "";
-    const sceneFileName = scenePhoto ? "photos/#" + seq + "_" + custNo + "_02現場環境_" + cleanAddr + ".jpg" : "";
-
-    return `
-      <div class="card">
-        <div class="card-title">#${r.seqNo} 電號：${r.custNo || "--"} (${r.inspected ? '✓ 已巡查' : '待巡查'})</div>
-        <div class="card-meta">
-          📍 地址：${r.addr || "--"} · 桿名：${r.pole || "--"} · 圖號：${r.code || "--"}
-        </div>
-        <div class="photos-grid">
-          <div class="photo-box">
-            <div class="photo-title">📷 電表特寫</div>
-            ${meterFileName ? '<img src="' + meterFileName + '" alt="電表特寫" onclick="window.open(this.src)" />' : '<div class="no-photo">無電表特寫</div>'}
-          </div>
-          <div class="photo-box">
-            <div class="photo-title">📷 現場環境</div>
-            ${sceneFileName ? '<img src="' + sceneFileName + '" alt="現場環境" onclick="window.open(this.src)" />' : '<div class="no-photo">無現場環境</div>'}
-          </div>
-        </div>
-      </div>
-    `;
-  }).join("")}
+  <div class="report-wrap">
+    ${pagesHtml}
+  </div>
 </body>
 </html>`;
   }
@@ -2763,7 +2977,7 @@
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "批次電表標記");
       const dateStr = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(wb, `台電電表標記清單_${dateStr}.xlsx`);
+      XLSX.writeFile(wb, `電表標記清單_${dateStr}.xlsx`);
       showToast("📥 Excel 檔案已順利下載！");
     } catch (e) {
       showToast("匯出失敗：" + e.message, "error");
