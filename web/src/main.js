@@ -2246,21 +2246,49 @@ window.__appBooted = true;
           }
         });
 
-        // 在圖層面板最底端加上微小不起眼的版本號，作為備用暗門 (外人只會當作一般版本號)
+        // 在圖層面板底端清楚標示系統版本，並提供強制刷新讀取按鈕
         const layerPanel = document.getElementById("layerMenuPanel");
         if (layerPanel) {
           const verWrap = document.createElement("div");
-          verWrap.style.cssText = "margin-top:10px; padding-top:6px; border-top:1px dashed #e2e8f0; text-align:center;";
+          verWrap.style.cssText = "margin-top:10px; padding-top:8px; border-top:1px dashed #cbd5e1; text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px;";
+          
           const verLink = document.createElement("a");
           verLink.href = "javascript:void(0)";
-          verLink.textContent = "系統版本：v2.7.6-tn (最新版)";
+          verLink.textContent = "系統版本：v2.7.6-tn";
           verLink.style.cssText = "color:#0f766e; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;";
-          verLink.title = "系統版本資訊";
+          verLink.title = "點擊切換至【全台土木設備分布地圖】";
           verLink.addEventListener("click", (e) => {
             e.preventDefault();
             switchToTaiwanEdition();
           });
           verWrap.appendChild(verLink);
+
+          const refreshBtn = document.createElement("button");
+          refreshBtn.type = "button";
+          refreshBtn.id = "forceRefreshAppBtn";
+          refreshBtn.textContent = "🔄 強制刷新讀取最新版本";
+          refreshBtn.style.cssText = "background:#f0fdf4; color:#166534; border:1px solid #86efac; border-radius:5px; font-size:11px; font-weight:700; padding:4px 10px; cursor:pointer; width:100%; max-width:180px; box-shadow:0 1px 2px rgba(0,0,0,0.05); transition:background 0.2s;";
+          refreshBtn.title = "清除瀏覽器快取並強制從伺服器讀取最新版本";
+          refreshBtn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = "⏳ 正在清除快取並載入...";
+            try {
+              if ("serviceWorker" in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) { await reg.unregister(); }
+              }
+              if ("caches" in window) {
+                const keys = await caches.keys();
+                for (const k of keys) { await caches.delete(k); }
+              }
+            } catch (err) {}
+            const url = new URL(window.location.href);
+            url.searchParams.set("_reload", String(Date.now()));
+            window.location.href = url.toString();
+          });
+          verWrap.appendChild(refreshBtn);
+
           layerPanel.appendChild(verWrap);
         }
       })();
