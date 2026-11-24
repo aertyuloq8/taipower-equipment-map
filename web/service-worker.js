@@ -1,4 +1,4 @@
-const CACHE_NAME = "equipment-map-photo-edition-r51";
+const CACHE_NAME = "equipment-map-photo-edition-r52";
 const TILE_CACHE_NAME = "equipment-map-tiles-v1";
 const TILE_CACHE_MAX = 5000;
 const TILE_CACHE_TRIM = 4000;
@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   "./cadastre.css",
   "./address-search.js",
   "./sync.js",
+  "./batch-photo-db.js",
   "./batch-meter.js",
   "./batch-meter.css",
   "./archive-worker.js",

@@ -1245,3 +1245,232 @@
     font-size: 10.5px;
   }
 }
+
+
+/* --- 批次巡檢卡片拍照雙槽樣式 --- */
+.batch-card-photo-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  border: 1px dashed #cbd5e1;
+  box-sizing: border-box;
+}
+.batch-photo-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.batch-photo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.batch-photo-btn:hover {
+  background: #f8fafc;
+  border-color: #0f766e;
+  color: #0f766e;
+}
+.batch-photo-btn.has-photo {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+.batch-photo-thumb-wrap {
+  position: relative;
+  width: 100%;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1e293b;
+  cursor: pointer;
+  border: 1px solid #94a3b8;
+}
+.batch-photo-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.batch-photo-thumb-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(220, 38, 38, 0.85);
+  color: #ffffff;
+  border: none;
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+}
+.batch-photo-thumb-del:hover {
+  background: #dc2626;
+}
+
+/* --- 大圖檢視燈箱 Modal --- */
+.batch-photo-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+.batch-photo-lightbox-img {
+  max-width: 95vw;
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  background: #000;
+}
+.batch-photo-lightbox-close {
+  margin-top: 12px;
+  padding: 8px 24px;
+  background: #334155;
+  color: #fff;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.batch-photo-lightbox-close:hover {
+  background: #475569;
+}
+
+/* --- A4 橫式滿版列印專用樣式 --- */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #batchA4PrintContainer, #batchA4PrintContainer * {
+    visibility: visible;
+  }
+  #batchA4PrintContainer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #ffffff !important;
+  }
+  .batch-a4-page {
+    width: 280mm;
+    height: 194mm;
+    page-break-after: always;
+    break-after: page;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2mm 4mm;
+    border: 1px solid #94a3b8;
+    background: #ffffff !important;
+  }
+  .batch-a4-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #0f766e;
+    padding-bottom: 3mm;
+    margin-bottom: 3mm;
+  }
+  .batch-a4-title {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #0f766e;
+  }
+  .batch-a4-meta-row {
+    font-size: 11pt;
+    color: #1e293b;
+    font-weight: 600;
+    display: flex;
+    gap: 6mm;
+  }
+  .batch-a4-photos-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    flex: 1;
+    margin-bottom: 3mm;
+    box-sizing: border-box;
+  }
+  .batch-a4-photo-box {
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 145mm;
+    box-sizing: border-box;
+  }
+  .batch-a4-photo-label {
+    background: #0f766e;
+    color: #ffffff;
+    font-size: 11pt;
+    font-weight: 700;
+    padding: 1.5mm 3mm;
+    text-align: center;
+  }
+  .batch-a4-photo-img-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 2mm;
+    background: #ffffff;
+  }
+  .batch-a4-photo-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .batch-a4-single-photo-box {
+    grid-column: span 2;
+  }
+  .batch-a4-empty-photo {
+    font-size: 13pt;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+  .batch-a4-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 2mm;
+    font-size: 10pt;
+    color: #475569;
+  }
+}

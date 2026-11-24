@@ -1,6 +1,7 @@
 import "./modules/modal.js";
 import "./modules/coords.js";
 import "./modules/constants.js";
+import { createPMTilesLayer } from "./pmtiles_layer.js";
 const { STORAGE_KEY, LEGACY_STORAGE_KEYS, PHOTO_DB_NAME, PHOTO_DB_VERSION, PHOTO_STORE_NAME, DRAFT_STORE_NAME, APP_DATA_STORE_NAME,
         DRAFT_ACTIVE_ID, EQUIPMENT_CACHE_ID, BACKUP_SUMMARY_KEY, BACKUP_FORMAT_VERSION, MAX_DIRECT_POINTS, MAX_ROUTE_POINTS } = window;
 // 開機旗標：index.html 內聯腳本用它判斷主程式是否成功載入（版本錯位時提示重整）
@@ -128,15 +129,38 @@ window.__appBooted = true;
           routeBtn.setAttribute("aria-pressed", String(state.routeLayerVisible));
           if (routeState) routeState.textContent = state.routeLayerVisible ? "顯示" : "隱藏";
         }
+        const sectBtn = document.getElementById("overlayLANDSECTToggle");
+        const sectState = document.getElementById("overlayLANDSECTState");
+        if (sectBtn && typeof state !== "undefined") {
+          const visible = Boolean(state.landsectVisible);
+          sectBtn.classList.toggle("is-active", visible);
+          sectBtn.classList.toggle("is-hidden", !visible);
+          sectBtn.setAttribute("aria-pressed", String(visible));
+          if (sectState) sectState.textContent = visible ? "顯示" : "隱藏";
+        }
+        const townBtn = document.getElementById("overlayTOWNToggle");
+        const townState = document.getElementById("overlayTOWNState");
+        if (townBtn && typeof state !== "undefined") {
+          const visible = Boolean(state.townOverlayVisible);
+          townBtn.classList.toggle("is-active", visible);
+          townBtn.classList.toggle("is-hidden", !visible);
+          townBtn.setAttribute("aria-pressed", String(visible));
+          if (townState) townState.textContent = visible ? "顯示" : "隱藏";
+        }
       }
       layerMenuToggle?.addEventListener("click", () => {
         const willOpen = layerMenuPanel?.hidden !== false;
         if (!layerMenuPanel || !layerMenuToggle) return;
         if (willOpen) {
-          closeMapSearchPanel();
-          closeAddressPanel();
-          window.__closeSyncPanel && window.__closeSyncPanel();
-          if (!collapsePanelControl()) return;
+          if (window.__closeAllPanelsExcept) {
+            window.__closeAllPanelsExcept("layer");
+          } else {
+            closeMapSearchPanel();
+            closeAddressPanel();
+            window.__closeSyncPanel && window.__closeSyncPanel();
+            if (!collapsePanelControl()) return;
+          }
+          document.dispatchEvent(new CustomEvent("v2-layer-open"));
         }
         layerMenuPanel.hidden = !willOpen;
         layerMenuToggle.setAttribute("aria-expanded", String(willOpen));
@@ -158,45 +182,35 @@ window.__appBooted = true;
         syncPanelToggleState();
         return didCollapse;
       }
-      function closeBatchMeterPanel() {
-        const panel = document.getElementById("v2BatchMeterPanel");
-        const toggle = document.getElementById("v2BatchMeterToggle");
-        panel?.classList.remove("is-open");
-        panel?.setAttribute("aria-hidden", "true");
-        toggle?.classList.remove("is-active");
-        toggle?.setAttribute("aria-expanded", "false");
-      }
-      window.__closeBatchMeterPanel = closeBatchMeterPanel;
-
       function collapseFloatingControls() {
-        closeMapSearchPanel();
-        closeLayerMenu();
-        closeAddressPanel();
-        closeBatchMeterPanel();
-        collapsePanelControl();
+        if (window.__closeFloatingPanels) {
+          window.__closeFloatingPanels();
+        } else {
+          closeMapSearchPanel();
+          closeLayerMenu();
+          closeAddressPanel();
+          collapsePanelControl();
+        }
       }
       mapSearchToggle.addEventListener("click", () => {
         disableRouteLayerForTools();
         const willOpen = !mapSearchPanel.classList.contains("is-open");
         if (willOpen) {
-          closeLayerMenu();
-          window.__closeSyncPanel && window.__closeSyncPanel();
-          closeAddressPanel();
-          closeBatchMeterPanel();
-          if (!collapsePanelControl()) return;
+          if (window.__closeAllPanelsExcept) {
+            window.__closeAllPanelsExcept("search");
+          } else {
+            closeLayerMenu();
+            window.__closeSyncPanel && window.__closeSyncPanel();
+            closeAddressPanel();
+            if (!collapsePanelControl()) return;
+          }
+          document.dispatchEvent(new CustomEvent("v2-search-open"));
         }
         mapSearchPanel.classList.toggle("is-open", willOpen);
         syncMapSearchState();
       });
       document.getElementById("mapSearchClose").addEventListener("click", () => {
         closeMapSearchPanel();
-      });
-      document.addEventListener("v2-batch-open", () => {
-        closeMapSearchPanel();
-        closeLayerMenu();
-        closeAddressPanel();
-        window.__closeSyncPanel && window.__closeSyncPanel();
-        collapsePanelControl();
       });
 
       // ==========================================
@@ -2157,9 +2171,10 @@ window.__appBooted = true;
       function miniPopupHtml(point) {
         let coLocatedHtml = "";
         try {
-          if (typeof state !== "undefined" && Array.isArray(state?.points)) {
+          if (typeof state !== "undefined") {
             const lat = Number(point.lat), lng = Number(point.lng);
-            const others = state.points.filter(p => (p.id !== point.id || p.name !== point.name) && Math.abs(p.lat - lat) < 0.0000005 && Math.abs(p.lng - lng) < 0.0000005);
+            const candidatePoints = state.usePMTiles ? (state.visiblePoints || []) : (state.points || []);
+            const others = candidatePoints.filter(p => (p.id !== point.id || p.name !== point.name) && Math.abs(p.lat - lat) < 0.0000005 && Math.abs(p.lng - lng) < 0.0000005);
             if (others.length > 0) {
               coLocatedHtml = `
                 <div style="margin-top:6px; padding-top:6px; border-top:1px dashed #cbd5e1; font-size:11px; text-align:left;">
@@ -2191,8 +2206,8 @@ window.__appBooted = true;
 // ==========================================
       // Leaflet 地圖初始化
       // ==========================================
-      let initialCenter = [23.1, 120.3];
-      let initialZoom = 11;
+      let initialCenter = [23.8, 120.9];
+      let initialZoom = 10;
       const hashMatch = (location.hash || "").match(/^#(\d+(?:\.\d+)?)\/([0-9.-]+)\/([0-9.-]+)/);
       if (hashMatch) {
         initialZoom = parseFloat(hashMatch[1]);
@@ -2200,17 +2215,18 @@ window.__appBooted = true;
       }
       const map = L.map("map", { preferCanvas: true, zoomControl: false, attributionControl: true }).setView(initialCenter, initialZoom);
       window.map = map;
+      window.__v2LeafletMap = map;
 
       // 隱藏式雙版本跳轉：連點 3 次大標題、長按 1.5 秒、或按 Ctrl+Alt+S 觸發，介面 100% 不留痕跡
-      function switchToTaiwanEdition() {
+      function switchToRegionalEdition() {
         if (!map) return;
         const c = map.getCenter();
         const z = map.getZoom();
         const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const defaultTarget = isLocal ? "http://localhost:5173/" : "https://taipower-taiwan-map.vercel.app/web/";
-        const baseUrl = window.__TAIWAN_EDITION_URL || defaultTarget;
+        const defaultTarget = isLocal ? "../webpro/web/" : "https://aertyuloq8.github.io/taipower-equipment-map/web/";
+        const baseUrl = window.__REGIONAL_EDITION_URL || defaultTarget;
         const targetUrl = `${baseUrl}#${z}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`;
-        if (confirm("⚡ 是否切換至【全台土部設備分布地圖】？\n\n（將保留目前地圖視野位置）")) {
+        if (confirm("⚡ 是否切換至【臺南巡檢專用版】？\n\n（將保留目前地圖視野位置）")) {
           window.location.href = targetUrl;
         }
       }
@@ -2226,13 +2242,13 @@ window.__appBooted = true;
             timer = setTimeout(() => { clicks = 0; }, 700);
             if (clicks >= 3) {
               clicks = 0;
-              switchToTaiwanEdition();
+              switchToRegionalEdition();
             }
           });
 
           let pressTimer = null;
           titleEl.addEventListener("touchstart", () => {
-            pressTimer = setTimeout(switchToTaiwanEdition, 1500);
+            pressTimer = setTimeout(switchToRegionalEdition, 1500);
           }, { passive: true });
           titleEl.addEventListener("touchend", () => clearTimeout(pressTimer));
           titleEl.addEventListener("touchcancel", () => clearTimeout(pressTimer));
@@ -2242,7 +2258,7 @@ window.__appBooted = true;
         window.addEventListener("keydown", (e) => {
           if (e.ctrlKey && e.altKey && (e.key === "s" || e.key === "S")) {
             e.preventDefault();
-            switchToTaiwanEdition();
+            switchToRegionalEdition();
           }
         });
 
@@ -2254,12 +2270,12 @@ window.__appBooted = true;
           
           const verLink = document.createElement("a");
           verLink.href = "javascript:void(0)";
-          verLink.textContent = "系統版本：v2.7.7-tn";
+          verLink.textContent = "系統版本：v2.7.7-tw";
           verLink.style.cssText = "color:#0f766e; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;";
-          verLink.title = "點擊切換至【全台土木設備分布地圖】";
+          verLink.title = "點擊切換至【臺南區處專用地圖】";
           verLink.addEventListener("click", (e) => {
             e.preventDefault();
-            switchToTaiwanEdition();
+            switchToRegionalEdition();
           });
           verWrap.appendChild(verLink);
 
@@ -2292,7 +2308,6 @@ window.__appBooted = true;
           layerPanel.appendChild(verWrap);
         }
       })();
-      window.__v2LeafletMap = map;
       map.createPane("routePane");
       map.getPane("routePane").style.zIndex = 390;
       map.getPane("routePane").style.pointerEvents = "none";
@@ -2673,10 +2688,12 @@ window.__appBooted = true;
       }
 
       const SHOW_POINTS_ZOOM   = 15;
-      const MAX_POINT_LABELS   = 1200;
+      const MAX_POINT_LABELS   = 2000;
       
 
       const state = {
+        usePMTiles: true,
+        selectedPole: null,
         points: [], meta: null, area: "", query: "",
         search: { prefixes: [], terms: [] },
         visiblePoints: [], drawnItems: [], equipmentColorMap: new Map(),
@@ -2687,15 +2704,9 @@ window.__appBooted = true;
         labelsHidden: false, lastFolderId: null,
         routeLayerVisible: false,
       };
-      window.state = state;
+      window.cleanOrphanPhotos = cleanOrphanPhotos;
       window.verifyZipManifest = verifyZipManifest;
       window.importZipBackup = importZipBackup;
-      window.createPhotoArchive = createPhotoArchive;
-      window.cleanOrphanPhotos = cleanOrphanPhotos;
-      window.ensureJSZip = ensureJSZip;
-      window.openPhotoDb = openPhotoDb;
-      window.putPhotoBlob = putPhotoBlob;
-      window.saveToLocalStorage = saveToLocalStorage;
 
       let editPhotoState = { recordId: null, existing: [], originalExisting: [], pending: [] };
       let editDraftState = { dirty: false, point: null, saveTimer: null, saveSequence: Promise.resolve(), restored: false };
@@ -2706,6 +2717,7 @@ window.__appBooted = true;
       const folderList        = document.querySelector("#folderList");
       const selectedCountText = document.getElementById("selectedCount");
       const areaSelect        = document.getElementById("areaSelect");
+      const citySelect        = document.getElementById("citySelect");
       const searchInput       = document.getElementById("searchInput");
       const results           = document.getElementById("results");
       const resultTemplate    = document.getElementById("resultTemplate");
@@ -2898,6 +2910,8 @@ window.__appBooted = true;
       let routeLayer   = L.layerGroup().addTo(map);
       let labelsLayer  = L.layerGroup().addTo(map);
       let recordsLayer = L.featureGroup().addTo(map);
+      window.__routeLayer = routeLayer;
+      window.__labelsLayer = labelsLayer;
 
       // ==========================================
       // ★ 混合圖示系統（Emoji + 1~3字短文字）
@@ -3203,8 +3217,12 @@ window.__appBooted = true;
         document.querySelector(".app").classList.toggle("is-panel-collapsed", collapsed);
         document.body.classList.toggle("is-panel-open", !collapsed);
         if (!collapsed) {
-          closeMapSearchPanel();
-          closeLayerMenu();
+          if (window.__closeAllPanelsExcept) {
+            window.__closeAllPanelsExcept("inspection");
+          } else {
+            closeMapSearchPanel();
+            closeLayerMenu();
+          }
           document.dispatchEvent(new CustomEvent("v2-inspection-open"));
         }
         syncPanelToggleState();
@@ -3215,6 +3233,10 @@ window.__appBooted = true;
       // The inspection sidebar and the V2 cadastre window occupy the same
       // mobile workspace.  Opening one must close the other.
       document.addEventListener("v2-cadastre-open", event => {
+        if (!inspectionPanel || inspectionPanel.classList.contains("is-collapsed")) return;
+        if (!setPanelCollapsed(true)) event.preventDefault();
+      });
+      document.addEventListener("v2-batch-open", event => {
         if (!inspectionPanel || inspectionPanel.classList.contains("is-collapsed")) return;
         if (!setPanelCollapsed(true)) event.preventDefault();
       });
@@ -4177,7 +4199,11 @@ window.__appBooted = true;
 
             deleteFolderRecursive(fId);
             saveToLocalStorage();
-            renderer.redraw();
+            if (state.usePMTiles) {
+          scheduleSyncPMTiles(50);
+        } else {
+          renderer.redraw();
+        }
             renderFolders();
             deleteRecordPhotos(recordsToDelete).catch(error => console.warn("刪除照片失敗：", error));
           });
@@ -4915,21 +4941,12 @@ window.__appBooted = true;
 
       async function addArchiveFile(manifestFiles, archiveFiles, path, data, type = "application/octet-stream") {
         const blob = await archiveDataToBlob(data, type);
-        const hash = await sha256Hex(blob);
-        const existingArchIndex = archiveFiles.findIndex(f => f.path === path);
-        if (existingArchIndex >= 0) {
-          archiveFiles[existingArchIndex] = { path, data: blob, type };
-        } else {
-          archiveFiles.push({ path, data: blob, type });
-        }
-        if (Array.isArray(manifestFiles)) {
-          const existingManIndex = manifestFiles.findIndex(f => f.path === path);
-          if (existingManIndex >= 0) {
-            manifestFiles[existingManIndex] = { path, bytes: blob.size, sha256: hash };
-          } else {
-            manifestFiles.push({ path, bytes: blob.size, sha256: hash });
-          }
-        }
+        archiveFiles.push({ path, data: blob, type });
+        manifestFiles.push({
+          path,
+          bytes: blob.size,
+          sha256: await sha256Hex(blob),
+        });
         return blob;
       }
       let __archiveWorker = null;
@@ -5120,25 +5137,11 @@ window.__appBooted = true;
           records: archiveRecords,
         }, null, 2);
         await addArchiveFile(manifestFiles, archiveFiles, "records.json", recordsJson, "application/json");
-        try {
-          let cadastreBM = [], addressBM = [];
-          if (window.__bookmarkDB) {
-            try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
-            try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
-          } else {
-            cadastreBM = JSON.parse(localStorage.getItem("tp_cadastre_bookmarks_v1") || "[]");
-            addressBM = JSON.parse(localStorage.getItem("tp_address_bookmarks_v1") || "[]");
-          }
-          await addArchiveFile(manifestFiles, archiveFiles, "cadastre-bookmarks.json", JSON.stringify(cadastreBM, null, 2), "application/json");
-          await addArchiveFile(manifestFiles, archiveFiles, "address-bookmarks.json", JSON.stringify(addressBM, null, 2), "application/json");
-        } catch {}
+
         await addArchiveFile(manifestFiles, archiveFiles, INSPECTION_CARD_FILE, createInspectionCardHtml(inspectionCards, folders), "text/html");
-        const seenCardPaths = new Set();
-        for (const card of inspectionCards) {
-          if (!card.cardPath || seenCardPaths.has(card.cardPath)) continue;
-          seenCardPaths.add(card.cardPath);
+        inspectionCards.forEach(card => {
           cardFiles.push({ path: card.cardPath, data: createInspectionCardDetailHtml(card) });
-        }
+        });
         for (const cardFile of cardFiles) await addArchiveFile(manifestFiles, archiveFiles, cardFile.path, cardFile.data, "text/html");
         const workbook = await createRecordsWorkbook(
           archiveRecords,
@@ -5346,7 +5349,7 @@ window.__appBooted = true;
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash,
           });
-          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
+          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1" };
           const cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
           const addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
           const bookmarkInfo = (cadastreBM.length + addressBM.length > 0) ? `、收藏 ${cadastreBM.length} 筆地籍 + ${addressBM.length} 筆門牌` : "";
@@ -5501,11 +5504,14 @@ window.__appBooted = true;
         if (!clientId) throw new Error("尚未設定 Google Client ID，已取消");
         if (_driveAccessToken && _driveTokenExpiresAt > Date.now() + 60000) return _driveAccessToken;
         if (isIOSDevice()) return getDriveTokenViaRedirect(clientId);
-        await loadGIS();
+        if (typeof google === "undefined" || !google.accounts || !google.accounts.oauth2) {
+          await loadGIS();
+        }
         return new Promise((resolve, reject) => {
           let settled = false;
           let popupHandle = null;
           let pollTimer = null;
+          let popupBlocked = false;
           const realOpen = window.open;
           // COOP 政策下讀取跨源 popup.closed 會丟錯，包起來避免紅字洗版
           const isPopupClosed = (popup) => {
@@ -5521,15 +5527,31 @@ window.__appBooted = true;
           };
           window.open = (...args) => {
             const opened = realOpen.apply(window, args);
-            if (opened) popupHandle = opened;
+            if (!opened) {
+              popupBlocked = true;
+            } else {
+              popupHandle = opened;
+            }
             return opened;
           };
           pollTimer = setInterval(() => {
+            if (popupBlocked) {
+              clearInterval(pollTimer);
+              window.open = realOpen;
+              console.warn("彈出視窗被瀏覽器封鎖，自動切換至跳轉登入模式...");
+              return getDriveTokenViaRedirect(clientId);
+            }
             if (isPopupClosed(popupHandle)) {
               finish(reject, new Error("Google 登入視窗已關閉，已取消"));
             }
           }, 300);
-          const timeoutId = setTimeout(() => finish(reject, new Error("Google 登入逾時，請重試")), 120000);
+          const timeoutId = setTimeout(() => {
+            if (!settled) {
+              window.open = realOpen;
+              console.warn("彈出視窗逾時，自動切換為跳轉登入...");
+              getDriveTokenViaRedirect(clientId);
+            }
+          }, 25000);
           const client = google.accounts.oauth2.initTokenClient({
             client_id: clientId,
             scope: DRIVE_SCOPE,
@@ -5541,8 +5563,25 @@ window.__appBooted = true;
               _driveTokenExpiresAt = Date.now() + 3300000;
               finish(resolve, resp.access_token);
             },
+            error_callback: (err) => {
+              clearTimeout(timeoutId);
+              console.warn("GIS 授權錯誤：", err);
+              if (err && (err.type === "popup_failed_to_open" || err.type === "popup_closed" || popupBlocked)) {
+                window.open = realOpen;
+                console.warn("彈出視窗開啟失敗，自動切換為跳轉登入...");
+                return getDriveTokenViaRedirect(clientId);
+              }
+              finish(reject, new Error("Google 登入異常：" + (err?.message || err?.type || "已取消")));
+            }
           });
-          client.requestAccessToken();
+          try {
+            client.requestAccessToken();
+          } catch (e) {
+            clearTimeout(timeoutId);
+            window.open = realOpen;
+            console.warn("requestAccessToken 執行失敗，切換為跳轉登入：", e);
+            return getDriveTokenViaRedirect(clientId);
+          }
         });
       }
       let backupProgressTimer = null;
@@ -5624,7 +5663,7 @@ window.__appBooted = true;
         });
       }
       async function listDriveBackups() {
-        const query = encodeURIComponent("(name contains '設備地圖備份' or name contains '批次匯出' or name contains '巡視紀錄') and trashed = false");
+        const query = encodeURIComponent("(name contains '巡檢紀錄備份' or name contains '設備地圖備份' or name contains '巡視紀錄') and not (name contains '收藏_' or name contains '批次') and trashed = false");
         const resp = await driveFetch(
           "https://www.googleapis.com/drive/v3/files?q=" + query +
           "&orderBy=createdTime desc&pageSize=20&fields=files(id,name,size,createdTime,description)"
@@ -5654,7 +5693,7 @@ window.__appBooted = true;
       function driveBackupFileName() {
         const now = new Date();
         const pad = (n) => String(n).padStart(2, "0");
-        return "設備地圖備份_" + now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) +
+        return "巡檢紀錄備份_" + now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) +
           "_" + pad(now.getHours()) + pad(now.getMinutes()) + ".zip";
       }
       async function driveBackupAction() {
@@ -5687,22 +5726,12 @@ window.__appBooted = true;
           button.textContent = "☁️ 上傳中（" + formatStorageBytes(archive.blob.size) + "）";
           backupProgressUpdate(62, "上傳中（" + formatStorageBytes(archive.blob.size) + "）…");
           const fileName = driveBackupFileName();
-          let cadastreBM = [], addressBM = [];
-          if (window.__bookmarkDB) {
-            try { cadastreBM = await window.__bookmarkDB.loadBookmarks("cadastre") || []; } catch {}
-            try { addressBM = await window.__bookmarkDB.loadBookmarks("address") || []; } catch {}
-          } else {
-            const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
-            cadastreBM = JSON.parse(localStorage.getItem(lsKeys.cadastre) || "[]");
-            addressBM = JSON.parse(localStorage.getItem(lsKeys.address) || "[]");
-          }
           await uploadZipToDrive(archive.blob, fileName, (pct) => backupProgressUpdate(62 + Math.round(pct * 0.36), "上傳 " + pct + "%…"), "application/zip",
             driveContentDescription([
               `資料夾${state.folders.length}個`,
               `紀錄${state.records.length}筆`,
               `照片${archive.photoCount}張`,
               profileLabel,
-              (cadastreBM.length + addressBM.length > 0) ? `收藏${cadastreBM.length}地籍${addressBM.length}門牌` : "",
               note ? `備註：${note}` : "",
             ]));
           backupProgressUpdate(100, "完成");
@@ -5716,10 +5745,9 @@ window.__appBooted = true;
             formatVersion: BACKUP_FORMAT_VERSION,
             manifestHash: archive.manifestHash,
           });
-          const bmInfo = (cadastreBM.length + addressBM.length > 0) ? "<br>收藏：" + cadastreBM.length + " 筆地籍、" + addressBM.length + " 筆門牌" : "";
-          GlobalModal.alert("已備份到個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
-            state.records.length + " 筆紀錄、" + archive.photoCount + " 張照片（" + profileLabel + "，" + formatStorageBytes(archive.blob.size) + "）。" + bmInfo + "<br>" +
-            "其他裝置可在「☁️ 從 Drive 還原」選取此檔。<small>備份檔未加密，請勿放入機密照片。</small>");
+          GlobalModal.alert("已備份巡檢紀錄與照片至個人 Google 雲端硬碟：<strong>" + escapeHtml(fileName) + "</strong><br>" +
+            state.records.length + " 筆巡檢紀錄、" + archive.photoCount + " 張照片（" + profileLabel + "，" + formatStorageBytes(archive.blob.size) + "）。<br>" +
+            "其他裝置可在巡檢面板「☁️ 從 Drive 還原」選取此檔。<br><small style='color:#64748b;'>備份檔未加密，請勿放入機密照片。地籍與門牌收藏各有其專屬雲端備份，不受影響。</small>");
         } catch (error) {
           console.error("Drive 備份失敗：", error);
           if (!/已取消/.test(error.message)) GlobalModal.alert("Drive 備份失敗：" + error.message);
@@ -5763,7 +5791,7 @@ window.__appBooted = true;
           };
           const pickedId = await new Promise(resolve => {
             GlobalModal.show({
-              title: "選擇雲端備份",
+              title: "☁️ 選擇雲端巡檢紀錄備份",
               content: rows + '<div style="margin-top:8px; font-size:12px; color:#64748b;">ZIP 備份可下載並還原；「僅下載檔案」可將任何雲端檔案（ZIP 或 Excel）存到本機。</div>' +
                 '<button type="button" style="margin-top:8px; width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; color:#334155; font-size:12px; cursor:pointer;" onclick="window.__v2DriveDownloadOnly()">⬇️ 僅下載檔案（不還原）</button>',
               type: "confirm",
@@ -5864,7 +5892,7 @@ window.__appBooted = true;
           const rows = driveBackupRows(files, true);
           const pickedIds = await new Promise(resolve => {
             GlobalModal.show({
-              title: "選擇要刪除的雲端備份",
+              title: "🗑 選擇要刪除的雲端巡檢備份",
               content: rows + '<div style="margin-top:8px; font-size:12px; color:#64748b;">可勾選多個備份一次刪除，刪除後無法從雲端還原，本機資料不受影響。</div>',
               type: "confirm",
               confirmText: "刪除",
@@ -5878,7 +5906,6 @@ window.__appBooted = true;
           });
           if (!pickedIds.length) {
             backupProgressHide();
-            GlobalModal.alert("未勾選任何備份。");
             return;
           }
           const pickedList = files.filter((f) => pickedIds.includes(f.id));
@@ -5913,7 +5940,7 @@ window.__appBooted = true;
         await runSystemBackup("");
       }
 
-            // --- 完全獨立之模組化 Google Drive 同步管理器 (地籍 / 門牌 / 批次電表 100% 解耦) ---
+      // --- 完全獨立之模組化 Google Drive 同步管理器 (地籍 / 門牌 / 批次電表 100% 解耦) ---
       function getBookmarkModuleConfig(type) {
         if (type === "cadastre") {
           return {
@@ -6042,14 +6069,44 @@ window.__appBooted = true;
             const now = new Date();
             const pad = (n) => String(n).padStart(2, "0");
             const timeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-            const fileName = `${cfg.prefix}${timeStr}.json`;
-            const blob = new Blob([JSON.stringify(bookmarks, null, 2)], { type: "application/json" });
+            let fileName = `${cfg.prefix}${timeStr}.json`;
+            let blob = null;
+            let mimeType = "application/json";
             const doneCount = type === "batch" ? bookmarks.filter(r => r.inspected).length : 0;
+
+            // 批次電表特殊處理：若本機有存證相片，自動打包 ZIP 上傳以實現跨裝置照片無縫同步
+            let photoCount = 0;
+            if (type === "batch" && window.BatchPhotoDB) {
+              try {
+                const photos = await window.BatchPhotoDB.getAllPhotos();
+                if (photos && photos.length > 0) {
+                  photoCount = photos.length;
+                  await ensureJSZip();
+                  const zip = new JSZip();
+                  zip.file("records.json", JSON.stringify(bookmarks, null, 2));
+                  const pFolder = zip.folder("photos");
+                  photos.forEach(p => {
+                    pFolder.file(p.id + ".jpg", p.blob);
+                    zip.file("meta_" + p.id + ".json", JSON.stringify(p.meta || {}));
+                  });
+                  blob = await zip.generateAsync({ type: "blob" });
+                  fileName = `${cfg.prefix}${timeStr}_${bookmarks.length}只_${photoCount}照.zip`;
+                  mimeType = "application/zip";
+                }
+              } catch (zipErr) {
+                console.warn("照片打包 ZIP 失敗，改用純 JSON：", zipErr);
+              }
+            }
+
+            if (!blob) {
+              blob = new Blob([JSON.stringify(bookmarks, null, 2)], { type: "application/json" });
+            }
+
             const description = type === "batch"
-              ? `${cfg.label} ${bookmarks.length} 筆 (已跑 ${doneCount} 筆，待跑 ${bookmarks.length - doneCount} 筆) · 上傳於 ${now.toLocaleString("zh-TW")}`
+              ? `${cfg.label} ${bookmarks.length} 筆 (已跑 ${doneCount} 筆，存證照片 ${photoCount} 張) · 上傳於 ${now.toLocaleString("zh-TW")}`
               : `${cfg.label} ${bookmarks.length} 筆 · 上傳於 ${now.toLocaleString("zh-TW")}`;
 
-            await uploadZipToDrive(blob, fileName, null, "application/json", description);
+            await uploadZipToDrive(blob, fileName, null, mimeType, description);
 
             GlobalModal.alert(`已成功上傳「${cfg.label}」（共 <strong>${bookmarks.length}</strong> 筆）至個人 Google 雲端硬碟：<br><br><strong>${escapeHtml(fileName)}</strong>`);
           } catch (e) {
@@ -6074,8 +6131,8 @@ window.__appBooted = true;
           try {
             await getDriveAccessToken();
 
-            // 查詢雲端 .json 備份檔 (使用標準 .json 查詢，避開 Google Drive API 對中文斷詞的索引限制)
-            const query = encodeURIComponent("name contains '.json' and trashed = false");
+            // 查詢雲端 .json 與 .zip 備份檔 (支援相片完整封裝檔)
+            const query = encodeURIComponent("((name contains '.json') or (name contains '.zip')) and trashed = false");
             const resp = await driveFetch(
               "https://www.googleapis.com/drive/v3/files?q=" + query +
               "&orderBy=createdTime desc&pageSize=50&fields=files(id,name,size,createdTime,description)"
@@ -6159,11 +6216,63 @@ window.__appBooted = true;
             if (button) button.textContent = "⬇️ 下載中…";
             const file = files.find(f => f.id === pickedId);
             const downloadResp = await driveFetch("https://www.googleapis.com/drive/v3/files/" + pickedId + "?alt=media");
-            const text = await downloadResp.text();
-            let downloaded;
-            try { downloaded = JSON.parse(text); } catch {
-              GlobalModal.alert("備份檔案格式錯誤，無法解析。");
-              return;
+            let downloaded = null;
+            let restoredPhotosCount = 0;
+
+            if (file && file.name && file.name.toLowerCase().endsWith(".zip")) {
+              try {
+                await ensureJSZip();
+                const zipBlob = await downloadResp.blob();
+                const zip = await JSZip.loadAsync(zipBlob);
+                const recordsFile = zip.file("records.json") || zip.file("batch.json") || zip.file("meters.json");
+                if (recordsFile) {
+                  downloaded = JSON.parse(await recordsFile.async("string"));
+                }
+                // 還原 photos/
+                if (window.BatchPhotoDB) {
+                  const photoEntries = [];
+                  const photoFiles = zip.file(/^photos\//);
+                  for (const pf of photoFiles) {
+                    if (pf.dir) continue;
+                    const pBlob = await pf.async("blob");
+                    const pId = pf.name.replace(/^photos\//, "").replace(/\.jpg$/i, "");
+                    let meta = {};
+                    const metaFile = zip.file("meta_" + pId + ".json");
+                    if (metaFile) {
+                      try { meta = JSON.parse(await metaFile.async("string")); } catch {}
+                    }
+                    const parts = pId.split("_");
+                    const type = parts.pop();
+                    const uid = parts.join("_");
+                    photoEntries.push({
+                      id: pId,
+                      uid,
+                      custNo: meta.custNo || "",
+                      type: (type === "meter" || type === "scene") ? type : "meter",
+                      blob: pBlob,
+                      width: 1600,
+                      height: 1200,
+                      size: pBlob.size,
+                      createdAt: Date.now(),
+                      timeStr: meta.timeStr || "",
+                      meta
+                    });
+                  }
+                  if (photoEntries.length > 0) {
+                    restoredPhotosCount = await window.BatchPhotoDB.importPhotoEntries(photoEntries);
+                  }
+                }
+              } catch (zipErr) {
+                console.error("ZIP 備份解壓失敗：", zipErr);
+                GlobalModal.alert("ZIP 備份檔案解壓失敗：" + zipErr.message);
+                return;
+              }
+            } else {
+              const text = await downloadResp.text();
+              try { downloaded = JSON.parse(text); } catch {
+                GlobalModal.alert("備份檔案格式錯誤，無法解析。");
+                return;
+              }
             }
             if (!Array.isArray(downloaded) && downloaded && typeof downloaded === "object") {
               if (Array.isArray(downloaded.records)) downloaded = downloaded.records;
@@ -6488,20 +6597,7 @@ window.__appBooted = true;
       async function restoreBackupData(parsed, photoEntries = [], replacePhotos = true, extra = {}) {
         if (!parsed || !Array.isArray(parsed.folders) || !Array.isArray(parsed.records)) throw new Error("備份格式錯誤");
         if (replacePhotos) await replacePhotoStore(photoEntries);
-        // Restore bookmarks if present in backup (optional, not in old backups)
-        try {
-          const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
-          if (Array.isArray(extra.cadastreBookmarks)) {
-            localStorage.setItem(lsKeys.cadastre, JSON.stringify(extra.cadastreBookmarks));
-            if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks("cadastre", extra.cadastreBookmarks);
-          }
-          if (Array.isArray(extra.addressBookmarks)) {
-            localStorage.setItem(lsKeys.address, JSON.stringify(extra.addressBookmarks));
-            if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks("address", extra.addressBookmarks);
-          }
-          // Try to refresh bookmark UIs if already loaded
-          try { window.dispatchEvent(new CustomEvent("bookmarksRestored")); } catch {}
-        } catch {}
+
         state.folders = parsed.folders;
         state.records = parsed.records;
         state.lastFolderId = state.records.length > 0 ? state.records[state.records.length - 1].folderId : null;
@@ -6513,7 +6609,11 @@ window.__appBooted = true;
         beginEditPhotos(null);
         await clearEditDraft();
         saveToLocalStorage();
-        renderer.redraw();
+        if (state.usePMTiles) {
+          scheduleSyncPMTiles(50);
+        } else {
+          renderer.redraw();
+        }
         renderPhotoBrowser();
         refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
@@ -6571,31 +6671,16 @@ window.__appBooted = true;
         state.records.push(...newRecords);
         normalizeInspectionState();
         saveToLocalStorage();
-        renderer.redraw();
+        if (state.usePMTiles) {
+          scheduleSyncPMTiles(50);
+        } else {
+          renderer.redraw();
+        }
         renderPhotoBrowser();
         refreshStorageStatus();
         const folderSelect = document.getElementById("sidebar-folder");
         if (folderSelect) folderSelect.innerHTML = getFolderOptionsHtml(state.lastFolderId);
-        // Merge bookmarks
-        let bookmarksAdded = 0;
-        const lsKeys = window.__BOOKMARK_LS_KEYS || { cadastre: "tp_cadastre_bookmarks_v1", address: "tp_address_bookmarks_v1", batch: "tp_batch_meter_bookmarks_v1" };
-        for (const [bmType, bmKey] of [["cadastreBookmarks", lsKeys.cadastre], ["addressBookmarks", lsKeys.address]]) {
-          const remoteBm = imported[bmType];
-          if (!Array.isArray(remoteBm) || !remoteBm.length) continue;
-          let localBm = [];
-          try { localBm = JSON.parse(localStorage.getItem(bmKey) || "[]"); } catch {}
-          const localIds = new Set(localBm.map(b => b.id || b.address || JSON.stringify(b)));
-          const newBm = remoteBm.filter(b => !localIds.has(b.id || b.address || JSON.stringify(b)));
-          if (newBm.length) {
-            localBm.push(...newBm);
-            bookmarksAdded += newBm.length;
-            localStorage.setItem(bmKey, JSON.stringify(localBm));
-            const bmTypeShort = bmKey.includes("cadastre") ? "cadastre" : "address";
-            if (window.__bookmarkDB) await window.__bookmarkDB.saveBookmarks(bmTypeShort, localBm);
-          }
-        }
-        if (bookmarksAdded) window.dispatchEvent(new CustomEvent("bookmarksRestored"));
-        return { folderCount: newFolders.length, recordCount: newRecords.length, photoMergedRecords, photoAdded, photoSkipped, bookmarksAdded };
+        return { folderCount: newFolders.length, recordCount: newRecords.length, photoMergedRecords, photoAdded, photoSkipped, bookmarksAdded: 0 };
       }
 
       async function verifyZipManifest(zip, manifest) {
@@ -6745,9 +6830,7 @@ window.__appBooted = true;
           ? "<br><strong style='color:#b91c1c'>警告：照片預估容量超過目前可用空間，請先清理或改用高畫質版備份。</strong>"
           : "";
         const photoProfile = summary.profile === "compressed" ? "高畫質版" : summary.profile === "original" ? "原圖" : "未標示";
-        const bmPreview = (imported.cadastreBookmarks?.length || imported.addressBookmarks?.length)
-          ? `<br>收藏：${imported.cadastreBookmarks?.length || 0} 筆地籍、${imported.addressBookmarks?.length || 0} 筆門牌`
-          : "";
+        const bmPreview = "";
         GlobalModal.show({
           title: "還原前資料預覽",
           content: `<strong>${escapeHtml(fileName)}</strong><br><br>
@@ -6865,7 +6948,7 @@ window.__appBooted = true;
         const editToggleEl = document.getElementById("defectEditToggle");
         const isInsideEdit = e.target.closest?.("#defectEditPanel, #defectEditToggle");
         if (!isInsideEdit && editPanelEl && !editPanelEl.hasAttribute("hidden")) {
-          const openAnother = e.target.closest?.("#v2AddressToggle, #mapSearchToggle, #layerMenuToggle, #v2CadastreToggle, #v2BatchMeterToggle, #v2SyncToggle, #v2AddressPanel, #mapSearchPanel, #layerMenuPanel, #v2CadastrePanel, #v2BatchMeterPanel, #v2SyncPanel");
+          const openAnother = e.target.closest?.("#v2AddressToggle, #mapSearchToggle, #layerMenuToggle, #v2CadastreToggle, #v2SyncToggle, #v2AddressPanel, #mapSearchPanel, #layerMenuPanel, #v2CadastrePanel, #v2SyncPanel");
           if (openAnother) closeDefectEditPanel();
         }
         const statHeader = e.target.closest('.defect-stat-header');
@@ -7238,7 +7321,12 @@ window.__appBooted = true;
         for (const t of tokens) { const n = t.toUpperCase(); if (/^[A-Z]\d{4}$/.test(n)) { if (!prefixes.includes(n)) prefixes.push(n); } else terms.push(t.toLowerCase()); }
         return { prefixes, terms };
       }
-      function pointSearchText(point) { return `${point.name || ""} ${point.code || ""} ${codePrefix(point.code)}`.toLowerCase(); }
+      function pointSearchText(point) {
+        const raw = `${point.name || ""} ${point.code || ""} ${codePrefix(point.code)}`.toLowerCase();
+        const noHash = raw.replace(/[#＃]/g, "");
+        const norm = noHash.replace(/(高幹|高分|幹|支|分|線)(?=\d)/, "");
+        return `${raw} ${noHash} ${norm}`;
+      }
       function hasSearchTerm(point, terms) { if (!terms.length) return false; const text = pointSearchText(point); return terms.some(term => text.includes(term)); }
       function matchesSearch(point, search) {
         if (!search.prefixes.length && !search.terms.length) return true;
@@ -7253,7 +7341,11 @@ window.__appBooted = true;
         return matchesSearch(point, state.search);
       }
       function visibleFilteredPoints() {
-        const bounds = map.getBounds(), output = [];
+        const bounds = map.getBounds();
+        if (state.usePMTiles) {
+          return (state.visiblePoints || []).filter(point => pointInBounds(point, bounds) && matchesFilters(point));
+        }
+        const output = [];
         for (const point of state.points) { if (pointInBounds(point, bounds) && matchesFilters(point)) output.push(point); }
         return output;
       }
@@ -7394,7 +7486,7 @@ window.__appBooted = true;
           btn.setAttribute("aria-pressed", String(state.routeLayerVisible));
         }
         syncLayerMenuState();
-        if (!state.routeLayerVisible || !state.points.length) return;
+        if (!state.routeLayerVisible || (!state.points.length && !state.usePMTiles)) return;
 
         const sourcePoints = visibleFilteredPoints();
         if (sourcePoints.length < 3) {
@@ -7447,6 +7539,47 @@ window.__appBooted = true;
         }
         if (routeCount === 0) setStatus("目前視窗沒有足夠點位可形成路線");
       }
+      function syncPoleVisibility() {
+        const isHidden = !!state.labelsHidden;
+        const labelsBtn = document.getElementById("toggleLabelsBtn");
+        if (labelsBtn) {
+          labelsBtn.classList.toggle("is-hidden", isHidden);
+          labelsBtn.classList.toggle("is-active", !isHidden);
+          labelsBtn.setAttribute("aria-pressed", String(!isHidden));
+        }
+        const labelsState = document.getElementById("labelsLayerState");
+        if (labelsState) {
+          labelsState.textContent = isHidden ? "隱藏" : "顯示";
+        }
+
+        if (state.usePMTiles && window.__pmtilesLayer) {
+          if (typeof window.__pmtilesLayer.setHidden === "function") {
+            window.__pmtilesLayer.setHidden(isHidden);
+          }
+          if (isHidden) {
+            if (labelsLayer) labelsLayer.clearLayers();
+          } else {
+            if (map.getZoom() >= 14 && state.visiblePoints.length > 0) {
+              updateLabels();
+            } else {
+              scheduleSyncPMTiles(50);
+            }
+          }
+          updateStats();
+        } else {
+          if (renderer && typeof renderer.redraw === "function") {
+            renderer.redraw();
+          }
+        }
+
+        updateRecordMarkers();
+        syncLayerMenuState();
+        syncMobileMapControls();
+
+        // 觸發自訂事件通知批次標記等其他面板雙向連動
+        window.dispatchEvent(new CustomEvent("poleLabelsToggled", { detail: { hidden: isHidden } }));
+      }
+
       function disableRouteLayerForTools() {
         if (!state.routeLayerVisible) return false;
         state.routeLayerVisible = false;
@@ -7458,12 +7591,7 @@ window.__appBooted = true;
           routeBtn.setAttribute("aria-pressed", "false");
         }
         state.labelsHidden = false;
-        const labelsBtn = document.getElementById("toggleLabelsBtn");
-        if (labelsBtn) labelsBtn.classList.remove("is-hidden");
-        syncMobileMapControls();
-        syncLayerMenuState();
-        renderer.redraw();
-        updateRecordMarkers();
+        syncPoleVisibility();
         return true;
       }
 
@@ -7478,7 +7606,10 @@ window.__appBooted = true;
         },
         onRemove(currentMap) { L.DomUtil.remove(this.canvas); currentMap.off("moveend zoomend resize", this.redraw, this); },
         redraw() {
-          if (!this.canvas || !state.points.length) return;
+          if (!this.canvas) return;
+          if (state.usePMTiles) { this.canvas.style.display = "none"; return; }
+          else { this.canvas.style.display = ""; }
+          if (!state.points.length) return;
           const size = map.getSize(), topLeft = map.containerPointToLayerPoint([0, 0]);
           L.DomUtil.setPosition(this.canvas, topLeft);
           this.canvas.width  = size.x; this.canvas.height = size.y;
@@ -7516,6 +7647,70 @@ window.__appBooted = true;
       });
       const renderer = new canvasLayer().addTo(map);
       window.__renderer = renderer;
+
+      // 採用同源相對路徑載入 PMTiles，100% 免 CORS，完全支援 GitHub Pages 與本機 Range Request
+      const pmtilesUrl = new URL("../data/taiwan_poles.pmtiles", window.location.href).href;
+      const pmtilesLayer = createPMTilesLayer(pmtilesUrl, {
+        isLabelsHidden: () => state.labelsHidden,
+        getSelectedId: () => state.selectedPole?.id,
+      });
+      window.__pmtilesLayer = pmtilesLayer;
+      if (state.usePMTiles) {
+        pmtilesLayer.addTo(map);
+      }
+
+      let syncPMTilesTimer = null;
+      let syncPMTilesReqId = 0;
+
+      async function syncVisiblePMTilesFeatures() {
+        if (!state.usePMTiles || !window.__pmtilesLayer) return;
+        const currentReqId = ++syncPMTilesReqId;
+        const zoom = map.getZoom();
+
+        // 路線圖層需要點位；標籤顯示時若 zoom >= 14 也需要點位
+        const needsPoints = state.routeLayerVisible || (!state.labelsHidden && zoom >= 14);
+
+        if (!needsPoints) {
+          state.visiblePoints = [];
+          if (labelsLayer) labelsLayer.clearLayers();
+          updateRouteLayer();
+          updateStats();
+          return;
+        }
+
+        try {
+          const fetchZoom = Math.max(zoom, 14);
+          const bounds = map.getBounds();
+          const poles = await window.__pmtilesLayer.getVisiblePolesInBounds(bounds, fetchZoom);
+
+          if (currentReqId !== syncPMTilesReqId) return;
+
+          state.visiblePoints = poles;
+          state.displayMode = "point";
+
+          // 更新 DOM 標籤層 (絕不裁切長文字)
+          if (state.labelsHidden || zoom < 14) {
+            labelsLayer.clearLayers();
+          } else {
+            updateLabels();
+          }
+
+          // 更新供電拓撲路線圖層
+          updateRouteLayer();
+
+          // 更新統計
+          updateStats();
+        } catch (err) {
+          console.warn("syncVisiblePMTilesFeatures error:", err);
+        }
+      }
+
+      function scheduleSyncPMTiles(delay = 100) {
+        if (!state.usePMTiles) return;
+        if (syncPMTilesTimer) clearTimeout(syncPMTilesTimer);
+        syncPMTilesTimer = setTimeout(syncVisiblePMTilesFeatures, delay);
+      }
+      window.__scheduleSyncPMTiles = scheduleSyncPMTiles;
 
       function circularHueDistance(a, b) { const diff = Math.abs(a - b) % 360; return Math.min(diff, 360 - diff); }
       function colorContrastScore(color, usedNeighborColors) {
@@ -7636,22 +7831,196 @@ window.__appBooted = true;
         }
       }
       function updateStats() {
+        if (state.usePMTiles) {
+          totalCount.textContent = formatNumber(2966407);
+          if (state.labelsHidden && !state.routeLayerVisible) {
+            visibleCount.textContent = "標籤已隱藏";
+          } else if (state.routeLayerVisible) {
+            visibleCount.textContent = `路線模式 (${formatNumber(state.visiblePoints.length)} 桿)`;
+          } else {
+            visibleCount.textContent = state.visiblePoints.length > 0 
+              ? `${formatNumber(state.visiblePoints.length)} 桿` 
+              : "全台向量模式";
+          }
+          drawCount.textContent = "自動切片載入";
+          return;
+        }
         totalCount.textContent   = formatNumber(state.points.length);
         visibleCount.textContent = formatNumber(state.labelsHidden ? 0 : state.visiblePoints.length);
         drawCount.textContent    = formatNumber(state.drawnItems.length);
       }
       function fillAreas() {
-        for (const area of state.meta?.areas || []) {
-          const option = document.createElement("option"); option.value = area.name; option.textContent = `${area.name} (${formatNumber(area.count)})`; areaSelect.append(option);
+        if (areaSelect) {
+          areaSelect.innerHTML = '<option value="">全部區域</option>';
+          for (const area of state.meta?.areas || []) {
+            const option = document.createElement("option");
+            option.value = area.name;
+            option.textContent = `${area.name} (${formatNumber(area.count)})`;
+            areaSelect.append(option);
+          }
+        }
+      }
+
+      let allCitiesMeta = [];
+
+      async function initCitySelector() {
+        if (!citySelect) return;
+        try {
+          const metaUrls = ["../data/processed/cities_meta.json", "data/processed/cities_meta.json"];
+          let res = null;
+          for (const u of metaUrls) {
+            try {
+              res = await fetch(u);
+              if (res.ok) break;
+            } catch {}
+          }
+          if (!res || !res.ok) return;
+          allCitiesMeta = await res.json();
+          citySelect.innerHTML = "";
+          const optAll = document.createElement("option");
+          optAll.value = "全台灣";
+          optAll.textContent = "🗺️ 全台灣 (296 萬筆電桿 · PMTiles)";
+          citySelect.appendChild(optAll);
+          for (const item of allCitiesMeta) {
+            const opt = document.createElement("option");
+            opt.value = item.city;
+            opt.textContent = `${item.city} (${formatNumber(item.count)})`;
+            citySelect.appendChild(opt);
+          }
+          const defaultCity = state.meta?.source?.match(/(臺北市|新北市|桃園市|臺中市|臺南市|高雄市|基隆市|新竹市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|屏東縣|宜蘭縣|花蓮縣|臺東縣|澎湖縣|金門縣|連江縣)/)?.[1] || "嘉義市";
+          const savedCity = localStorage.getItem("tp_selected_city") || "全台灣";
+          if (savedCity === "全台灣" || allCitiesMeta.some(c => c.city === savedCity)) {
+            citySelect.value = savedCity;
+            if (savedCity !== defaultCity) {
+              await switchCity(savedCity);
+            }
+          }
+        } catch (e) {
+          console.warn("載入縣市選單失敗：", e);
+        }
+      }
+
+      citySelect?.addEventListener("change", async (e) => {
+        const cityName = e.target.value;
+        if (cityName) await switchCity(cityName);
+      });
+
+      async function switchCity(cityName) {
+        localStorage.setItem("tp_selected_city", cityName);
+        if (cityName === "全台灣") {
+          state.usePMTiles = true;
+          if (window.__pmtilesLayer && !map.hasLayer(window.__pmtilesLayer)) {
+            window.__pmtilesLayer.addTo(map);
+          }
+          if (renderer && renderer.canvas) {
+            renderer.canvas.style.display = "none";
+          }
+          labelsLayer.clearLayers();
+          state.points = [];
+          state.meta = {
+            source: "全台灣開放資料 (PMTiles 向量圖磚 2,966,407 筆)",
+            totalRows: 2966407,
+            converted: 2966407,
+            bounds: [[21.5, 119.0], [26.5, 122.5]],
+            areas: []
+          };
+          if (areaSelect) {
+            areaSelect.innerHTML = '<option value="">全台灣無分區限制</option>';
+          }
+          scheduleSyncPMTiles(120);
+          updateStats();
+          setStatus("⚡ 已啟用全台灣 PMTiles 向量圖磚 (296 萬筆電桿)");
+          setTimeout(() => setStatus(""), 2500);
+          return;
+        }
+
+        const cityInfo = allCitiesMeta.find(c => c.city === cityName);
+        if (state.usePMTiles && window.__pmtilesLayer) {
+          if (cityInfo?.bounds) {
+            map.fitBounds(cityInfo.bounds, { padding: [28, 28] });
+            setStatus(`視角已移至【${cityName}】(PMTiles 全台圖磚延續)`);
+            setTimeout(() => setStatus(""), 2500);
+          }
+          return;
+        }
+
+        setStatus(`載入【${cityName}】設備資料...`);
+        try {
+          const cityInfo = allCitiesMeta.find(c => c.city === cityName);
+          const urls = [
+            `../data/processed/cities/${cityName}.json`,
+            `data/processed/cities/${cityName}.json`
+          ];
+          
+          let points = null;
+          try {
+            const worker = new Worker(new URL("./workers/points-worker.js", import.meta.url));
+            points = await new Promise((resolve, reject) => {
+              const timer = setTimeout(() => { worker.terminate(); reject(new Error("Worker 逾時")); }, 30000);
+              worker.onmessage = (ev) => {
+                clearTimeout(timer); worker.terminate();
+                if (ev.data?.type === "done" && Array.isArray(ev.data.points)) resolve(ev.data.points);
+                else reject(new Error(ev.data?.error || "Worker 解析失敗"));
+              };
+              worker.onerror = (err) => { clearTimeout(timer); worker.terminate(); reject(err); };
+              const absUrls = urls.map(u => new URL(u, window.location.href).href);
+              worker.postMessage({ id: "points", urls: absUrls });
+            });
+          } catch (workerErr) {
+            console.warn("Worker 載入城市失敗，降級主線程：", workerErr);
+            for (const u of urls) {
+              try {
+                const r = await fetch(u);
+                if (r.ok) { points = await r.json(); break; }
+              } catch {}
+            }
+          }
+
+          if (!Array.isArray(points)) throw new Error("無效的點位資料");
+
+          const areaCount = new Map();
+          for (const p of points) {
+            const a = p.area || "未分類";
+            areaCount.set(a, (areaCount.get(a) || 0) + 1);
+          }
+          const areas = [...areaCount.entries()]
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+
+          const lats = points.map(p => p.lat);
+          const lngs = points.map(p => p.lng);
+          const bounds = cityInfo?.bounds || [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]];
+
+          state.points = points;
+          state.meta = {
+            source: `${cityName}開放資料 (Dataset 33305)`,
+            totalRows: points.length,
+            converted: points.length,
+            bounds,
+            areas,
+            pointsHash: `${cityName}_${points.length}`,
+          };
+
+          fillAreas();
+          renderResults([]);
+          if (bounds) map.fitBounds(bounds, { padding: [28, 28] });
+          if (state.usePMTiles) {
+          scheduleSyncPMTiles(50);
+        } else {
+          renderer.redraw();
+        }
+          updateStats();
+          setStatus(`【${cityName}】共 ${formatNumber(points.length)} 支電桿載入完成`);
+          setTimeout(() => setStatus(""), 2500);
+        } catch (err) {
+          console.error("切換縣市失敗：", err);
+          setStatus(`⚠️ 切換縣市失敗：${err.message}`);
         }
       }
 
       document.getElementById("toggleLabelsBtn").addEventListener("click", (e) => {
         state.labelsHidden = !state.labelsHidden;
-        e.currentTarget.classList.toggle("is-hidden", state.labelsHidden);
-        syncMobileMapControls();
-        syncLayerMenuState();
-        renderer.redraw(); updateRecordMarkers();
+        syncPoleVisibility();
         try { e.currentTarget.blur(); } catch (err) {}
       });
       document.getElementById("routeLayerToggle").addEventListener("click", (e) => {
@@ -7660,13 +8029,17 @@ window.__appBooted = true;
           closeMapSearchPanel();
           collapsePanelControl();
           state.labelsHidden = true;
-          document.getElementById("toggleLabelsBtn").classList.add("is-hidden");
-          syncMobileMapControls();
-          renderer.redraw();
+          syncPoleVisibility();
+          scheduleSyncPMTiles(50);
         } else {
-          updateRouteLayer();
+          state.labelsHidden = false;
+          if (state.usePMTiles) {
+            routeLayer.clearLayers();
+          } else {
+            updateRouteLayer();
+          }
+          syncPoleVisibility();
         }
-        syncLayerMenuState();
         if (state.routeLayerVisible) setStatus("已顯示設備開頭推估路線");
         window.setTimeout(() => setStatus(""), 1800);
         try { e.currentTarget.blur(); } catch (err) {}
@@ -7685,8 +8058,63 @@ window.__appBooted = true;
         window.setTimeout(() => setStatus(""), 1800);
         try { e.currentTarget.blur(); } catch (err) {}
       });
+
+      // 國土測繪 段籍圖 (WMTS LANDSECT) 疊加
+      let landsectTileLayer = null;
+      document.getElementById("overlayLANDSECTToggle")?.addEventListener("click", (e) => {
+        state.landsectVisible = !state.landsectVisible;
+        if (state.landsectVisible) {
+          if (!landsectTileLayer) {
+            landsectTileLayer = L.tileLayer("https://wmts.nlsc.gov.tw/wmts/LANDSECT/default/GoogleMapsCompatible/{z}/{y}/{x}", {
+              maxZoom: 20,
+              opacity: 0.75,
+              zIndex: 300,
+              attribution: "國土測繪圖資服務雲"
+            });
+          }
+          landsectTileLayer.addTo(map);
+          setStatus("已疊加國土測繪段籍圖");
+        } else {
+          if (landsectTileLayer && map.hasLayer(landsectTileLayer)) {
+            map.removeLayer(landsectTileLayer);
+          }
+          setStatus("已取消段籍圖疊加");
+        }
+        syncLayerMenuState();
+        window.setTimeout(() => setStatus(""), 1800);
+        try { e.currentTarget.blur(); } catch (err) {}
+      });
+
+      // 國土測繪 鄉鎮界 (WMTS TOWN) 疊加
+      let townTileLayer = null;
+      document.getElementById("overlayTOWNToggle")?.addEventListener("click", (e) => {
+        state.townOverlayVisible = !state.townOverlayVisible;
+        if (state.townOverlayVisible) {
+          if (!townTileLayer) {
+            townTileLayer = L.tileLayer("https://wmts.nlsc.gov.tw/wmts/TOWN/default/GoogleMapsCompatible/{z}/{y}/{x}", {
+              maxZoom: 20,
+              opacity: 0.75,
+              zIndex: 301,
+              attribution: "國土測繪圖資服務雲"
+            });
+          }
+          townTileLayer.addTo(map);
+          setStatus("已疊加鄉鎮界圖層");
+        } else {
+          if (townTileLayer && map.hasLayer(townTileLayer)) {
+            map.removeLayer(townTileLayer);
+          }
+          setStatus("已取消鄉鎮界圖層");
+        }
+        syncLayerMenuState();
+        window.setTimeout(() => setStatus(""), 1800);
+        try { e.currentTarget.blur(); } catch (err) {}
+      });
       map.on("moveend zoomend", () => {
         updateTpcGridReadout();
+        if (state.usePMTiles) {
+          scheduleSyncPMTiles(80);
+        }
         if (!tpcGrid.visible) return;
         if (tpcGrid.buildTimer) clearTimeout(tpcGrid.buildTimer);
         tpcGrid.buildTimer = setTimeout(buildTpcGridLayer, 60);
@@ -7801,34 +8229,346 @@ window.__appBooted = true;
         results.append(button);
       }
 
-      function applyFilter(options = {}) {
+      let globalSearchTimer = null;
+      let globalSearchReqId = 0;
+
+      async function applyFilter(options = {}) {
         disableRouteLayerForTools();
-        state.area = areaSelect.value; state.query = searchInput.value.trim(); state.search = parseSearchQuery(state.query);
-        const matches = searchMatches(state.search);
-        const code = matches.length ? null : normalizeTpcCode(state.query);
+        state.area = areaSelect.value;
+        state.query = searchInput.value.trim();
+        state.search = parseSearchQuery(state.query);
+
+        // 1. 本地即時搜尋 (巡視紀錄 + 視窗內可見電桿，0ms 秒開)
+        const localMatches = searchMatches(state.search);
+
+        // 2. 判斷是否為圖號座標定位 (例如 9碼 / 11碼圖號)
+        const code = localMatches.length ? null : normalizeTpcCode(state.query);
         const coordinates = code ? tpcCodeToLatLng(code) : null;
         if (coordinates) {
           const location = { ...coordinates, code };
           focusTpcSearchLocation(location);
           renderTpcCoordinateResult(location);
-        } else {
-          if (!options.preserveTpcLocation) clearTpcSearchLocation();
-          renderResults(matches);
+          if (state.usePMTiles) scheduleSyncPMTiles(50);
+          else renderer.redraw();
+          return;
         }
-        renderer.redraw();
+
+        // 3. 立即呈現本地符合項目
+        renderResults(localMatches);
+
+        // 4. 若輸入了關鍵字，非同步發起全台 296 萬筆設備搜尋 (次毫秒級 API)
+        if (state.query && state.query.length >= 1) {
+          fetchGlobalSearchResults(state.query, localMatches);
+        }
+
+        if (state.usePMTiles) {
+          scheduleSyncPMTiles(50);
+        } else {
+          renderer.redraw();
+        }
+      }
+
+      function parsePoleNameStructure(name) {
+        const clean = String(name || "").replace(/[#＃\s]/g, "");
+        const m = clean.match(/^([^\d]+?)(高幹|高分|幹|支|分|線)?(\d+)(.*)$/);
+        if (m) {
+          return {
+            raw: name,
+            clean,
+            basePrefix: m[1],
+            typeTag: m[2] || "",
+            primaryNum: parseInt(m[3], 10),
+            numStr: m[3],
+            rest: m[4] || "",
+            normShort: `${m[1]}${m[3]}`
+          };
+        }
+        return { raw: name, clean, basePrefix: clean, typeTag: "", primaryNum: null, numStr: "", rest: "", normShort: clean };
+      }
+
+      function comparePolesProgressive(a, b, cleanQ, prefix, num, numStr) {
+        const pA = a.parsed || parsePoleNameStructure(a.name);
+        const pB = b.parsed || parsePoleNameStructure(b.name);
+
+        // 0. Exact prefix match (e.g. 冷水 vs 冷水坑)
+        const aExactPrefix = pA.basePrefix === prefix;
+        const bExactPrefix = pB.basePrefix === prefix;
+        if (aExactPrefix && !bExactPrefix) return -1;
+        if (!aExactPrefix && bExactPrefix) return 1;
+
+        // 1. Exact trunk pole match (e.g. 冷水高幹#1 for query "冷水1")
+        const aExactShort = pA.normShort === cleanQ && !pA.rest;
+        const bExactShort = pB.normShort === cleanQ && !pB.rest;
+        if (aExactShort && !bExactShort) return -1;
+        if (!aExactShort && bExactShort) return 1;
+
+        // 2. Exact literal match
+        const aExactClean = pA.clean === cleanQ || a.code === cleanQ;
+        const bExactClean = pB.clean === cleanQ || b.code === cleanQ;
+        if (aExactClean && !bExactClean) return -1;
+        if (!aExactClean && bExactClean) return 1;
+
+        // 3. Direct branch of exact pole (e.g. 冷水1左#1 for query "冷水1")
+        const aDirectBranch = pA.normShort === cleanQ && pA.rest;
+        const bDirectBranch = pB.normShort === cleanQ && pB.rest;
+        if (aDirectBranch && !bDirectBranch) return -1;
+        if (!aDirectBranch && bDirectBranch) return 1;
+
+        // 4. Numerical progression (1 -> 10 -> 100 or ascending)
+        if (num !== null && pA.primaryNum !== null && pB.primaryNum !== null) {
+          // Prioritize round decimal powers (1, 10, 100...)
+          const isRoundA = pA.numStr === numStr || pA.numStr === numStr + "0" || pA.numStr === numStr + "00";
+          const isRoundB = pB.numStr === numStr || pB.numStr === numStr + "0" || pB.numStr === numStr + "00";
+          if (isRoundA && !isRoundB) return -1;
+          if (!isRoundA && isRoundB) return 1;
+
+          if (pA.primaryNum !== pB.primaryNum) {
+            return pA.primaryNum - pB.primaryNum;
+          }
+          
+          // If primaryNum is same, trunk comes before branches
+          const aIsTrunk = !pA.rest;
+          const bIsTrunk = !pB.rest;
+          if (aIsTrunk && !bIsTrunk) return -1;
+          if (!aIsTrunk && bIsTrunk) return 1;
+        }
+
+        return a.name.localeCompare(b.name, "zh-Hant", { numeric: true });
+      }
+
+      let _polePrefixIndex = null;
+      let _polePrefixIndexPromise = null;
+      async function ensurePolePrefixIndex() {
+        if (_polePrefixIndex) return _polePrefixIndex;
+        if (_polePrefixIndexPromise) return _polePrefixIndexPromise;
+        _polePrefixIndexPromise = (async () => {
+          try {
+            const urls = [
+              new URL("./data/pole_prefix_index.json", window.location.href).href,
+              new URL("/data/pole_prefix_index.json", window.location.origin).href,
+              new URL("../data/pole_prefix_index.json", window.location.href).href
+            ];
+            for (const url of urls) {
+              try {
+                const resp = await fetch(url);
+                if (resp.ok) {
+                  _polePrefixIndex = await resp.json();
+                  return _polePrefixIndex;
+                }
+              } catch {}
+            }
+            return null;
+          } catch (e) {
+            console.warn("全台電桿前綴索引載入略過：", e);
+            return null;
+          }
+        })();
+        return _polePrefixIndexPromise;
+      }
+
+      async function searchPolesGlobally(query, cityName = "", areaName = "") {
+        const index = await ensurePolePrefixIndex();
+        if (!index || !window.__pmtilesLayer || !window.__pmtilesLayer.getTileFeatures) return [];
+
+        const rawQ = String(query || "").trim();
+        const cleanQ = rawQ.replace(/[#＃\s]/g, "");
+        if (!cleanQ) return [];
+
+        const match = cleanQ.match(/^([^\d]+)(\d+)?/);
+        if (!match) return [];
+        const prefix = match[1];
+        const num = match[2] ? parseInt(match[2], 10) : null;
+        const numStr = match[2] || "";
+        const basePrefix = prefix.replace(/(高幹|高分|幹|支|線)$/, "");
+
+        const candidatePrefixes = new Set();
+        for (const p of [prefix, basePrefix]) {
+          if (p && index.p[p]) candidatePrefixes.add(p);
+        }
+        for (const p in index.p) {
+          if (candidatePrefixes.size >= 12) break;
+          if (p.startsWith(prefix) || (basePrefix && p.startsWith(basePrefix))) {
+            candidatePrefixes.add(p);
+          }
+        }
+
+        const tilesToFetch = new Map();
+        for (const p of candidatePrefixes) {
+          const clusters = index.p[p];
+          if (!clusters) continue;
+          for (const item of clusters) {
+            const [caId, min_num, max_num, x1, y1, x2, y2, count] = item;
+            const cityArea = index.ca[caId];
+            if (cityName && cityName !== "全台灣" && cityArea[0] !== cityName) continue;
+            if (areaName && cityArea[1] !== areaName) continue;
+
+            // Bounding box support
+            const hasBounds = x2 !== undefined && y2 !== undefined;
+            if (hasBounds) {
+              if (num !== null && (num < min_num || num > max_num + 50)) {
+                const minStr = String(min_num);
+                const maxStr = String(max_num);
+                if (!minStr.startsWith(numStr) && !maxStr.startsWith(numStr)) {
+                  continue;
+                }
+              }
+
+              for (let x = x1; x <= Math.min(x2, x1 + 2); x++) {
+                for (let y = y1; y <= Math.min(y2, y1 + 2); y++) {
+                  const key = `13_${x}_${y}`;
+                  if (!tilesToFetch.has(key)) {
+                    tilesToFetch.set(key, { z: 13, x, y, cityArea });
+                  }
+                  if (tilesToFetch.size >= 12) break;
+                }
+                if (tilesToFetch.size >= 12) break;
+              }
+            } else {
+              // Legacy point cluster
+              const [,, lat, lng] = item;
+              const tile = window.__pmtilesLayer.latLng2Tile(lat, lng, 13);
+              const key = `13_${tile.x}_${tile.y}`;
+              if (!tilesToFetch.has(key)) {
+                tilesToFetch.set(key, { z: 13, x: tile.x, y: tile.y, cityArea });
+              }
+            }
+            if (tilesToFetch.size >= 12) break;
+          }
+          if (tilesToFetch.size >= 12) break;
+        }
+
+        const results = [];
+        const seen = new Set();
+
+        for (const [key, t] of tilesToFetch) {
+          let feats = [];
+          try {
+            feats = await window.__pmtilesLayer.getTileFeatures(t.z, t.x, t.y);
+          } catch {}
+          if (!feats || !feats.length) continue;
+
+          for (const f of feats) {
+            const name = f.name || "";
+            const code = f.code || "";
+            const cleanName = name.replace(/[#＃\s]/g, "");
+            const parsed = parsePoleNameStructure(name);
+
+            const isMatch = cleanName.includes(cleanQ) || 
+                            code.includes(cleanQ) || 
+                            parsed.normShort.includes(cleanQ) ||
+                            (parsed.basePrefix === prefix && numStr && parsed.numStr.startsWith(numStr));
+
+            if (isMatch) {
+              const coords = window.__pmtilesLayer.tilePoint2LatLng(t.x, t.y, t.z, f.px, f.py);
+              const k = f.id != null ? f.id : `${name}_${coords.lat.toFixed(6)}`;
+              if (seen.has(k)) continue;
+              seen.add(k);
+              results.push({
+                id: f.id,
+                name: name || code,
+                code: code || name,
+                city: f.city || t.cityArea[0],
+                area: f.area || t.cityArea[1],
+                type: f.type || "水泥桿",
+                lat: coords.lat,
+                lng: coords.lng,
+                parsed
+              });
+            }
+          }
+        }
+
+        results.sort((a, b) => comparePolesProgressive(a, b, cleanQ, prefix, num, numStr));
+        return results.slice(0, 50);
+      }
+
+      async function fetchGlobalSearchResults(query, localMatches) {
+        const reqId = ++globalSearchReqId;
+        if (globalSearchTimer) clearTimeout(globalSearchTimer);
+
+        globalSearchTimer = setTimeout(async () => {
+          try {
+            const cityName = citySelect?.value || "";
+            const areaName = areaSelect?.value || "";
+            const center = (typeof map !== "undefined" && map && map.getCenter) ? map.getCenter() : null;
+
+            let globalResults = [];
+
+            // 1. 優先嘗試全台本機記憶體快速索引 (PMTiles 次毫秒級檢索，免後端，跨全台視野無死角)
+            try {
+              globalResults = await searchPolesGlobally(query, cityName, areaName);
+            } catch (err) {
+              console.warn("全台索引檢索異常：", err);
+            }
+
+            // 2. 若本地無結果且後端搜尋 API 存在，嘗試從後端撈取
+            if (!globalResults || !globalResults.length) {
+              try {
+                const params = new URLSearchParams({
+                  q: query,
+                  city: cityName === "全台灣" ? "" : cityName,
+                  area: areaName
+                });
+                if (center) {
+                  params.set("lat", center.lat.toFixed(6));
+                  params.set("lng", center.lng.toFixed(6));
+                }
+                const resp = await fetch(`/api/search?${params}`);
+                if (resp.ok) {
+                  globalResults = await resp.json();
+                }
+              } catch {}
+            }
+
+            if (reqId !== globalSearchReqId) return;
+
+            const seenKeys = new Set();
+            const combined = [];
+
+            // 本地符合優先排在最前
+            for (const item of localMatches) {
+              const k = item.id != null ? `id_${item.id}` : `${item.code}_${item.name}`;
+              seenKeys.add(k);
+              combined.push(item);
+            }
+
+            // 全台搜尋結果接續
+            for (const item of (globalResults || [])) {
+              const k = item.id != null ? `id_${item.id}` : `${item.code}_${item.name}`;
+              if (!seenKeys.has(k)) {
+                seenKeys.add(k);
+                combined.push(item);
+              }
+              if (combined.length >= 50) break;
+            }
+
+            if (combined.length > 1) {
+              const rawClean = String(query || "").trim().replace(/[#＃\s]/g, "");
+              const m = rawClean.match(/^([^\d]+)(\d+)?/);
+              const pfx = m ? m[1] : rawClean;
+              const n = m && m[2] ? parseInt(m[2], 10) : null;
+              const nStr = m && m[2] ? m[2] : "";
+              combined.sort((a, b) => comparePolesProgressive(a, b, rawClean, pfx, n, nStr));
+            }
+            renderResults(combined);
+          } catch (e) {
+            console.warn("全台搜尋 API 查詢失敗：", e);
+          }
+        }, 120);
       }
 
       // ★ 修改後的 searchMatches：支援僅區域無關鍵字時列出點位，巡視紀錄不受區域過濾
       function searchMatches(search) {
-        // 若無搜尋詞且無區域 → 空結果
-        if (!search.prefixes.length && !search.terms.some(t => t.length >= 2) && !state.area) {
+        // 若無搜尋詞且無區域 → 空結果 (支援 1 字中文搜尋)
+        if (!search.prefixes.length && !search.terms.some(t => t.length >= 1) && !state.area) {
           return [];
         }
 
         const outputMap = new Map();
 
-        // 1. 搜尋基礎圖資 (巡視紀錄例外，跳過區域過濾)
-        for (const point of state.points) {
+        // 1. 搜尋基礎圖資 (PMTiles 模式下搜尋當前視窗可見電桿，單一縣市模式搜尋 points)
+        const sourcePoles = state.usePMTiles ? (state.visiblePoints || []) : (state.points || []);
+        for (const point of sourcePoles) {
           if (state.area && point.area !== state.area && point.area !== "📂 巡視紀錄") continue;
           if (matchesSearch(point, search)) {
             const key = point.id != null ? `p_${point.id}` : `p_${point.code}_${point.name}`;
@@ -7933,22 +8673,70 @@ function renderDefectStats() {
       document.getElementById('photoScrollTopBtn').addEventListener('click', () => { document.querySelector('.photo-browser')?.scrollTo({ top: 0, behavior: 'smooth' }); });
       document.getElementById('photoScrollBotBtn').addEventListener('click', () => { const el = document.querySelector('.photo-browser'); el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); });
 
-      function renderResults(items) {
+      let currentAllResults = [];
+      let activeCityPill = "all";
+
+      function renderResults(items, isPillFilter = false) {
+        if (!isPillFilter) {
+          currentAllResults = items || [];
+          activeCityPill = "all";
+        }
+
         results.innerHTML = "";
-        if (!items.length) {
+        if (!items || !items.length) {
           const message = state.query
             ? "找不到相符設備。可輸入完整圖號座標，例如 M9993HC1197。"
             : "請輸入設備關鍵字或圖號座標。";
           results.innerHTML = `<p class="popup-meta">${message}</p>`;
           return;
         }
+
+        // 統計命中的各縣市數量
+        const cityMap = new Map();
+        for (const p of currentAllResults) {
+          const c = p.city || "其他";
+          cityMap.set(c, (cityMap.get(c) || 0) + 1);
+        }
+
+        // 若搜尋結果橫跨多個縣市，提供直覺的縣市快選膠囊
+        if (cityMap.size > 1) {
+          const pillsWrap = document.createElement("div");
+          pillsWrap.className = "search-city-pills";
+
+          const allBtn = document.createElement("button");
+          allBtn.type = "button";
+          allBtn.className = `search-city-pill ${activeCityPill === "all" ? "is-active" : ""}`;
+          allBtn.textContent = `全部 (${currentAllResults.length})`;
+          allBtn.addEventListener("click", () => {
+            activeCityPill = "all";
+            renderResults(currentAllResults, true);
+          });
+          pillsWrap.appendChild(allBtn);
+
+          for (const [c, count] of cityMap.entries()) {
+            const pill = document.createElement("button");
+            pill.type = "button";
+            pill.className = `search-city-pill ${activeCityPill === c ? "is-active" : ""}`;
+            pill.textContent = `${c} (${count})`;
+            pill.addEventListener("click", () => {
+              activeCityPill = c;
+              renderResults(currentAllResults.filter(p => (p.city || "其他") === c), true);
+            });
+            pillsWrap.appendChild(pill);
+          }
+          results.appendChild(pillsWrap);
+        }
+
         for (const point of items) {
           const fragment = resultTemplate.content.cloneNode(true);
           fragment.querySelector("strong").textContent = point.name || "未命名";
-          fragment.querySelector("span").textContent   = `${point.area || ""} / ${point.code || ""}`;
+          const distBadge = (point.dist_km != null)
+            ? (point.dist_km < 1 ? ` · 約 ${(point.dist_km * 1000)|0}m` : ` · 約 ${point.dist_km}km`)
+            : "";
+          fragment.querySelector("span").textContent   = `${point.city ? point.city + " " : ""}${point.area || ""}${distBadge} / ${point.code || ""}`;
           fragment.querySelector("button").addEventListener("click", () => {
             disableRouteLayerForTools();
-            map.flyTo([point.lat, point.lng], map.getMaxZoom(), { duration: 0.45 });
+            map.flyTo([point.lat, point.lng], Math.max(map.getZoom(), 18), { duration: 0.45 });
             L.popup({ autoPanPadding: [10, 10] }).setLatLng([point.lat, point.lng]).setContent(miniPopupHtml(point)).openOn(map);
             openEditPanel(point);
             document.getElementById("mapSearchPanel").classList.remove("is-open");
@@ -7973,8 +8761,22 @@ function renderDefectStats() {
         }
       });
 
-      map.on("click", (e) => {
+      map.on("click", async (e) => {
         disableRouteLayerForTools();
+        if (state.labelsHidden) return; // 標籤與點位隱藏時不觸發背景電桿反查
+        if (state.usePMTiles && window.__pmtilesLayer) {
+          const best = await window.__pmtilesLayer.findPoleAtLatLng(map, e.latlng);
+          if (best) {
+            state.selectedPole = best;
+            window.__pmtilesLayer.redraw();
+            L.popup({ autoPanPadding: [10, 10] })
+              .setLatLng([best.lat, best.lng])
+              .setContent(miniPopupHtml(best))
+              .openOn(map);
+            openEditPanel(best);
+          }
+          return;
+        }
         if (state.displayMode === "prefix") {
           const prefix = state.drawnItems.find(item => { const b = item.hitBox; return b && e.containerPoint.x >= b.x && e.containerPoint.x <= b.x + b.width && e.containerPoint.y >= b.y && e.containerPoint.y <= b.y + b.height; });
           if (prefix) map.flyTo([prefix.lat, prefix.lng], Math.max(map.getZoom() + 2, SHOW_POINTS_ZOOM), { duration: 0.45 });
@@ -8505,92 +9307,78 @@ function renderDefectStats() {
       }
 
       async function init() {
-        setStatus("載入設備資料...");
-		initSidebarForm(); // ★ 加入這行，初始化編輯表單內容
+        initSidebarForm();
         loadFromLocalStorage(); maybeBackfillDefectUsage(); renderFolders(); renderDefectStats(); renderDefectGroups(); updateRecordMarkers(); refreshStorageStatus();
-        // Async: upgrade from localStorage to IndexedDB if needed
         migrateInspectionToIdb();
         syncMobileMapControls();
         try {
-          const { meta, points } = await tryFetchData();
-          state.meta = meta; state.points = points;
-          await cacheEquipmentData(meta, points);
-          fillAreas(); renderResults([]);
-          if (!hashMatch) map.setView([23.7, 120.95], 8);
-          if (!hashMatch && state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
-          renderer.redraw();
-          updateNetworkNotice();
+          await initCitySelector();
+          if (state.usePMTiles) {
+            scheduleSyncPMTiles(150);
+          }
           setStatus("");
         } catch (e) {
-          console.error(e);
-          try {
-            const cached = await getCachedEquipmentData();
-            if (!cached) throw e;
-            state.meta = cached.meta; state.points = cached.points;
-            fillAreas(); renderResults([]);
-            if (!hashMatch) map.setView([23.7, 120.95], 8);
-            if (!hashMatch && state.meta?.bounds) map.fitBounds(state.meta.bounds, { padding: [28, 28] });
-            renderer.redraw();
-            setOfflineNotice(`離線降級模式：已使用 ${formatDateTime(cached.cachedAt)} 的設備資料。紀錄、照片與備份仍可使用；地圖底圖可能無法載入。`);
-            setStatus("");
-          } catch (cacheError) {
-            setStatus("⚠️ 設備資料載入失敗：" + e.message);
-          }
+          console.error("初始化選單失敗：", e);
+          setStatus("");
         }
+        updateNetworkNotice();
         await checkForSavedDraft();
       }
 
       init();
 
       if ('serviceWorker' in navigator) {
-        let refreshingForServiceWorker = false;
-        const pwaBanner = document.getElementById('pwaUpdateBanner');
-        const pwaReloadBtn = document.getElementById('pwaUpdateReload');
-        const pwaDismissBtn = document.getElementById('pwaUpdateDismiss');
-        let pendingRegistration = null;
-        function showPWAUpdateBanner(registration) {
-          if (!pwaBanner || pwaBanner.hidden === false) return;
-          if (sessionStorage.getItem('v2-pwa-dismissed')) return;
-          pendingRegistration = registration;
-          pwaBanner.hidden = false;
-        }
-        pwaDismissBtn?.addEventListener('click', () => {
-          if (pwaBanner) pwaBanner.hidden = true;
-          try { sessionStorage.setItem('v2-pwa-dismissed', '1'); } catch (e) {}
-        });
-        pwaReloadBtn?.addEventListener('click', () => {
-          if (pendingRegistration?.waiting) {
-            pendingRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          } else {
-            window.location.reload();
+        if (import.meta.env?.DEV) {
+          // 本機 Vite 開發環境下，強制註銷 Service Worker 並清除快取，避免快取衝突與重載迴圈
+          navigator.serviceWorker.getRegistrations().then(regs => {
+            for (const reg of regs) reg.unregister();
+          });
+          if (window.caches) {
+            caches.keys().then(keys => {
+              for (const key of keys) caches.delete(key);
+            });
           }
-        });
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (refreshingForServiceWorker) return;
-          refreshingForServiceWorker = true;
-          window.location.reload();
-        });
+        } else {
+          const pwaBanner = document.getElementById('pwaUpdateBanner');
+          const pwaReloadBtn = document.getElementById('pwaUpdateReload');
+          const pwaDismissBtn = document.getElementById('pwaUpdateDismiss');
+          let pendingRegistration = null;
+          function showPWAUpdateBanner(registration) {
+            if (!pwaBanner || pwaBanner.hidden === false) return;
+            if (sessionStorage.getItem('v2-pwa-dismissed')) return;
+            pendingRegistration = registration;
+            pwaBanner.hidden = false;
+          }
+          pwaDismissBtn?.addEventListener('click', () => {
+            if (pwaBanner) pwaBanner.hidden = true;
+            try { sessionStorage.setItem('v2-pwa-dismissed', '1'); } catch (e) {}
+          });
+          pwaReloadBtn?.addEventListener('click', () => {
+            if (pendingRegistration?.waiting) {
+              pendingRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            } else {
+              window.location.reload();
+            }
+          });
 
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js?rev=36', { scope: './' })
-            .then((registration) => {
-              console.log('✅ PWA 離線核心註冊成功，範圍:', registration.scope);
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js?rev=39', { scope: './' })
+              .then((registration) => {
+                if (registration.waiting) {
+                  showPWAUpdateBanner(registration);
+                }
 
-              if (registration.waiting) {
-                showPWAUpdateBanner(registration);
-              }
-
-              registration.addEventListener('updatefound', () => {
-                const worker = registration.installing;
-                if (!worker) return;
-                worker.addEventListener('statechange', () => {
-                  if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-                    showPWAUpdateBanner(registration);
-                  }
+                registration.addEventListener('updatefound', () => {
+                  const worker = registration.installing;
+                  if (!worker) return;
+                  worker.addEventListener('statechange', () => {
+                    if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                      showPWAUpdateBanner(registration);
+                    }
+                  });
                 });
-              });
-            })
-            .catch(err => console.log('❌ PWA 註冊失敗:', err));
-        });
+              })
+              .catch(err => console.log('PWA 註冊失敗:', err));
+          });
+        }
       }
-    
