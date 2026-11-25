@@ -2804,7 +2804,7 @@
     }).join("");
   }
 
-  async function rotatePhotoBlobIfLandscape(blob) {
+  async function rotatePhotoBlobForSlot(blob, targetOrientation) {
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
     try {
@@ -2816,7 +2816,10 @@
       });
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
-      if (!w || !h || w <= h) return null;
+      if (!w || !h) return null;
+      const needsRotate = targetOrientation === "portrait" ? (w > h) : (h > w);
+      if (!needsRotate) return null;
+
       const canvas = document.createElement("canvas");
       canvas.width = h;
       canvas.height = w;
@@ -2840,7 +2843,7 @@
 
     showToast(
       state.a4AutoRotate
-        ? "🖨️ 正在整理相片並將雙照橫圖轉直放大排版..."
+        ? "🖨️ 正在整理相片並依格位智慧轉向放大排版..."
         : "🖨️ 正在整合相片與排版 A4 橫式報告...",
       "dup"
     );
@@ -2866,15 +2869,16 @@
       const meterPhoto = photoMap.get(`${r.uid}_meter`);
       const scenePhoto = photoMap.get(`${r.uid}_scene`);
       const isDual = Boolean(meterPhoto?.blob && scenePhoto?.blob);
+      const targetOrientation = isDual ? "portrait" : "landscape";
       const resolveOne = async (photo) => {
         if (!photo || !photo.blob) return "";
         let targetBlob = photo.blob;
-        if (state.a4AutoRotate && isDual) {
+        if (state.a4AutoRotate) {
           try {
-            const rotated = await rotatePhotoBlobIfLandscape(photo.blob);
+            const rotated = await rotatePhotoBlobForSlot(photo.blob, targetOrientation);
             if (rotated) targetBlob = rotated;
           } catch (rotErr) {
-            console.warn("雙照橫圖轉直失敗，改用原圖:", rotErr);
+            console.warn("報表照片智慧轉向失敗，改用原圖:", rotErr);
           }
         }
         const u = URL.createObjectURL(targetBlob);
@@ -3218,10 +3222,10 @@
 </head>
 <body>
   <div class="no-print">
-    <label class="offline-rotate-toggle ${state.a4AutoRotate ? 'is-checked' : ''}" id="offlineRotateLabel" title="僅在同戶有 2 張相片時，自動將橫拍轉直塞滿格位">
+    <label class="offline-rotate-toggle ${state.a4AutoRotate ? 'is-checked' : ''}" id="offlineRotateLabel" title="自動依格位方向轉向放大：雙照時橫拍轉直、單照時直拍轉橫">
       <input type="checkbox" id="offlineAutoRotateChk" ${state.a4AutoRotate ? 'checked' : ''} />
       <span class="offline-rotate-switch" aria-hidden="true"></span>
-      <span>🔄 雙照橫圖轉直放大</span>
+      <span>🔄 照片智慧轉向放大</span>
     </label>
     <button class="print-btn" onclick="window.print()">🖨️ 一鍵列印 A4 存證報告 / 另存 PDF</button>
   </div>
@@ -3234,15 +3238,17 @@
       const lbl = document.getElementById("offlineRotateLabel");
       function applyOfflineAutoRotate(enabled) {
         if (lbl) lbl.classList.toggle("is-checked", enabled);
-        const dualRows = document.querySelectorAll(".batch-a4-photos-row:not(.is-single)");
-        dualRows.forEach(row => {
+        const rows = document.querySelectorAll(".batch-a4-photos-row");
+        rows.forEach(row => {
+          const isSingle = row.classList.contains("is-single");
           row.querySelectorAll(".batch-a4-photo-img-wrap").forEach(wrap => {
             const img = wrap.querySelector("img.batch-a4-photo-img");
             if (!img) return;
             const updateOne = () => {
               const nw = img.naturalWidth || 0;
               const nh = img.naturalHeight || 0;
-              if (enabled && nw > nh && nw > 0 && nh > 0) {
+              const needsRotate = isSingle ? (nh > nw) : (nw > nh);
+              if (enabled && needsRotate && nw > 0 && nh > 0) {
                 const bw = Math.max(100, wrap.clientWidth - 8);
                 const bh = Math.max(100, wrap.clientHeight - 8);
                 const s = Math.min(bw / nh, bh / nw);
@@ -3705,7 +3711,7 @@
       controls.a4AutoRotateWrap?.classList.toggle("is-checked", checked);
       try { localStorage.setItem(A4_AUTO_ROTATE_LS_KEY, checked ? "1" : "0"); } catch {}
       showToast(checked
-        ? "🔄 已開啟：雙照橫圖列印時將自動轉直放大（不影響原圖）"
+        ? "🔄 已開啟：雙照橫圖轉直、單照直圖轉橫放大列印（不影響原圖）"
         : "🖼️ 已關閉：報表將維持相片原始方向"
       );
     });
