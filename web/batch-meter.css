@@ -1362,6 +1362,98 @@
   background: #475569;
 }
 
+/* --- 報表雙照橫圖轉直放大開關 (桌機與手機抽屜自適應) --- */
+.batch-a4-rotate-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 9px;
+  min-height: 36px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  cursor: pointer;
+  user-select: none;
+  box-sizing: border-box;
+  transition: background 0.15s, border-color 0.15s;
+}
+.batch-a4-rotate-toggle:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.batch-a4-rotate-toggle.is-checked {
+  background: #f0fdfa;
+  border-color: #0f766e;
+}
+.batch-a4-rotate-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  min-height: 0 !important;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
+.batch-a4-rotate-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 20px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  transition: background 0.18s ease;
+}
+.batch-a4-rotate-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.18s ease;
+}
+.batch-a4-rotate-toggle.is-checked .batch-a4-rotate-switch {
+  background: #0f766e;
+}
+.batch-a4-rotate-toggle.is-checked .batch-a4-rotate-switch::after {
+  transform: translateX(14px);
+}
+.batch-a4-rotate-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  line-height: 1.35;
+}
+.batch-a4-rotate-toggle.is-checked .batch-a4-rotate-text {
+  color: #0f766e;
+}
+.batch-a4-rotate-text small {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 10.5px;
+}
+.batch-a4-rotate-toggle.is-checked .batch-a4-rotate-text small {
+  color: #0d9488;
+}
+@media (max-width: 480px) {
+  .batch-a4-rotate-toggle {
+    padding: 6px 8px;
+    gap: 7px;
+  }
+  .batch-a4-rotate-text {
+    font-size: 11px;
+  }
+}
+
 /* --- 拍照後保留編輯提示列 (供續拍第 2 張或刪照，關閉彈窗或點擊完成後自動收合) --- */
 .batch-editing-hold-bar {
   display: flex;

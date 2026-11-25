@@ -942,6 +942,7 @@
 10000000010\t16\t20\tD\t00000010\t116/09\t台南市新化區中山路５１８號\t亭置式變場\tQ0997EB5501`;
 
   // 模組狀態
+  const A4_AUTO_ROTATE_LS_KEY = "tp_batch_a4_auto_rotate_v1";
   const state = {
     records: [],
     layerGroup: null,
@@ -950,6 +951,7 @@
     bgLabelsHidden: true,   // 是否已隱藏底圖設備標籤
     activeFilters: {},      // 當前多條件篩選狀態: { [colKey]: Set([selectedValues]) }
     hideInspected: true,    // 是否隱藏已跑/已巡檢點位 (符合現場巡檢跑過隱藏之直覺體驗)
+    a4AutoRotate: (() => { try { return localStorage.getItem(A4_AUTO_ROTATE_LS_KEY) === "1"; } catch { return false; } })(),
     isReadOnlyShare: false, // 是否處於唯讀現場巡查分享模式 (他人僅能檢視、導航與標記隱藏，無法刪除)
     shareHash: "",          // 當前載入之分享雜湊標識
   };
@@ -1056,9 +1058,16 @@
     controls.templateBtn = document.getElementById("batchMeterTemplateBtn");
     controls.a4ReportBtn = document.getElementById("batchA4ReportBtn");
     controls.exportZipBtn = document.getElementById("batchExportZipBtn");
+    controls.a4AutoRotateWrap = document.getElementById("batchA4AutoRotateWrap");
+    controls.a4AutoRotateChk = document.getElementById("batchA4AutoRotateChk");
+    if (controls.a4AutoRotateChk) {
+      controls.a4AutoRotateChk.checked = Boolean(state.a4AutoRotate);
+      controls.a4AutoRotateWrap?.classList.toggle("is-checked", Boolean(state.a4AutoRotate));
+    }
     if (state.isReadOnlyShare) {
       if (controls.a4ReportBtn) controls.a4ReportBtn.style.display = "none";
       if (controls.exportZipBtn) controls.exportZipBtn.style.display = "none";
+      if (controls.a4AutoRotateWrap) controls.a4AutoRotateWrap.style.display = "none";
     }
     controls.downloadJsonBtn = document.getElementById("batchDownloadJsonBtn");
     controls.restoreJsonBtn = document.getElementById("batchRestoreJsonBtn");
@@ -2795,13 +2804,46 @@
     }).join("");
   }
 
+  async function rotatePhotoBlobIfLandscape(blob) {
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error("圖片讀取失敗"));
+        el.src = url;
+      });
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (!w || !h || w <= h) return null;
+      const canvas = document.createElement("canvas");
+      canvas.width = h;
+      canvas.height = w;
+      const ctx = canvas.getContext("2d");
+      ctx.translate(h, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(img, 0, 0, w, h);
+      return await new Promise((res) => {
+        canvas.toBlob((b) => res(b || null), "image/jpeg", 0.90);
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function openA4PrintReport() {
     if (!state.records.length) {
       showToast("目前沒有批次電表可產出報告！", "dup");
       return;
     }
 
-    showToast("🖨️ 正在整合相片與排版 A4 橫式報告...", "dup");
+    showToast(
+      state.a4AutoRotate
+        ? "🖨️ 正在整理相片並將雙照橫圖轉直放大排版..."
+        : "🖨️ 正在整合相片與排版 A4 橫式報告...",
+      "dup"
+    );
     _printBlobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
     _printBlobUrls = [];
 
@@ -2819,21 +2861,31 @@
       document.body.appendChild(printContainer);
     }
 
-    const pagesHtml = buildA4ReportPagesHtml(state.records, (r) => {
+    const resolvedUrls = new Map();
+    await Promise.all(state.records.map(async (r) => {
       const meterPhoto = photoMap.get(`${r.uid}_meter`);
       const scenePhoto = photoMap.get(`${r.uid}_scene`);
-      let meterSrc = "";
-      let sceneSrc = "";
-      if (meterPhoto && meterPhoto.blob) {
-        meterSrc = URL.createObjectURL(meterPhoto.blob);
-        _printBlobUrls.push(meterSrc);
-      }
-      if (scenePhoto && scenePhoto.blob) {
-        sceneSrc = URL.createObjectURL(scenePhoto.blob);
-        _printBlobUrls.push(sceneSrc);
-      }
-      return { meterSrc, sceneSrc };
-    });
+      const isDual = Boolean(meterPhoto?.blob && scenePhoto?.blob);
+      const resolveOne = async (photo) => {
+        if (!photo || !photo.blob) return "";
+        let targetBlob = photo.blob;
+        if (state.a4AutoRotate && isDual) {
+          try {
+            const rotated = await rotatePhotoBlobIfLandscape(photo.blob);
+            if (rotated) targetBlob = rotated;
+          } catch (rotErr) {
+            console.warn("雙照橫圖轉直失敗，改用原圖:", rotErr);
+          }
+        }
+        const u = URL.createObjectURL(targetBlob);
+        _printBlobUrls.push(u);
+        return u;
+      };
+      const [meterSrc, sceneSrc] = await Promise.all([resolveOne(meterPhoto), resolveOne(scenePhoto)]);
+      resolvedUrls.set(r.uid, { meterSrc, sceneSrc });
+    }));
+
+    const pagesHtml = buildA4ReportPagesHtml(state.records, (r) => resolvedUrls.get(r.uid));
 
     printContainer.innerHTML = pagesHtml;
 
@@ -2955,11 +3007,67 @@
     }
     .no-print {
       display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
       justify-content: flex-end;
       margin-bottom: 16px;
       position: sticky;
       top: 12px;
       z-index: 1000;
+    }
+    .offline-rotate-toggle {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+    }
+    .offline-rotate-toggle.is-checked {
+      background: #f0fdfa;
+      border-color: #0f766e;
+      color: #0f766e;
+    }
+    .offline-rotate-toggle input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    .offline-rotate-switch {
+      position: relative;
+      width: 32px;
+      height: 18px;
+      background: #cbd5e1;
+      border-radius: 999px;
+      transition: background 0.15s;
+    }
+    .offline-rotate-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: #ffffff;
+      border-radius: 50%;
+      transition: transform 0.15s;
+    }
+    .offline-rotate-toggle.is-checked .offline-rotate-switch {
+      background: #0f766e;
+    }
+    .offline-rotate-toggle.is-checked .offline-rotate-switch::after {
+      transform: translateX(14px);
     }
     .print-btn {
       background: #0f766e;
@@ -3110,11 +3218,62 @@
 </head>
 <body>
   <div class="no-print">
+    <label class="offline-rotate-toggle ${state.a4AutoRotate ? 'is-checked' : ''}" id="offlineRotateLabel" title="僅在同戶有 2 張相片時，自動將橫拍轉直塞滿格位">
+      <input type="checkbox" id="offlineAutoRotateChk" ${state.a4AutoRotate ? 'checked' : ''} />
+      <span class="offline-rotate-switch" aria-hidden="true"></span>
+      <span>🔄 雙照橫圖轉直放大</span>
+    </label>
     <button class="print-btn" onclick="window.print()">🖨️ 一鍵列印 A4 存證報告 / 另存 PDF</button>
   </div>
   <div class="report-wrap">
     ${pagesHtml}
   </div>
+  <script>
+    (function() {
+      const chk = document.getElementById("offlineAutoRotateChk");
+      const lbl = document.getElementById("offlineRotateLabel");
+      function applyOfflineAutoRotate(enabled) {
+        if (lbl) lbl.classList.toggle("is-checked", enabled);
+        const dualRows = document.querySelectorAll(".batch-a4-photos-row:not(.is-single)");
+        dualRows.forEach(row => {
+          row.querySelectorAll(".batch-a4-photo-img-wrap").forEach(wrap => {
+            const img = wrap.querySelector("img.batch-a4-photo-img");
+            if (!img) return;
+            const updateOne = () => {
+              const nw = img.naturalWidth || 0;
+              const nh = img.naturalHeight || 0;
+              if (enabled && nw > nh && nw > 0 && nh > 0) {
+                const bw = Math.max(100, wrap.clientWidth - 8);
+                const bh = Math.max(100, wrap.clientHeight - 8);
+                const s = Math.min(bw / nh, bh / nw);
+                img.style.width = (nw * s).toFixed(1) + "px";
+                img.style.height = (nh * s).toFixed(1) + "px";
+                img.style.maxWidth = "none";
+                img.style.maxHeight = "none";
+                img.style.flex = "0 0 auto";
+                img.style.transform = "rotate(90deg)";
+                img.style.transformOrigin = "center center";
+              } else {
+                img.style.width = "";
+                img.style.height = "";
+                img.style.maxWidth = "";
+                img.style.maxHeight = "";
+                img.style.flex = "";
+                img.style.transform = "";
+                img.style.transformOrigin = "";
+              }
+            };
+            if (img.complete && img.naturalWidth > 0) updateOne();
+            else img.addEventListener("load", updateOne, { once: true });
+          });
+        });
+      }
+      if (chk) {
+        chk.addEventListener("change", () => applyOfflineAutoRotate(chk.checked));
+        applyOfflineAutoRotate(chk.checked);
+      }
+    })();
+  </script>
 </body>
 </html>`;
   }
@@ -3540,6 +3699,16 @@
     controls.templateBtn?.addEventListener("click", downloadStandardTemplate);
     controls.a4ReportBtn?.addEventListener("click", openA4PrintReport);
     controls.exportZipBtn?.addEventListener("click", exportAllPhotosZip);
+    controls.a4AutoRotateChk?.addEventListener("change", (e) => {
+      const checked = Boolean(e.target.checked);
+      state.a4AutoRotate = checked;
+      controls.a4AutoRotateWrap?.classList.toggle("is-checked", checked);
+      try { localStorage.setItem(A4_AUTO_ROTATE_LS_KEY, checked ? "1" : "0"); } catch {}
+      showToast(checked
+        ? "🔄 已開啟：雙照橫圖列印時將自動轉直放大（不影響原圖）"
+        : "🖼️ 已關閉：報表將維持相片原始方向"
+      );
+    });
         syncBgLabelsBtnWithMap();
 
     // 監聽標籤/點位圖層切換事件，實現與圖層控制選單雙向即時連動
