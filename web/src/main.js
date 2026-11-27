@@ -1714,7 +1714,7 @@ window.__appBooted = true;
           if (!blob) throw new Error("找不到目前開啟的照片");
           await shareImageFile(blob, photoViewerPhoto.fileName || "巡檢照片.jpg");
         } catch (error) {
-          GlobalModal.alert("分享原圖失敗：" + error.message);
+          GlobalModal.alert("分享圖片失敗：" + error.message);
         }
       }
 
@@ -2054,7 +2054,7 @@ window.__appBooted = true;
                 <div class="photo-record-strip">${record.photos.map(photo => `
                   <figure class="photo-browser-item">
                     <input type="checkbox" data-photo-select="${escapeHtml(photo.id)}" aria-label="選取 ${escapeHtml(photo.fileName || "巡檢照片")}"${prevChecked.has(photo.id) ? " checked" : ""}>
-                    <img data-photo-open="${escapeHtml(photo.id)}" data-browser-image="${escapeHtml(photo.id)}" alt="${escapeHtml(photo.fileName || "巡檢照片")}" title="點擊查看原圖" loading="lazy" />
+                    <img data-photo-open="${escapeHtml(photo.id)}" data-browser-image="${escapeHtml(photo.id)}" alt="${escapeHtml(photo.fileName || "巡檢照片")}" title="點擊查看大圖" loading="lazy" />
                     <button type="button" data-photo-delete-single="${escapeHtml(photo.id)}" title="刪除這張照片" aria-label="刪除這張照片">×</button>
                   </figure>`).join("")}</div>
                 <div class="photo-record-defect"><strong>改善事項</strong><span>${escapeHtml(record.defect || "未填寫")}</span></div>
@@ -2255,7 +2255,7 @@ window.__appBooted = true;
           const verLink = document.createElement("a");
           verLink.id = "systemVersionLink";
           verLink.href = "javascript:void(0)";
-          verLink.textContent = "系統版本：v2.8.7-tn";
+          verLink.textContent = "系統版本：v2.8.8-tn";
           verLink.style.cssText = "color:#0f766e; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;";
           verLink.title = "點擊切換至【全台土木設備分布地圖】";
           verLink.addEventListener("click", (e) => {
@@ -3432,6 +3432,7 @@ window.__appBooted = true;
               originalSize: Number(photo.originalSize) || Number(photo.size) || 0,
               originalType: String(photo.originalType || photo.type || "image/jpeg"),
               capturedAt: photo.capturedAt || null,
+              ...(photo.compressed ? { compressed: true } : {}),
             }))
             : [];
         }
@@ -3717,7 +3718,7 @@ window.__appBooted = true;
         const photos = Array.isArray(record.photos) ? record.photos : [];
         const labels = {
           card: photoLinkLabels?.card || "巡檢卡連結",
-          original: photoLinkLabels?.original || "原始照片連結",
+          original: photoLinkLabels?.original || "照片連結",
         };
         const row = {
           "巡視日期(目錄)": getFullFolderPath(record.folderId),
@@ -3754,7 +3755,7 @@ window.__appBooted = true;
         const includePhotoLinks = typeof photoLinkFor === "function";
         const labels = {
           card: photoLinkLabels?.card || "巡檢卡連結",
-          original: photoLinkLabels?.original || "原始照片連結",
+          original: photoLinkLabels?.original || "照片連結",
         };
         const orderedRecords = sortInspectionRecords(records);
         const emptyRow = {
@@ -3798,8 +3799,8 @@ window.__appBooted = true;
               if (firstLink.originalTarget) {
                 const originalLinkRef = XLSX.utils.encode_cell({ c: originalLinkColumn, r: recordIndex + 1 });
                 if (!ws[originalLinkRef]) ws[originalLinkRef] = { t: "s", v: "" };
-                ws[originalLinkRef].v = `開啟第一張原圖 (${linkedPhotos.length})`;
-                setExcelHyperlink(ws, originalLinkColumn, recordIndex + 1, firstLink.originalTarget, firstLink.photo.fileName || "開啟原始照片");
+                ws[originalLinkRef].v = `開啟第一張圖片 (${linkedPhotos.length})`;
+                setExcelHyperlink(ws, originalLinkColumn, recordIndex + 1, firstLink.originalTarget, firstLink.photo.fileName || "開啟圖片");
               }
             }
             linkedPhotos.forEach(({ photo, cardTarget, originalTarget }) => {
@@ -3810,7 +3811,7 @@ window.__appBooted = true;
                 "改善事項": record.defect || "",
                 "照片檔案": photo.fileName || photo.id,
                 [labels.card]: cardTarget ? "開啟巡檢卡" : "",
-                [labels.original]: originalTarget ? "開啟原圖" : "",
+                [labels.original]: originalTarget ? "開啟圖片" : "",
                 cardTarget,
                 originalTarget,
               });
@@ -3826,7 +3827,7 @@ window.__appBooted = true;
                 setExcelHyperlink(photoWs, photoCardColumn, index + 1, row.cardTarget, row["照片檔案"] || "開啟巡檢卡");
               }
               if (row.originalTarget) {
-                setExcelHyperlink(photoWs, photoOriginalColumn, index + 1, row.originalTarget, row["照片檔案"] || "開啟原始照片");
+                setExcelHyperlink(photoWs, photoOriginalColumn, index + 1, row.originalTarget, row["照片檔案"] || "開啟圖片");
               }
             });
             XLSX.utils.book_append_sheet(wb, photoWs, "照片連結");
@@ -3901,15 +3902,7 @@ window.__appBooted = true;
                     }
                     return;
                   }
-                GlobalModal.select(
-                    "選擇 ZIP 照片版本",
-                    "完整備份建議使用原圖；高畫質版適合分享，還原後只會保留高畫質圖片。",
-                    [
-                      '<option value="original">原圖：可完整備份與還原</option>',
-                      '<option value="compressed">高畫質版：檔案較小，適合分享</option>',
-                    ].join(""),
-                    photoProfile => exportRecordsAsZip(records, folders, safeFileBaseName, photoProfile, destination, cloudBase)
-                  );
+                  await exportRecordsAsZip(records, folders, safeFileBaseName, "compressed", destination, cloudBase);
                 })();
               }
             );
@@ -5051,7 +5044,7 @@ window.__appBooted = true;
         }
       }
 
-      async function createPhotoArchive(records, folders, archiveTitle, photoProfile = "original", onProgress = null) {
+      async function createPhotoArchive(records, folders, archiveTitle, photoProfile = "compressed", onProgress = null) {
         await ensureJSZip();
         await ensureXLSX();
         const archiveFiles = [];
@@ -5075,17 +5068,23 @@ window.__appBooted = true;
             const sourcePhoto = { ...photo };
             const sourceBlob = await getPhotoBlob(photo.id, sourcePhoto);
             if (!sourceBlob) continue;
-            const blob = photoProfile === "compressed"
+            const alreadyCompressed = photoProfile === "compressed"
+              && Boolean(photo.compressed)
+              && /^image\/jpeg$/i.test(String(sourceBlob.type || photo.type || ""));
+            const blob = (photoProfile === "compressed" && !alreadyCompressed)
               ? await compressPhotoForExport(sourceBlob)
               : sourceBlob;
             originalPhotoBytes += Number(sourceBlob.size) || 0;
             exportedPhotoBytes += Number(blob.size) || 0;
             if (photoProfile === "compressed") {
-              photo.originalSize = Number(photo.originalSize) || sourceBlob.size;
-              photo.originalType = photo.originalType || sourceBlob.type || "image/jpeg";
-              photo.size = blob.size;
-              photo.type = blob.type || "image/jpeg";
-              photo.fileName = photoArchiveFileName(photo, "compressed");
+              if (alreadyCompressed || blob !== sourceBlob || /^image\/jpeg$/i.test(String(blob.type || ""))) {
+                photo.compressed = alreadyCompressed || blob !== sourceBlob;
+                photo.originalSize = Number(photo.originalSize) || sourceBlob.size;
+                photo.originalType = photo.originalType || sourceBlob.type || "image/jpeg";
+                photo.size = blob.size;
+                photo.type = blob.type || "image/jpeg";
+                photo.fileName = photoArchiveFileName(photo, "compressed");
+              }
             }
             const path = photoArchivePath(record, photo, photoProfile);
             const cardPath = inspectionCardDetailPath(photo.id);
@@ -5155,7 +5154,7 @@ window.__appBooted = true;
           `備份格式版本：${BACKUP_FORMAT_VERSION}`,
           `巡檢紀錄：${archiveRecords.length} 筆`,
           `照片檔案：${photoCount} 張`,
-          `照片版本：${photoProfile === "compressed" ? "匯出高畫質版（適合分享，無法恢復未匯出的原始細節）" : "原圖（可完整還原）"}`,
+          `照片版本：${photoProfile === "compressed" ? "高畫質版（已最佳化並避免跨裝置重複壓縮）" : "原圖（可完整還原）"}`,
           "請先解壓縮 ZIP，再開啟 records.xlsx。",
           `Excel 的「巡視紀錄」與「照片連結」工作表提供「巡檢卡連結」與「${photoProfile === "compressed" ? "照片連結" : "原始照片連結"}」。`,
           `${INSPECTION_CARD_FILE} 是依資料夾分類的巡檢卡列表；cards 資料夾存放各照片的巡檢卡，使用同包 photos 資料夾內的圖片，不會額外複製照片檔案。`,
@@ -5202,7 +5201,7 @@ window.__appBooted = true;
       window.__syncBridge = {
         buildBackup: async () => {
           normalizeInspectionState();
-          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份");
+          const archive = await createPhotoArchive(state.records, state.folders, "土木設備分布地圖照片版完整備份", "compressed");
           return {
             blob: archive.blob,
             photoCount: archive.photoCount,
@@ -5230,7 +5229,7 @@ window.__appBooted = true;
         }),
         snapshotBeforeOverwrite: async () => {
           try {
-            const archive = await createPhotoArchive(state.records, state.folders, "覆蓋前自動快照");
+            const archive = await createPhotoArchive(state.records, state.folders, "覆蓋前自動快照", "compressed");
             await putAppDataRecord("tpSyncPreOverwriteSnapshot", {
               blob: archive.blob,
               recordCount: state.records.length,
@@ -5311,7 +5310,7 @@ window.__appBooted = true;
         }),
       };
 
-      async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "original", destination = "local", cloudBaseName = "") {
+      async function exportRecordsAsZip(records, folders, fileBaseName, photoProfile = "compressed", destination = "local", cloudBaseName = "") {
         try {
           backupProgressUpdate(2, "準備打包…");
           const { blob, photoCount, manifestHash } = await createPhotoArchive(
@@ -5446,7 +5445,7 @@ window.__appBooted = true;
           }
           return;
         }
-        exportRecordsAsZip(resume.records, resume.folders, resume.fileBaseName, resume.photoProfile || "original", resume.destination, resume.cloudBase || "");
+        exportRecordsAsZip(resume.records, resume.folders, resume.fileBaseName, resume.photoProfile || "compressed", resume.destination, resume.cloudBase || "");
       }
       (function handleDriveOAuthRedirect() {
         const hash = location.hash;
@@ -5665,15 +5664,8 @@ window.__appBooted = true;
         button.disabled = true;
         button.textContent = "☁️ 登入 Google 中";
         try {
-          const photoProfile = await new Promise((resolve) => {
-            GlobalModal.select("選擇照片版本",
-              "完整備份建議使用原圖；高畫質版適合分享，還原後只會保留高畫質圖片。",
-              '<option value="original">原圖：可完整備份與還原</option><option value="compressed">高畫質版：檔案較小，適合分享</option>',
-              (v) => resolve(v),
-              { confirmText: "下一步", cancelText: "取消", onCancel: () => resolve(null) });
-          });
-          if (!photoProfile) return;
-          const profileLabel = photoProfile === "compressed" ? "高畫質版" : "原圖版";
+          const photoProfile = "compressed";
+          const profileLabel = "高畫質版";
           const note = await new Promise((resolve) => {
             GlobalModal.prompt("備註（選填，會顯示在雲端備份清單）", "",
               (v) => resolve(String(v || "").trim().slice(0, 100)),
@@ -6526,15 +6518,8 @@ window.__appBooted = true;
         button.disabled = true;
         button.textContent = password ? "⏳ 加密備份中" : "⏳ 打包中";
         try {
-          const photoProfile = await new Promise((resolve) => {
-            GlobalModal.select("選擇照片版本",
-              "完整備份建議使用原圖；高畫質版適合分享，還原後只會保留高畫質圖片。",
-              '<option value="original">原圖：可完整備份與還原</option><option value="compressed">高畫質版：檔案較小，適合分享</option>',
-              (v) => resolve(v),
-              { confirmText: "開始備份", cancelText: "取消", onCancel: () => resolve(null) });
-          });
-          if (!photoProfile) return;
-          const profileLabel = photoProfile === "compressed" ? "高畫質版" : "原圖版";
+          const photoProfile = "compressed";
+          const profileLabel = "高畫質版";
           backupProgressUpdate(2, "準備打包…");
           normalizeInspectionState();
           const archive = await createPhotoArchive(
@@ -6753,7 +6738,17 @@ window.__appBooted = true;
           if (aEntry) addressBookmarks = JSON.parse(await aEntry.async("string"));
         } catch {}
 
+        const isCompressedBackup = (parsed.photoProfile || manifest?.photoProfile) === "compressed";
         const metaById = new Map(parsed.records.flatMap(record => (record.photos || []).map(photo => [photo.id, photo])));
+        if (isCompressedBackup) {
+          for (const photo of metaById.values()) {
+            const photoType = String(photo?.type || "").toLowerCase();
+            const fileName = String(photo?.fileName || "").toLowerCase();
+            if (!photoType || photoType === "image/jpeg" || /\.jpe?g$/i.test(fileName)) {
+              photo.compressed = true;
+            }
+          }
+        }
         const photoPrefixes = [...metaById.keys()].map(id => [id + "_", id]).sort((a, b) => b[0].length - a[0].length);
         const photoEntries = [];
         let photoDone = 0;
@@ -6765,6 +6760,9 @@ window.__appBooted = true;
           if (!photoId) continue;
           const photo = metaById.get(photoId);
           const blob = normalizePhotoBlob(await entry.async("blob"), photo);
+          if (isCompressedBackup && photo && /^image\/jpeg$/i.test(String(blob?.type || ""))) {
+            photo.compressed = true;
+          }
           photoEntries.push({ id: photoId, blob });
           photoDone++;
           if (onProgress) onProgress(photoDone, Math.max(1, metaById.size));
@@ -6827,7 +6825,7 @@ window.__appBooted = true;
           ? "瀏覽器未提供可用空間估算"
           : `目前可用：約 ${formatStorageBytes(capacity.remaining)}${capacity.enough === false ? "，可能不足" : ""}`;
         const warning = capacity.enough === false
-          ? "<br><strong style='color:#b91c1c'>警告：照片預估容量超過目前可用空間，請先清理或改用高畫質版備份。</strong>"
+          ? "<br><strong style='color:#b91c1c'>警告：照片預估容量超過目前可用空間，請先清理部分舊紀錄或瀏覽器資料後再還原。</strong>"
           : "";
         const photoProfile = summary.profile === "compressed" ? "高畫質版" : summary.profile === "original" ? "原圖" : "未標示";
         const bmPreview = (imported.cadastreBookmarks?.length || imported.addressBookmarks?.length)
